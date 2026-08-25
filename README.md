@@ -84,6 +84,8 @@ reserva_salas_GoHorse/
 ├── models/
 ├── views/
 ├── config/
+├── css/
+├── assets/
 │
 ├── main.py
 ├── requirements.txt
