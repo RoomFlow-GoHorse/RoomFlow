@@ -1,0 +1,254 @@
+/* =========================================================
+   FONTS
+========================================================= */
+
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,600;1,9..144,300&family=JetBrains+Mono:wght@400;500&display=swap');
+
+
+/* =========================================================
+   TOKENS
+========================================================= */
+
+:root {
+  --brand: #6D28D9;
+  --brand-hover: #5B21B6;
+  --brand-light: #EDE9FE;
+  --brand-lighter: #F5F3FF;
+
+  --mustard: #B45309;
+  --mustard-light: #FEF3C7;
+  --mustard-border: #FCD34D;
+
+  --surface: #F8F7F4;
+  --surface-alt: #F0EEE9;
+
+  --graphite: #1C1C2E;
+  --graphite-soft: #52525B;
+  --graphite-muted: #A1A1AA;
+  --soft: var(--graphite-soft);
+  --muted: var(--graphite-muted);
+
+  --stroke: #E4E1DB;
+  --stroke-strong: #C8C4BC;
+
+  --success: #16A34A;
+  --success-bg: #DCFCE7;
+
+  --danger: #DC2626;
+  --danger-bg: #FEE2E2;
+
+  --warning: #D97706;
+  --warning-bg: #FEF3C7;
+
+  --font-sans: "DM Sans", system-ui, sans-serif;
+  --font-display: "Fraunces", Georgia, serif;
+  --font-mono: "JetBrains Mono", monospace;
+}
+
+
+/* =========================================================
+   RESET
+========================================================= */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-sans);
+  background: var(--surface);
+  color: var(--graphite);
+}
+
+.stApp {
+  background: var(--surface);
+}
+
+.block-container {
+  max-width: none !important;
+  padding: 0 !important;
+}
+
+[data-testid="stVerticalBlock"] {
+  gap: 0;
+}
+
+[data-testid="stMainBlockContainer"] {
+  max-width: none !important;
+  padding: 0 !important;
+}
+
+
+/* =========================================================
+   SCROLLBAR
+========================================================= */
+
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #D1CFCA;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #A8A49E;
+}
+
+
+/* =========================================================
+   SIDEBAR NATIVA
+========================================================= */
+
+section[data-testid="stSidebar"] {
+  display: none;
+}
+
+
+/* =========================================================
+   LOGO
+========================================================= */
+
+.rf-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--graphite);
+}
+
+.rf-logo-mark {
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: var(--brand);
+  color: white;
+  font-weight: 800;
+}
+
+
+/* =========================================================
+   LAYOUT DO SISTEMA AUTENTICADO
+========================================================= */
+
+.rf-shell {
+  min-height: 100vh;
+  display: flex;
+  background: var(--surface);
+}
+
+.rf-sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  z-index: 20;
+  width: 240px;
+  padding: 18px 12px;
+  background: white;
+  border-right: 1px solid var(--stroke);
+}
+
+.rf-main {
+  width: calc(100% - 240px);
+  min-height: 100vh;
+  margin-left: 240px;
+  padding: 24px 24px 80px;
+}
+
+.rf-nav {
+  display: grid;
+  gap: 6px;
+  margin-top: 26px;
+}
+
+.rf-nav-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-radius: 8px;
+  color: var(--graphite-soft);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.rf-nav-item.active {
+  color: var(--brand);
+  background: var(--brand-light);
+}
+
+.rf-side-user {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--stroke);
+}
+
+.rf-avatar {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--brand-light);
+  color: var(--brand);
+  font-weight: 700;
+}
+
+
+/* =========================================================
+   COMPONENTES COMPARTILHADOS
+========================================================= */
+
+.rf-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.rf-grid.two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.rf-card {
+  padding: 16px;
+  background: white;
+  border: 1px solid var(--stroke);
+  border-radius: 8px;
+}
+
+
+/* =========================================================
+   RESPONSIVO GLOBAL
+========================================================= */
+
+@media (max-width: 800px) {
+  .rf-main {
+    width: 100%;
+    margin-left: 0;
+    padding: 16px 16px 90px;
+  }
+
+  .rf-sidebar {
+    display: none;
+  }
+}
