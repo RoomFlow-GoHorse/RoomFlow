@@ -12,6 +12,7 @@ def load_css_file(path):
 
 def load_css():
     load_css_file("css/global.css")
+    load_css_file("css/signup_pages.css")
 
 
 def esc(value):

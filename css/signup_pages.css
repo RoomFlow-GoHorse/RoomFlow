@@ -1,0 +1,357 @@
+/* =========================================================
+   SIGNUP PAGES CSS (css/signup_pages.css)
+   Fidelidade extrema ao Figma e alinhamento do DOM do Streamlit
+========================================================= */
+
+/* Background global para as telas de auth */
+.stApp {
+    background-color: #F7F7F9 !important;
+}
+
+/* CARDS DE ESCOLHA (signup_choice_page) */
+.rf-choice-card {
+    background-color: #FFFFFF;
+    border: 2px solid #E4E4E7;
+    border-radius: 16px;
+    padding: 28px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    transition: all 0.2s ease;
+    min-height: 240px;
+    box-sizing: border-box;
+    margin-bottom: 12px;
+}
+
+.rf-choice-card:hover {
+    border-color: var(--brand, #6D28D9);
+    box-shadow: 0 10px 25px -5px rgba(109, 40, 217, 0.1);
+}
+
+.rf-card-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    background-color: var(--brand-lighter, #F5F3FF);
+    color: var(--brand, #6D28D9);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 20px;
+}
+
+.rf-choice-card h2 {
+    font-size: 16px;
+    font-weight: 600;
+    color: #171717;
+    margin: 0 0 8px 0;
+}
+
+.rf-choice-card p {
+    font-size: 14px;
+    color: #737373;
+    line-height: 1.6;
+    margin: 0 0 24px 0;
+}
+
+/* HEADER */
+.rf-page-header {
+    margin-bottom: 32px;
+}
+
+.rf-page-header.text-center {
+    text-align: center;
+}
+
+.rf-page-header-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+}
+
+.rf-page-header-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--brand-lighter, #F5F3FF);
+    color: var(--brand, #6D28D9);
+}
+
+.rf-page-header-label span {
+    color: var(--brand, #6D28D9);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+}
+
+.rf-auth-eyebrow {
+    color: var(--brand, #6D28D9);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+}
+
+.rf-page-header h1 {
+    font-size: 30px;
+    font-weight: 600;
+    line-height: 1.2;
+    letter-spacing: -0.025em;
+    color: #171717;
+    margin: 0 0 8px 0;
+}
+
+.rf-page-header p {
+    font-size: 14px;
+    color: #737373;
+    line-height: 1.6;
+    margin: 0;
+}
+
+/* STEPPER */
+.rf-stepper {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 32px;
+}
+
+.rf-step-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.rf-step-circle {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+    transition: all 0.2s ease;
+}
+
+.rf-step-circle.active {
+    background-color: var(--brand, #6D28D9);
+    color: #FFFFFF;
+}
+
+.rf-step-circle.inactive {
+    background-color: #E4E4E7;
+    color: #737373;
+}
+
+.rf-step-label {
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.rf-step-label.active {
+    color: var(--brand-hover, #4C1D95);
+    font-weight: 600;
+}
+
+.rf-step-label.inactive {
+    color: #737373;
+}
+
+.rf-step-line {
+    flex: 1;
+    height: 1px;
+    margin: 0 12px;
+    transition: all 0.2s ease;
+}
+
+.rf-step-line.active {
+    background-color: var(--brand, #6D28D9);
+}
+
+.rf-step-line.inactive {
+    background-color: #D4D4D8;
+}
+
+/* CARD DE FORMULÁRIO */
+.rf-card-form {
+    background-color: #FFFFFF;
+    border: 1px solid #E4E4E7;
+    border-radius: 16px;
+    padding: 28px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    margin-bottom: 24px;
+}
+
+.rf-form-card-header {
+    margin-bottom: 20px;
+}
+
+.rf-form-card-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+.rf-form-card-title h2 {
+    font-size: 16px;
+    font-weight: 600;
+    color: #171717;
+    margin: 0;
+}
+
+.rf-form-card-header p {
+    font-size: 12px;
+    color: #737373;
+    margin: 0;
+}
+
+/* ERROS E MENSAGENS */
+.rf-form-error {
+    font-size: 12px;
+    border-radius: 12px;
+    padding: 12px 16px;
+    border: 1px solid #FECACA;
+    color: #991B1B;
+    background-color: #FEF2F2;
+    margin-bottom: 20px;
+}
+
+.rf-terms, .rf-member-help {
+    text-align: center;
+    font-size: 11px;
+    color: #A1A1AA;
+    margin-top: 24px;
+}
+
+/* TELAS DE ESTADO */
+.rf-state-wrapper {
+    min-height: 80vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+    background-color: #F7F7F9;
+}
+
+.rf-state-card {
+    width: 100%;
+    max-width: 448px !important;
+    background-color: #FFFFFF;
+    border: 1px solid #E4E4E7;
+    border-radius: 16px;
+    padding: 32px;
+    text-align: center;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    margin: 0 auto;
+}
+
+.rf-state-icon {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 20px auto;
+}
+
+.rf-state-icon.loading {
+    background-color: var(--brand-lighter, #F5F3FF);
+    color: var(--brand, #6D28D9);
+}
+
+.rf-state-icon.success {
+    background-color: #F0FDF4;
+    color: #16A34A;
+}
+
+.rf-state-icon.error {
+    background-color: #FEF2F2;
+    color: #DC2626;
+}
+
+.rf-state-card h2 {
+    font-size: 24px;
+    font-weight: 600;
+    color: #171717;
+    letter-spacing: -0.02em;
+    margin: 0 0 8px 0;
+}
+
+.rf-state-card p {
+    font-size: 14px;
+    color: #737373;
+    line-height: 1.6;
+    margin: 0 0 28px 0;
+}
+
+/* RESUMO DE DADOS NA TELA DE SUCESSO */
+.rf-summary {
+    background-color: #FAFAFA;
+    border: 1px solid #E4E4E7;
+    border-radius: 12px;
+    padding: 16px;
+    text-align: left;
+    margin-bottom: 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.rf-summary > div {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.rf-summary span {
+    font-size: 12px;
+    color: #737373;
+}
+
+.rf-summary strong {
+    font-size: 12px;
+    font-weight: 600;
+    color: #171717;
+    text-align: right;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 60%;
+}
+
+.rf-summary strong.green {
+    color: #16A34A;
+}
+
+/* SPINNER CSS */
+.rf-spinner {
+    width: 28px;
+    height: 28px;
+    border: 3px solid rgba(109, 40, 217, 0.2);
+    border-top-color: var(--brand, #6D28D9);
+    border-radius: 50%;
+    animation: rf-spin 0.8s linear infinite;
+}
+
+@keyframes rf-spin {
+    to { transform: rotate(360deg); }
+}
+
+/* LINK INFERIOR */
+.rf-auth-login-link {
+    text-align: center;
+    font-size: 14px;
+    color: #737373;
+    margin-top: 32px;
+}
