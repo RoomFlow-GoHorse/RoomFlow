@@ -1,0 +1,45 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,600;1,9..144,300&family=JetBrains+Mono:wght@400;500&display=swap');
+
+:root {
+    /* Fontes */
+    --font-sans: 'DM Sans', system-ui, sans-serif;
+    --font-display: 'Fraunces', Georgia, serif;
+    --font-mono: 'JetBrains Mono', monospace;
+
+    /* Marca */
+    --color-brand: #6D28D9;
+    --color-brand-hover: #5B21B6;
+    --color-brand-light: #EDE9FE;
+    --color-brand-lighter: #F5F3FF;
+
+    /* Mostarda */
+    --color-mustard: #B45309;
+    --color-mustard-bg: #FEF3C7;
+    --color-mustard-border: #FCD34D;
+
+    /* Superfícies */
+    --color-surface: #F8F7F4;
+    --color-surface-alt: #F0EEE9;
+
+    /* Texto */
+    --color-graphite: #1C1C2E;
+    --color-graphite-soft: #52525B;
+    --color-graphite-muted: #A1A1AA;
+
+    /* Bordas */
+    --color-stroke: #E4E1DB;
+    --color-stroke-strong: #C8C4BC;
+
+    /* Estados */
+    --color-success: #16A34A;
+    --color-success-bg: #DCFCE7;
+
+    --color-danger: #DC2626;
+    --color-danger-bg: #FEE2E2;
+
+    --color-warning: #D97706;
+    --color-warning-bg: #FEF3C7;
+
+    --color-info: #0EA5E9;
+    --color-info-bg: #E0F2FE;
+}
