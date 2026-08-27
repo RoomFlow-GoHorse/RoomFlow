@@ -70,9 +70,9 @@ def _validate_step_one():
     confirm = st.session_state.signup_inst_confirm_senha
 
     if not nome:
-        return "Informe o nome completo do responsável."
+        return "Informe seu nome completo."
     if not email:
-        return "Informe o e-mail do responsável."
+        return "Informe seu e-mail."
     if not senha:
         return "Crie uma senha para continuar."
     if len(senha) < 6:
@@ -96,14 +96,15 @@ def _validate_step_two():
         return "Selecione o tipo da instituição."
     return None
 
+def _exit_signup():
+    _reset()
+    go("signup_choice")
+
 def _go_back():
     if st.session_state.signup_inst_step == 2:
         st.session_state.signup_inst_step = 1
         st.session_state.signup_inst_error = ""
         st.rerun()
-    else:
-        _reset()
-        go("signup_choice")
 
 def _next_step():
     error = _validate_step_one()
@@ -131,24 +132,19 @@ def _finish_verification():
     st.rerun()
 
 def _render_topbar():
-    col1, col2 = st.columns([1, 1])
+    col1, col2 = st.columns([1, 1], vertical_alignment="center")
     with col1:
         if st.button("← Voltar", key="signup_inst_top_back", type="tertiary"):
-            _go_back()
+            _exit_signup()
     with col2:
         st.markdown(
-            """
-            <div style="display: flex; justify-content: flex-end; align-items: center; gap: 8px; font-weight: 700;">
-                <div class="rf-logo-mark" style="width:28px; height:28px; font-size:14px; border-radius:8px; background-color:#6D28D9; color:white; display:flex; align-items:center; justify-content:center;">R</div>
-                <span style="font-size: 16px; color: #171717;">RoomFlow</span>
-            </div>
-            """,
+            '<div class="rf-choice-logo"><div class="rf-logo-mark">R</div><span class="rf-logo-text">RoomFlow</span></div>',
             unsafe_allow_html=True,
         )
 
 def _render_stepper():
     step = st.session_state.signup_inst_step
-    check_svg = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>'
+    check_svg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>'
 
     st.markdown(
         f"""
@@ -157,7 +153,7 @@ def _render_stepper():
                 <div class="rf-step-circle active">
                     {check_svg if step == 2 else "1"}
                 </div>
-                <span class="rf-step-label {'active' if step == 1 else 'inactive'}">
+                <span class="rf-step-label {'active' if step == 1 else 'completed'}">
                     Seus dados
                 </span>
             </div>
@@ -183,7 +179,7 @@ def _render_header():
     icon = user_svg if step == 1 else building_svg
     title = "Crie sua conta" if step == 1 else "Cadastre sua instituição"
     description = (
-        "Comece criando a conta do responsável pela instituição."
+        "Comece criando sua conta de administrador da instituição."
         if step == 1
         else "Agora informe os dados da instituição que será administrada pelo RoomFlow."
     )
@@ -206,94 +202,72 @@ def _render_header():
 
 def _render_form():
     _render_topbar()
-
     _render_header()
     _render_stepper()
 
-    st.markdown('<div class="rf-card-form">', unsafe_allow_html=True)
-
-    if st.session_state.signup_inst_step == 1:
-        st.markdown(
-            """
-            <div class="rf-form-card-header">
-                <div class="rf-form-card-title">
-                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#6D28D9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-                    <h2>Dados do responsável</h2>
-                </div>
-                <p>Essas informações serão usadas para criar sua conta de administrador.</p>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-        st.text_input("Nome completo *", key="signup_inst_nome", placeholder="Seu nome completo")
-
-        c1, c2 = st.columns(2)
-        with c1:
-            st.text_input("E-mail *", key="signup_inst_email", placeholder="seu@email.com")
-        with c2:
-            st.text_input("Telefone", key="signup_inst_telefone", placeholder="(11) 99999-9999")
-
-        c3, c4 = st.columns(2)
-        with c3:
-            st.text_input("Senha *", key="signup_inst_senha", placeholder="••••••••", type="password")
-            st.markdown('<span class="rf-field-help">Mínimo de 6 caracteres.</span>', unsafe_allow_html=True)
-        with c4:
-            st.text_input("Confirmar senha *", key="signup_inst_confirm_senha", placeholder="••••••••", type="password")
-
-    else:
-        st.markdown(
-            """
-            <div class="rf-form-card-header">
-                <div class="rf-form-card-title">
-                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#6D28D9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2" ry="2"></rect><path d="M9 22v-4h6v4"></path></svg>
-                    <h2>Dados da instituição</h2>
-                </div>
-                <p>Informe os dados oficiais da instituição que será administrada.</p>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-        st.text_input("Nome da instituição *", key="signup_inst_instituicao", placeholder="Ex: Faculdade de Tecnologia XPTO")
-
-        c1, c2 = st.columns(2)
-        with c1:
-            st.text_input("CNPJ *", key="signup_inst_cnpj", placeholder="00.000.000/0000-00")
-        with c2:
-            st.selectbox("Tipo de instituição *", ["Selecione..."] + INSTITUTION_TYPES, key="signup_inst_tipo_select")
-            st.session_state.signup_inst_tipo = (
-                "" if st.session_state.signup_inst_tipo_select == "Selecione..."
-                else st.session_state.signup_inst_tipo_select
+    # Container unificado do Card de Formulário com classe CSS explícita
+    with st.container():
+        st.markdown('<div class="rf-inst-form-card"></div>', unsafe_allow_html=True)
+        if st.session_state.signup_inst_step == 1:
+            st.markdown(
+                '<div class="rf-form-card-header"><div class="rf-form-card-title"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#6D28D9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg><h2>Dados do administrador</h2></div><p>Essas informações serão usadas para criar sua conta de administrador.</p></div>',
+                unsafe_allow_html=True,
             )
 
-        c3, c4 = st.columns(2)
-        with c3:
-            st.text_input("Cidade", key="signup_inst_cidade", placeholder="São Paulo")
-        with c4:
-            st.selectbox("Estado / UF", ["Selecione..."] + ESTADOS, key="signup_inst_estado_select")
-            st.session_state.signup_inst_estado = (
-                "" if st.session_state.signup_inst_estado_select == "Selecione..."
-                else st.session_state.signup_inst_estado_select
+            st.text_input("Nome completo *", key="signup_inst_nome", placeholder="Seu nome completo")
+
+            c1, c2 = st.columns(2)
+            with c1:
+                st.text_input("E-mail *", key="signup_inst_email", placeholder="seu@email.com")
+            with c2:
+                st.text_input("Telefone", key="signup_inst_telefone", placeholder="(11) 99999-9999")
+
+            c3, c4 = st.columns(2)
+            with c3:
+                st.text_input("Senha *", key="signup_inst_senha", placeholder="••••••••", type="password")
+                st.markdown('<span class="rf-field-help" style="font-size:12px; color:#A1A1AA;">Mínimo de 6 caracteres.</span>', unsafe_allow_html=True)
+            with c4:
+                st.text_input("Confirmar senha *", key="signup_inst_confirm_senha", placeholder="••••••••", type="password")
+
+        else:
+            st.markdown(
+                '<div class="rf-form-card-header"><div class="rf-form-card-title"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#6D28D9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2" ry="2"></rect><path d="M9 22v-4h6v4"></path></svg><h2>Dados da instituição</h2></div><p>Informe os dados oficiais da instituição que será administrada.</p></div>',
+                unsafe_allow_html=True,
             )
 
-        c5, c6 = st.columns(2)
-        with c5:
-            st.text_input("Telefone institucional", key="signup_inst_telefone_inst", placeholder="(11) 3000-0000")
-        with c6:
-            st.text_input("E-mail institucional", key="signup_inst_email_inst", placeholder="contato@instituicao.edu.br")
+            st.text_input("Nome da instituição *", key="signup_inst_instituicao", placeholder="Ex: Faculdade de Tecnologia XPTO")
 
-    st.markdown("</div>", unsafe_allow_html=True)
+            c1, c2 = st.columns(2)
+            with c1:
+                st.text_input("CNPJ *", key="signup_inst_cnpj", placeholder="00.000.000/0000-00")
+            with c2:
+                st.selectbox("Tipo de instituição *", ["Selecione..."] + INSTITUTION_TYPES, key="signup_inst_tipo_select")
+                st.session_state.signup_inst_tipo = (
+                    "" if st.session_state.signup_inst_tipo_select == "Selecione..."
+                    else st.session_state.signup_inst_tipo_select
+                )
+
+            c3, c4 = st.columns(2)
+            with c3:
+                st.text_input("Cidade", key="signup_inst_cidade", placeholder="São Paulo")
+            with c4:
+                st.selectbox("Estado / UF", ["Selecione..."] + ESTADOS, key="signup_inst_estado_select")
+                st.session_state.signup_inst_estado = (
+                    "" if st.session_state.signup_inst_estado_select == "Selecione..."
+                    else st.session_state.signup_inst_estado_select
+                )
+
+            c5, c6 = st.columns(2)
+            with c5:
+                st.text_input("Telefone institucional", key="signup_inst_telefone_inst", placeholder="(11) 3000-0000")
+            with c6:
+                st.text_input("E-mail institucional", key="signup_inst_email_inst", placeholder="contato@instituicao.edu.br")
 
     # Exibição de erros
     error = st.session_state.signup_inst_error
     if error:
         st.markdown(
-            f"""
-            <div class="rf-form-error">
-                {error}
-            </div>
-            """,
+            f'<div class="rf-form-error">{error}</div>',
             unsafe_allow_html=True,
         )
 
@@ -348,7 +322,7 @@ def _render_success():
                         <strong>{st.session_state.signup_inst_instituicao or "—"}</strong>
                     </div>
                     <div>
-                        <span>Responsável</span>
+                        <span>Administrador</span>
                         <strong>{st.session_state.signup_inst_nome or "—"}</strong>
                     </div>
                     <div>
@@ -377,15 +351,79 @@ def signup_institution():
     st.html(
         """
         <style>
+            /* Restringe a tela a 672px idêntico ao max-w-2xl do Figma com padding top seguro */
             [data-testid="stMainBlockContainer"] {
-                max-width: 680px !important;
+                max-width: 672px !important;
                 margin-left: auto !important;
                 margin-right: auto !important;
-                padding: 32px 24px !important;
+                padding-top: 80px !important;
+                padding-bottom: 40px !important;
+                padding-left: 24px !important;
+                padding-right: 24px !important;
             }
 
             .stApp {
                 background-color: #F7F7F9 !important;
+            }
+
+            /* TOPBAR BOTÃO VOLTAR */
+            [data-testid="stMainBlockContainer"] div[data-testid="stColumn"]:first-child button {
+                background: transparent !important;
+                border: none !important;
+                box-shadow: none !important;
+                color: #737373 !important;
+                font-weight: 500 !important;
+                font-size: 14px !important;
+                padding: 0 !important;
+            }
+
+            [data-testid="stMainBlockContainer"] div[data-testid="stColumn"]:first-child button:hover {
+                color: var(--brand, #6D28D9) !important;
+            }
+
+            /* LOGO TOPBAR */
+            .rf-choice-logo {
+                display: flex;
+                align-items: center;
+                justify-content: flex-end;
+                gap: 8px;
+                font-weight: 700;
+            }
+
+            .rf-logo-mark {
+                width: 28px;
+                height: 28px;
+                border-radius: 8px;
+                background-color: var(--brand, #6D28D9);
+                color: #FFFFFF;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 14px;
+                font-weight: 700;
+            }
+
+            .rf-logo-text {
+                font-size: 16px;
+                font-weight: 700;
+                color: #171717;
+            }
+
+            /* CONTAINER CARD DE FORMULÁRIO (FUNDO BRANCO, BORDA #E4E4E7, RADIUS 16PX) */
+            [data-testid="stMainBlockContainer"] [data-testid="stVerticalBlock"]:has(div.rf-inst-form-card) {
+                background-color: #FFFFFF !important;
+                border: 1px solid #E4E4E7 !important;
+                border-radius: 16px !important;
+                padding: 28px !important;
+                box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+                margin-bottom: 24px !important;
+            }
+
+            [data-testid="stMainBlockContainer"] [data-testid="stVerticalBlock"]:has(div.rf-inst-form-card) [data-testid="stVerticalBlock"] {
+                background-color: transparent !important;
+                border: none !important;
+                box-shadow: none !important;
+                padding: 0 !important;
             }
         </style>
         """

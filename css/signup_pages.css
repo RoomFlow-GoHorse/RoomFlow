@@ -216,7 +216,7 @@
 
 /* ERROS E MENSAGENS */
 .rf-form-error {
-    font-size: 12px;
+    font-size: 14px;
     border-radius: 12px;
     padding: 12px 16px;
     border: 1px solid #FECACA;
@@ -227,9 +227,71 @@
 
 .rf-terms, .rf-member-help {
     text-align: center;
-    font-size: 11px;
+    font-size: 12px;
     color: #A1A1AA;
     margin-top: 24px;
+    
+}
+
+/* =========================================================
+   ESTILOS DE INPUTS E BOTÕES GLOBALIZADOS NAS PÁGINAS DE SIGNUP
+========================================================= */
+
+[data-testid="stMainBlockContainer"] [data-testid="stTextInput"] input,
+[data-testid="stMainBlockContainer"] [data-testid="stSelectbox"] [data-baseweb="select"] > div {
+    height: 44px !important;
+    border-radius: 12px !important;
+    border: 1px solid #D4D4D8 !important;
+    background-color: #FFFFFF !important;
+    color: #171717 !important;
+    font-size: 14px !important;
+    box-shadow: none !important;
+}
+
+[data-testid="stMainBlockContainer"] [data-testid="stTextInput"] input:focus,
+[data-testid="stMainBlockContainer"] [data-testid="stSelectbox"] [data-baseweb="select"] > div:focus-within {
+    border-color: #7C3AED !important;
+    box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.1) !important;
+}
+
+[data-testid="stMainBlockContainer"] [data-testid="stTextInput"] label,
+[data-testid="stMainBlockContainer"] [data-testid="stSelectbox"] label {
+    font-size: 14px !important;
+    font-weight: 500 !important;
+    color: #262626 !important;
+    margin-bottom: 6px !important;
+}
+
+/* ESTILIZAÇÃO DE BOTÕES PRIMÁRIOS E SECUNDÁRIOS DO STREAMLIT */
+[data-testid="stMainBlockContainer"] .stButton > button[kind="primary"] {
+    background-color: #6D28D9 !important;
+    color: #FFFFFF !important;
+    border: none !important;
+    border-radius: 12px !important;
+    height: 46px !important;
+    font-size: 14px !important;
+    font-weight: 600 !important;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
+}
+
+[data-testid="stMainBlockContainer"] .stButton > button[kind="primary"]:hover {
+    background-color: #5B21B6 !important;
+    color: #FFFFFF !important;
+}
+
+[data-testid="stMainBlockContainer"] .stButton > button[kind="secondary"] {
+    background-color: #FFFFFF !important;
+    color: #4C1D95 !important;
+    border: 1px solid #D4D4D8 !important;
+    border-radius: 12px !important;
+    height: 46px !important;
+    font-size: 14px !important;
+    font-weight: 600 !important;
+}
+
+[data-testid="stMainBlockContainer"] .stButton > button[kind="secondary"]:hover {
+    background-color: #F5F3FF !important;
+    border-color: #7C3AED !important;
 }
 
 /* TELAS DE ESTADO */
