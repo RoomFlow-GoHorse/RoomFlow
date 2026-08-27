@@ -24,6 +24,7 @@ def boot_state():
 
 def go(page):
     st.session_state.page = page
+    st.query_params["page"] = page
     st.rerun()
 
 

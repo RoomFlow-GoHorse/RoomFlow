@@ -1,0 +1,58 @@
+/* =========================================================
+   SIGNUP PAGES
+========================================================= */
+
+.rf-auth-page-container {
+    width: min(100% - 40px, 640px);
+    margin: 0 auto;
+    padding: 40px 0 60px;
+}
+
+.rf-auth-page-container.member {
+    width: min(100% - 40px, 520px);
+}
+
+.rf-page-header {
+    margin-bottom: 32px;
+}
+
+.rf-page-header-label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+}
+
+.rf-page-header-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--brand-lighter);
+    color: var(--brand);
+}
+
+.rf-page-header-label span {
+    color: var(--brand);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+}
+
+.rf-page-header h1 {
+    margin: 0 0 8px;
+    font-size: 30px;
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+    color: var(--graphite);
+}
+
+.rf-page-header p {
+    margin: 0;
+    color: var(--graphite-soft);
+    font-size: 14px;
+    line-height: 1.6;
+}
