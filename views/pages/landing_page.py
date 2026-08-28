@@ -3,18 +3,6 @@
 from views.components.ui_components import load_css_file, logo
 
 
-def icon_svg(name):
-    paths = {
-        "map_pin": '<path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>',
-        "calendar": '<path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/>',
-        "zap": '<path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14Z"/>',
-        "alert_triangle": '<path d="m21.73 18-8-14a2 2 0 0 0-3.46 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
-        "clock": '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
-        "bar_chart": '<path d="M3 3v18h18"/><path d="M7 16V9"/><path d="M12 16V5"/><path d="M17 16v-3"/>',
-    }
-    return f'<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">{paths[name]}</svg>'
-
-
 def landing():
     load_css_file("css/landing_page.css")
     st.html(
@@ -581,7 +569,7 @@ def landing():
                         <article class="rf-feature-card">
 
                             <div class="rf-feature-icon">
-                                {icon_svg("map_pin")}
+                                🏢
                             </div>
 
                             <h3>
@@ -600,7 +588,7 @@ def landing():
                         <article class="rf-feature-card">
 
                             <div class="rf-feature-icon">
-                                {icon_svg("calendar")}
+                                📅
                             </div>
 
                             <h3>
@@ -619,7 +607,7 @@ def landing():
                         <article class="rf-feature-card">
 
                             <div class="rf-feature-icon">
-                                {icon_svg("zap")}
+                                🎛️
                             </div>
 
                             <h3>
@@ -638,7 +626,7 @@ def landing():
                         <article class="rf-feature-card">
 
                             <div class="rf-feature-icon">
-                                {icon_svg("alert_triangle")}
+                                ⚠️
                             </div>
 
                             <h3>
@@ -657,7 +645,7 @@ def landing():
                         <article class="rf-feature-card">
 
                             <div class="rf-feature-icon">
-                                {icon_svg("clock")}
+                                🕒
                             </div>
 
                             <h3>
@@ -676,7 +664,7 @@ def landing():
                         <article class="rf-feature-card">
 
                             <div class="rf-feature-icon">
-                                {icon_svg("bar_chart")}
+                                📊
                             </div>
 
                             <h3>

@@ -1,30 +1,55 @@
 import streamlit as st
+
 from services.app_state_service import go
 
 
 def signup_choice():
-    # ==========================================================
-    # 1. CSS EXCLUSIVO DA ROTA DE SELEÇÃO DE CADASTRO
-    # ==========================================================
     st.html(
         """
         <style>
-            /* Ajuste preciso de padding-top para o topo não ser cortado pela barra de ferramentas fixa do Streamlit */
-            [data-testid="stMainBlockContainer"] {
-                max-width: 800px !important;
-                margin-left: auto !important;
-                margin-right: auto !important;
-                padding-top: 80px !important;
-                padding-bottom: 32px !important;
-                padding-left: 24px !important;
-                padding-right: 24px !important;
-            }
-
             .stApp {
                 background-color: #F7F7F9 !important;
             }
 
-            /* TOPBAR */
+            [data-testid="stMainBlockContainer"] {
+                width: 100% !important;
+                max-width: 820px !important;
+                min-height: 100vh !important;
+                margin-left: auto !important;
+                margin-right: auto !important;
+                padding: 32px 24px 40px !important;
+                display: flex !important;
+                flex-direction: column !important;
+                justify-content: center !important;
+            }
+
+            [data-testid="stMainBlockContainer"] > [data-testid="stVerticalBlock"] {
+                width: 100% !important;
+                min-height: calc(100vh - 72px) !important;
+                display: flex !important;
+                flex-direction: column !important;
+                justify-content: center !important;
+            }
+
+            [data-testid="stMainBlockContainer"] .st-key-signup_choice_card {
+                width: 100% !important;
+                height: auto !important;
+                min-height: 0 !important;
+                flex: 0 0 auto !important;
+                background-color: transparent !important;
+                border: none !important;
+                border-radius: 0 !important;
+                padding: 0 !important;
+                box-shadow: none !important;
+            }
+
+            [data-testid="stMainBlockContainer"] .st-key-signup_choice_card [data-testid="stVerticalBlock"] {
+                background: transparent !important;
+                border: none !important;
+                box-shadow: none !important;
+                padding: 0 !important;
+            }
+
             .rf-choice-logo {
                 display: flex;
                 align-items: center;
@@ -52,7 +77,6 @@ def signup_choice():
                 color: #171717;
             }
 
-            /* BOTÕES STREAMLIT ESTILIZADOS COMO LINKS ROXOS */
             [data-testid="stMainBlockContainer"] .stButton > button {
                 background: transparent !important;
                 background-color: transparent !important;
@@ -79,11 +103,10 @@ def signup_choice():
                 opacity: 0.9;
             }
 
-            /* HEADER */
             .rf-choice-header {
                 text-align: center;
                 margin-top: 16px;
-                margin-bottom: 28px;
+                margin-bottom: 64px;
             }
 
             .rf-choice-eyebrow {
@@ -108,7 +131,6 @@ def signup_choice():
                 margin: 0;
             }
 
-            /* CARDS */
             .rf-choice-card-content {
                 background-color: #FFFFFF;
                 border: 2px solid #E4E4E7;
@@ -156,12 +178,45 @@ def signup_choice():
                 margin: 0;
             }
 
-            /* RESPONSIVIDADE */
+            .rf-choice-footer {
+                text-align: center;
+                margin-top: 38px;
+                font-size: 14px;
+                color: #737373;
+            }
+
+            .rf-choice-login-link {
+                margin: 38px 0 0 0;
+                color: #737373;
+                font-size: 14px;
+                text-align: center;
+                padding-top: 15px;
+            }
+
+            .rf-choice-login-link a {
+                color: #6D28D9;
+                font-weight: 700;
+                text-decoration: none;
+            }
+
+            .rf-choice-login-link a:hover {
+                color: #4C1D95;
+            }
+
             @media (max-width: 768px) {
                 [data-testid="stMainBlockContainer"] {
-                    padding-top: 64px !important;
-                    padding-left: 18px !important;
-                    padding-right: 18px !important;
+                    max-width: none !important;
+                    padding: 40px 18px !important;
+                    justify-content: flex-start !important;
+                }
+
+                [data-testid="stMainBlockContainer"] > [data-testid="stVerticalBlock"] {
+                    min-height: auto !important;
+                    justify-content: flex-start !important;
+                }
+
+                [data-testid="stMainBlockContainer"] .st-key-signup_choice_card {
+                    padding: 0 !important;
                 }
 
                 .rf-choice-title {
@@ -176,57 +231,43 @@ def signup_choice():
         """
     )
 
-    # ==========================================================
-    # 2. TOPBAR
-    # ==========================================================
-    col_tb1, col_tb2 = st.columns([1, 1], vertical_alignment="center")
+    with st.container(key="signup_choice_card"):
+        col_tb1, col_tb2 = st.columns([1, 1], vertical_alignment="center")
 
-    with col_tb1:
-        if st.button("← Voltar", key="signup_choice_top_back", type="tertiary"):
-            go("landing")
+        with col_tb1:
+            if st.button("← Voltar", key="signup_choice_top_back", type="tertiary"):
+                go("landing")
 
-    with col_tb2:
+        with col_tb2:
+            st.markdown(
+                '<div class="rf-choice-logo"><div class="rf-logo-mark">R</div><span class="rf-logo-text">RoomFlow</span></div>',
+                unsafe_allow_html=True,
+            )
+
         st.markdown(
-            '<div class="rf-choice-logo"><div class="rf-logo-mark">R</div><span class="rf-logo-text">RoomFlow</span></div>',
+            '<div class="rf-choice-header"><p class="rf-choice-eyebrow">Bem-vindo ao RoomFlow</p><h1 class="rf-choice-title">Criar sua conta</h1><p class="rf-choice-subtitle">Escolha como você deseja utilizar o RoomFlow.</p></div>',
             unsafe_allow_html=True,
         )
 
-    # ==========================================================
-    # 3. HEADER CENTRALIZADO
-    # ==========================================================
-    st.markdown(
-        '<div class="rf-choice-header"><p class="rf-choice-eyebrow">Bem-vindo ao RoomFlow</p><h1 class="rf-choice-title">Criar sua conta</h1><p class="rf-choice-subtitle">Escolha como você deseja utilizar o RoomFlow.</p></div>',
-        unsafe_allow_html=True,
-    )
+        c1, c2 = st.columns(2, gap="large")
 
-    # ==========================================================
-    # 4. CARDS DE ESCOLHA
-    # ==========================================================
-    c1, c2 = st.columns(2, gap="large")
+        with c1:
+            st.markdown(
+                '<div class="rf-choice-card-content"><div><div class="rf-card-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2" ry="2"></rect><path d="M9 22v-4h6v4"></path><path d="M8 6h.01"></path><path d="M12 6h.01"></path><path d="M16 6h.01"></path><path d="M8 10h.01"></path><path d="M12 10h.01"></path><path d="M16 10h.01"></path><path d="M8 14h.01"></path><path d="M12 14h.01"></path><path d="M16 14h.01"></path></svg></div><h2>Sou responsável pela instituição</h2><p>Cadastre sua instituição no RoomFlow e torne-se responsável pela administração da plataforma.</p></div></div>',
+                unsafe_allow_html=True,
+            )
+            if st.button("Cadastrar instituição →", key="signup_choice_institution", type="tertiary"):
+                go("signup_institution")
 
-    with c1:
+        with c2:
+            st.markdown(
+                '<div class="rf-choice-card-content"><div><div class="rf-card-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg></div><h2>Sou membro da instituição</h2><p>Já faço parte de uma instituição cadastrada e quero criar minha conta para utilizar o RoomFlow.</p></div></div>',
+                unsafe_allow_html=True,
+            )
+            if st.button("Criar conta →", key="signup_choice_member", type="tertiary"):
+                go("signup_member")
+
         st.markdown(
-            '<div class="rf-choice-card-content"><div><div class="rf-card-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2" ry="2"></rect><path d="M9 22v-4h6v4"></path><path d="M8 6h.01"></path><path d="M12 6h.01"></path><path d="M16 6h.01"></path><path d="M8 10h.01"></path><path d="M12 10h.01"></path><path d="M16 10h.01"></path><path d="M8 14h.01"></path><path d="M12 14h.01"></path><path d="M16 14h.01"></path></svg></div><h2>Sou responsável pela instituição</h2><p>Cadastre sua instituição no RoomFlow e torne-se responsável pela administração da plataforma.</p></div></div>',
+            '<p class="rf-choice-login-link">Já possui uma conta? <a href="?page=login" target="_self">Entrar</a></p>',
             unsafe_allow_html=True,
         )
-        if st.button("Cadastrar instituição →", key="signup_choice_institution", type="tertiary"):
-            go("signup_institution")
-
-    with c2:
-        st.markdown(
-            '<div class="rf-choice-card-content"><div><div class="rf-card-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg></div><h2>Sou membro da instituição</h2><p>Já faço parte de uma instituição cadastrada e quero criar minha conta para utilizar o RoomFlow.</p></div></div>',
-            unsafe_allow_html=True,
-        )
-        if st.button("Criar conta →", key="signup_choice_member", type="tertiary"):
-            go("signup_member")
-
-    # ==========================================================
-    # 5. RODAPÉ
-    # ==========================================================
-    st.markdown('<div style="text-align: center; margin-top: 38px; font-size: 14px; color: #737373;">Já possui uma conta?</div>', unsafe_allow_html=True)
-
-    footer_left, footer_center, footer_right = st.columns([2, 1, 2])
-
-    with footer_center:
-        if st.button("Entrar", key="signup_choice_login", type="tertiary", use_container_width=True):
-            go("login")

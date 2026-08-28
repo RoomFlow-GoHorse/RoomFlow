@@ -46,11 +46,22 @@ def _render_styles():
 
             [data-testid="stMainBlockContainer"] {
                 width: 100% !important;
-                max-width: 420px !important;
+                max-width: 480px !important;
                 min-height: 100vh !important;
-                margin-left: calc(min(46vw, 560px) + ((100vw - min(46vw, 560px) - 420px) / 2)) !important;
+                margin-left: calc(min(46vw, 560px) + ((100vw - min(46vw, 560px) - 480px) / 2)) !important;
                 margin-right: auto !important;
                 padding: 32px 0 40px !important;
+                display: flex !important;
+                flex-direction: column !important;
+                justify-content: center !important;
+            }
+
+            [data-testid="stMainBlockContainer"] > [data-testid="stVerticalBlock"] {
+                width: 100% !important;
+                min-height: calc(100vh - 72px) !important;
+                display: flex !important;
+                flex-direction: column !important;
+                justify-content: center !important;
             }
 
             .rf-login-art {
@@ -129,11 +140,30 @@ def _render_styles():
             }
 
             .rf-login-back-spacer {
-                margin-bottom: 40px;
+                margin-bottom: 32px;
+            }
+
+            [data-testid="stMainBlockContainer"] .st-key-login_card {
+                width: 100% !important;
+                height: auto !important;
+                min-height: 0 !important;
+                flex: 0 0 auto !important;
+                background: #FFFFFF !important;
+                border: 1px solid #E4E4E7 !important;
+                border-radius: 16px !important;
+                padding: 28px !important;
+                box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+            }
+
+            [data-testid="stMainBlockContainer"] .st-key-login_card [data-testid="stVerticalBlock"] {
+                background: transparent !important;
+                border: none !important;
+                box-shadow: none !important;
+                padding: 0 !important;
             }
 
             .rf-login-eyebrow {
-                margin: 0 0 12px 0;
+                margin: 5px 0 2px 0;
                 color: #6D28D9;
                 font-size: 12px;
                 font-weight: 600;
@@ -161,7 +191,14 @@ def _render_styles():
                 display: flex;
                 align-items: center;
                 justify-content: space-between;
-                margin: 0 0 -2px 0;
+                margin-top: 16px;
+                margin-bottom: 12px;
+            }
+
+            .rf-login-password-label {
+                color: #262626;
+                font-size: 14px;
+                font-weight: 500;
             }
 
             .rf-login-forgot {
@@ -191,10 +228,22 @@ def _render_styles():
                 text-align: center;
             }
 
-            .rf-login-footer p {
-                margin: 0 0 8px 0;
+            .rf-login-footer p,
+            .rf-login-signup-link {
+                margin: 0;
                 color: #737373;
                 font-size: 14px;
+                text-align: center;
+            }
+
+            .rf-login-signup-link a {
+                color: #6D28D9;
+                font-weight: 700;
+                text-decoration: none;
+            }
+
+            .rf-login-signup-link a:hover {
+                color: #4C1D95;
             }
 
             .rf-login-footer span {
@@ -260,9 +309,20 @@ def _render_styles():
                 background: transparent !important;
             }
 
-            [data-testid="stMainBlockContainer"] .st-key-login_signup button {
+            [data-testid="stMainBlockContainer"] .st-key-login_forgot_password {
+                display: flex !important;
+                justify-content: flex-end !important;
+            }
+
+            [data-testid="stMainBlockContainer"] .st-key-login_forgot_password button[kind="tertiary"] {
                 color: #6D28D9 !important;
-                font-weight: 700 !important;
+                font-size: 12px !important;
+                font-weight: 500 !important;
+                text-align: right !important;
+            }
+
+            [data-testid="stMainBlockContainer"] .st-key-login_forgot_password button[kind="tertiary"]:hover {
+                color: #4C1D95 !important;
             }
 
             [data-testid="stMainBlockContainer"] [data-testid="stTextInput"] {
@@ -305,10 +365,11 @@ def _render_styles():
                 }
 
                 [data-testid="stMainBlockContainer"] {
-                    max-width: 420px !important;
-                    margin-left: 0;
+                    max-width: 480px !important;
+                    margin-left: auto !important;
                     margin-right: auto !important;
                     padding: 32px 24px 40px !important;
+                    justify-content: center !important;
                 }
             }
 
@@ -316,6 +377,12 @@ def _render_styles():
                 [data-testid="stMainBlockContainer"] {
                     max-width: none !important;
                     padding: 40px 24px !important;
+                    justify-content: flex-start !important;
+                }
+
+                [data-testid="stMainBlockContainer"] > [data-testid="stVerticalBlock"] {
+                    min-height: auto !important;
+                    justify-content: flex-start !important;
                 }
 
                 .rf-login-back-spacer {
@@ -361,39 +428,51 @@ def login():
     _render_styles()
     _render_art_panel()
 
-    if st.button("← Voltar para início", key="login_back", type="tertiary"):
-        go("landing")
-    st.markdown('<div class="rf-login-back-spacer"></div>', unsafe_allow_html=True)
+    with st.container(key="login_card"):
+        if st.button("← Voltar para início", key="login_back", type="tertiary"):
+            go("landing")
+        st.markdown('<div class="rf-login-back-spacer"></div>', unsafe_allow_html=True)
 
-    _render_header()
+        _render_header()
 
-    st.text_input(
-        "E-mail",
-        key="login_email",
-        placeholder="seu@email.com",
-    )
-
-    st.markdown(
-        '<div class="rf-login-password-row"><span></span><a class="rf-login-forgot" href="?page=forgot_password" target="_self">Esqueci minha senha</a></div>',
-        unsafe_allow_html=True,
-    )
-    st.text_input(
-        "Senha",
-        key="login_password",
-        placeholder="Digite sua senha",
-        type="password",
-    )
-
-    if st.session_state.login_error:
-        st.markdown(
-            f'<div class="rf-login-error">{st.session_state.login_error}</div>',
-            unsafe_allow_html=True,
+        st.text_input(
+            "E-mail",
+            key="login_email",
+            placeholder="seu@email.com",
         )
 
-    if st.button("Entrar →", key="login_submit", type="primary", width="stretch"):
-        _attempt_login(st.session_state.login_email, st.session_state.login_password)
+        password_label_col, forgot_col = st.columns([2, 1], vertical_alignment="center")
+        with password_label_col:
+            st.markdown(
+                '<span class="rf-login-password-label">Senha</span>',
+                unsafe_allow_html=True,
+            )
+        with forgot_col:
+            if st.button(
+                "Esqueci minha senha",
+                key="login_forgot_password",
+                type="tertiary",
+            ):
+                go("forgot_password")
 
-    st.markdown('<div class="rf-login-footer"><p>Ainda não possui uma conta?</p></div>', unsafe_allow_html=True)
-    if st.button("Criar conta", key="login_signup", type="tertiary"):
-        go("signup_choice")
-    st.markdown('<div class="rf-login-footer"><span>Problemas para acessar? Entre em contato com a instituição.</span></div>', unsafe_allow_html=True)
+        st.text_input(
+            "Senha",
+            key="login_password",
+            placeholder="Digite sua senha",
+            type="password",
+            label_visibility="collapsed",
+        )
+
+        if st.session_state.login_error:
+            st.markdown(
+                f'<div class="rf-login-error">{st.session_state.login_error}</div>',
+                unsafe_allow_html=True,
+            )
+
+        if st.button("Entrar →", key="login_submit", type="primary", width="stretch"):
+            _attempt_login(st.session_state.login_email, st.session_state.login_password)
+
+        st.markdown(
+            '<div class="rf-login-footer"><p class="rf-login-signup-link">Ainda não possui uma conta? <a href="?page=signup_choice" target="_self">Criar conta</a></p><span>Problemas para acessar? Entre em contato com a instituição.</span></div>',
+            unsafe_allow_html=True,
+        )
