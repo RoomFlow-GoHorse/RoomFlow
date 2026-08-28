@@ -1,6 +1,6 @@
 ROLE_LABELS = {
-    "admin": "Gerente",
-    "gerente": "Administrador",
+    "admin": "Administrador",
+    "gerente": "Gerente",
     "solicitante": "Solicitante",
     "participante": "Participante",
 }

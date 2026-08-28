@@ -1,18 +1,25 @@
 import streamlit as st
 
-from data.mock_data import USERS
+from data.mock_data import USERS, password_hash
 
 
 def login(email, password):
-    if not password:
+    email = email.strip().lower()
+
+    if not email or not password:
         return None, "E-mail ou senha incorretos. Verifique seus dados e tente novamente."
-    user = next((item for item in USERS if item["email"].lower() == email.lower()), None)
+
+    user = next((item for item in USERS if item["email"].lower() == email), None)
     if not user:
-        return None, "Nao encontramos uma conta com esses dados. Confirme seu cadastro com a instituicao."
+        return None, "Não encontramos uma conta com esses dados. Confirme seu cadastro com a instituição."
+    if user.get("password_hash") != password_hash(password):
+        return None, "E-mail ou senha incorretos. Verifique seus dados e tente novamente."
     if user["status"] != "ativo":
-        return None, "Esta conta esta inativa. Entre em contato com a instituicao."
-    st.session_state.user = user.copy()
-    return user, ""
+        return None, "Esta conta está inativa. Entre em contato com a instituição."
+
+    session_user = {key: value for key, value in user.items() if key != "password_hash"}
+    st.session_state.user = session_user
+    return session_user, ""
 
 
 def logout():

@@ -8,4 +8,4 @@ def permissions(user):
     actions = sorted(set().union(*PERMISSIONS.values()))
     for action in actions:
         rows.append([action] + ["Sim" if action in PERMISSIONS[role] else "Nao" for role in ["admin", "gerente", "solicitante", "participante"]])
-    table(["Acao", "Gerente", "Administrador", "Solicitante", "Participante"], rows)
+    table(["Acao", "Administrador", "Gerente", "Solicitante", "Participante"], rows)

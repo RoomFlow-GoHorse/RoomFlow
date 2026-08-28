@@ -1,15 +1,57 @@
+import hashlib
 from datetime import date, timedelta
 
 
 TODAY = date.today()
 
+PASSWORD_SALT = "roomflow-demo"
+
+
+def password_hash(password):
+    return hashlib.pbkdf2_hmac(
+        "sha256",
+        password.encode("utf-8"),
+        PASSWORD_SALT.encode("utf-8"),
+        120000,
+    ).hex()
+
+
 USERS = [
-    {"id": "u1", "name": "Marina Costa", "email": "admin@roomflow.com", "role": "admin", "status": "ativo", "initials": "MC"},
+    {"id": "u1", "name": "Marina Costa", "email": "administrador@roomflow.com", "role": "admin", "status": "ativo", "initials": "MC"},
     {"id": "u2", "name": "Rafael Nunes", "email": "gerente@roomflow.com", "role": "gerente", "status": "ativo", "initials": "RN"},
     {"id": "u3", "name": "Ana Beatriz", "email": "solicitante@roomflow.com", "role": "solicitante", "status": "ativo", "initials": "AB"},
     {"id": "u4", "name": "Lucas Lima", "email": "participante@roomflow.com", "role": "participante", "status": "ativo", "initials": "LL"},
     {"id": "u5", "name": "Carla Mendes", "email": "carla@faculdade.edu", "role": "solicitante", "status": "inativo", "initials": "CM"},
 ]
+
+DEMO_USERS = [
+    {"id": "u1", "name": "Marina Costa", "email": "administrador@roomflow.com", "password": "admin123", "role": "admin", "status": "ativo", "initials": "MC"},
+    {"id": "u2", "name": "Rafael Nunes", "email": "gerente@roomflow.com", "password": "gerente123", "role": "gerente", "status": "ativo", "initials": "RN"},
+    {"id": "u3", "name": "Ana Beatriz", "email": "solicitante@roomflow.com", "password": "solicitante123", "role": "solicitante", "status": "ativo", "initials": "AB"},
+    {"id": "u4", "name": "Lucas Lima", "email": "participante@roomflow.com", "password": "participante123", "role": "participante", "status": "ativo", "initials": "LL"},
+]
+
+
+def seed_demo_users():
+    users_by_email = {user["email"].lower(): user for user in USERS}
+
+    for demo in DEMO_USERS:
+        email = demo["email"].lower()
+        seeded_user = {
+            key: value
+            for key, value in demo.items()
+            if key != "password"
+        }
+        seeded_user["password_hash"] = password_hash(demo["password"])
+
+        if email in users_by_email:
+            users_by_email[email].update(seeded_user)
+        else:
+            USERS.append(seeded_user)
+            users_by_email[email] = seeded_user
+
+
+seed_demo_users()
 
 SPACES = [
     {"id": "s1", "name": "Sala 101", "type": "Sala", "capacity": 20, "location": "Bloco A - 1 andar", "status": "disponivel", "resources": ["Projetor", "Quadro branco"], "occupancy": 64},
