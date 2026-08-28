@@ -17,18 +17,17 @@ def password_hash(password):
 
 
 USERS = [
-    {"id": "u1", "name": "Marina Costa", "email": "administrador@roomflow.com", "role": "admin", "status": "ativo", "initials": "MC"},
-    {"id": "u2", "name": "Rafael Nunes", "email": "gerente@roomflow.com", "role": "gerente", "status": "ativo", "initials": "RN"},
-    {"id": "u3", "name": "Ana Beatriz", "email": "solicitante@roomflow.com", "role": "solicitante", "status": "ativo", "initials": "AB"},
-    {"id": "u4", "name": "Lucas Lima", "email": "participante@roomflow.com", "role": "participante", "status": "ativo", "initials": "LL"},
-    {"id": "u5", "name": "Carla Mendes", "email": "carla@faculdade.edu", "role": "solicitante", "status": "inativo", "initials": "CM"},
+    {"id": "u1", "name": "Marina Costa", "email": "admin@gmail.com", "role": "admin", "status": "ativo", "initials": "MC"},
+    {"id": "u2", "name": "Rafael Nunes", "email": "gerente@gmail.com", "role": "gerente", "status": "ativo", "initials": "RN"},
+    {"id": "u3", "name": "Ana Beatriz", "email": "solicitante@gmail.com", "role": "solicitante", "status": "ativo", "initials": "AB"},
+    {"id": "u4", "name": "Lucas Lima", "email": "participante@gmail.com", "role": "participante", "status": "ativo", "initials": "LL"},
 ]
 
 DEMO_USERS = [
-    {"id": "u1", "name": "Marina Costa", "email": "administrador@roomflow.com", "password": "admin123", "role": "admin", "status": "ativo", "initials": "MC"},
-    {"id": "u2", "name": "Rafael Nunes", "email": "gerente@roomflow.com", "password": "gerente123", "role": "gerente", "status": "ativo", "initials": "RN"},
-    {"id": "u3", "name": "Ana Beatriz", "email": "solicitante@roomflow.com", "password": "solicitante123", "role": "solicitante", "status": "ativo", "initials": "AB"},
-    {"id": "u4", "name": "Lucas Lima", "email": "participante@roomflow.com", "password": "participante123", "role": "participante", "status": "ativo", "initials": "LL"},
+    {"id": "u1", "name": "Marina Costa", "email": "admin@gmail.com", "password": "admin123", "role": "admin", "status": "ativo", "initials": "MC"},
+    {"id": "u2", "name": "Rafael Nunes", "email": "gerente@gmail.com", "password": "gerente123", "role": "gerente", "status": "ativo", "initials": "RN"},
+    {"id": "u3", "name": "Ana Beatriz", "email": "solicitante@gmail.com", "password": "solicitante123", "role": "solicitante", "status": "ativo", "initials": "AB"},
+    {"id": "u4", "name": "Lucas Lima", "email": "participante@gmail.com", "password": "participante123", "role": "participante", "status": "ativo", "initials": "LL"},
 ]
 
 
@@ -64,7 +63,7 @@ SPACES = [
 
 RESERVATIONS = [
     {"id": "r1", "requester": "Ana Beatriz", "requester_id": "u3", "title": "Aula de Metodologia", "space": "Sala 101", "date": TODAY.isoformat(), "start": "08:00", "end": "10:00", "type": "Aula", "status": "aprovada", "priority": "media", "participants": 18, "justification": "Aula regular da turma ADM-2."},
-    {"id": "r2", "requester": "Carla Mendes", "requester_id": "u5", "title": "Banca de TCC", "space": "Sala 204", "date": TODAY.isoformat(), "start": "09:30", "end": "11:00", "type": "Banca", "status": "pendente", "priority": "alta", "participants": 7, "justification": "Banca com convidados externos."},
+    {"id": "r2", "requester": "Ana Beatriz", "requester_id": "u3", "title": "Banca de TCC", "space": "Sala 204", "date": TODAY.isoformat(), "start": "09:30", "end": "11:00", "type": "Banca", "status": "pendente", "priority": "alta", "participants": 7, "justification": "Banca com convidados externos."},
     {"id": "r3", "requester": "Ana Beatriz", "requester_id": "u3", "title": "Workshop de Pesquisa", "space": "Auditorio Principal", "date": (TODAY + timedelta(days=1)).isoformat(), "start": "14:00", "end": "17:00", "type": "Workshop", "status": "em_analise", "priority": "media", "participants": 90, "justification": "Evento institucional."},
     {"id": "r4", "requester": "Rafael Nunes", "requester_id": "u2", "title": "Reuniao de coordenacao", "space": "Sala de Reunioes B", "date": (TODAY + timedelta(days=2)).isoformat(), "start": "10:00", "end": "11:30", "type": "Reuniao", "status": "aprovada", "priority": "baixa", "participants": 6, "justification": "Alinhamento semanal."},
     {"id": "r5", "requester": "Ana Beatriz", "requester_id": "u3", "title": "Monitoria", "space": "Laboratorio de Informatica", "date": (TODAY - timedelta(days=1)).isoformat(), "start": "16:00", "end": "18:00", "type": "Monitoria", "status": "rejeitada", "priority": "baixa", "participants": 22, "justification": "Conflito de recursos."},
