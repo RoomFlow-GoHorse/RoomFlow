@@ -292,7 +292,7 @@ def _render_art_panel():
     st.html(
         f"""
         <aside class="rf-forgot-art">
-            <div>{logo(light=True)}</div>
+            <div>{logo(variant="light")}</div>
             <div class="rf-forgot-art-copy">
                 <div class="rf-forgot-gold-line"></div>
                 <h2>Recupere o acesso<br><span>sem perder o fluxo.</span></h2>

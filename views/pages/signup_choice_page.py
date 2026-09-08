@@ -1,6 +1,7 @@
 import streamlit as st
 
 from services.app_state_service import go
+from views.components.ui_components import logo
 
 
 def signup_choice():
@@ -56,25 +57,6 @@ def signup_choice():
                 justify-content: flex-end;
                 gap: 8px;
                 font-weight: 700;
-            }
-
-            .rf-logo-mark {
-                width: 28px;
-                height: 28px;
-                border-radius: 8px;
-                background-color: var(--brand, #6D28D9);
-                color: #FFFFFF;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                font-size: 14px;
-                font-weight: 700;
-            }
-
-            .rf-logo-text {
-                font-size: 16px;
-                font-weight: 700;
-                color: #171717;
             }
 
             [data-testid="stMainBlockContainer"] .stButton > button {
@@ -239,10 +221,7 @@ def signup_choice():
                 go("landing")
 
         with col_tb2:
-            st.markdown(
-                '<div class="rf-choice-logo"><div class="rf-logo-mark">R</div><span class="rf-logo-text">RoomFlow</span></div>',
-                unsafe_allow_html=True,
-            )
+            st.html(logo(size="small", class_name="rf-choice-logo"))
 
         st.markdown(
             '<div class="rf-choice-header"><p class="rf-choice-eyebrow">Bem-vindo ao RoomFlow</p><h1 class="rf-choice-title">Criar sua conta</h1><p class="rf-choice-subtitle">Escolha como você deseja utilizar o RoomFlow.</p></div>',

@@ -1,6 +1,8 @@
 import time
 import streamlit as st
+
 from services.app_state_service import go
+from views.components.ui_components import logo
 
 INSTITUTION_TYPES = [
     "Faculdade",
@@ -137,10 +139,7 @@ def _render_topbar():
         if st.button("← Voltar", key="signup_inst_top_back", type="tertiary"):
             _exit_signup()
     with col2:
-        st.markdown(
-            '<div class="rf-choice-logo"><div class="rf-logo-mark">R</div><span class="rf-logo-text">RoomFlow</span></div>',
-            unsafe_allow_html=True,
-        )
+        st.html(logo(size="small", class_name="rf-choice-logo"))
 
 def _render_stepper():
     step = st.session_state.signup_inst_step
@@ -388,25 +387,6 @@ def signup_institution():
                 justify-content: flex-end;
                 gap: 8px;
                 font-weight: 700;
-            }
-
-            .rf-logo-mark {
-                width: 28px;
-                height: 28px;
-                border-radius: 8px;
-                background-color: var(--brand, #6D28D9);
-                color: #FFFFFF;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                font-size: 14px;
-                font-weight: 700;
-            }
-
-            .rf-logo-text {
-                font-size: 16px;
-                font-weight: 700;
-                color: #171717;
             }
 
             /* CONTAINER CARD DE FORMULÁRIO (FUNDO BRANCO, BORDA #E4E4E7, RADIUS 16PX) */

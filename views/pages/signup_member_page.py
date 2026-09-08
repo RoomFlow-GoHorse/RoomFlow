@@ -3,6 +3,7 @@ import streamlit as st
 
 from services import mock_data_service
 from services.app_state_service import go
+from views.components.ui_components import logo
 
 DEMO_INSTITUTIONS = [
     "Faculdade de Tecnologia XPTO",
@@ -93,10 +94,7 @@ def _render_topbar():
             go("signup_choice")
 
     with col2:
-        st.markdown(
-            '<div class="rf-choice-logo"><div class="rf-logo-mark">R</div><span class="rf-logo-text">RoomFlow</span></div>',
-            unsafe_allow_html=True,
-        )
+        st.html(logo(size="small", class_name="rf-choice-logo"))
 
 def _render_form():
     _render_topbar()
@@ -340,25 +338,6 @@ def signup_member():
                 justify-content: flex-end;
                 gap: 8px;
                 font-weight: 700;
-            }
-
-            .rf-logo-mark {
-                width: 28px;
-                height: 28px;
-                border-radius: 8px;
-                background-color: var(--brand, #6D28D9);
-                color: #FFFFFF;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                font-size: 14px;
-                font-weight: 700;
-            }
-
-            .rf-logo-text {
-                font-size: 16px;
-                font-weight: 700;
-                color: #171717;
             }
 
             [data-testid="stMainBlockContainer"] [data-testid="stVerticalBlock"]:has(div.rf-member-form-card) {
