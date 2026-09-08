@@ -69,18 +69,20 @@ body {
   background: var(--surface);
 }
 
-.block-container {
-  max-width: none !important;
-  padding: 0 !important;
+/* Streamlit 1.62 chrome reset: remove the native header and only its top offset. */
+header[data-testid="stHeader"] {
+  display: none !important;
 }
 
-[data-testid="stVerticalBlock"] {
-  gap: 0;
+[data-testid="stAppViewContainer"],
+[data-testid="stMain"] {
+  padding-top: 0 !important;
 }
 
 [data-testid="stMainBlockContainer"] {
   max-width: none !important;
   padding: 0 !important;
+  margin-top: 0 !important;
 }
 
 
@@ -118,108 +120,6 @@ body {
   font-size: 20px;
   font-weight: 700;
   color: var(--graphite);
-}
-
-/* =========================================================
-   SHELL INTERNO E NAVEGACAO
-========================================================= */
-
-section[data-testid="stSidebar"] {
-  width: 240px !important;
-  min-width: 240px !important;
-  background: #ffffff;
-  border-right: 1px solid var(--stroke);
-}
-
-section[data-testid="stSidebar"] > div:first-child {
-  background: #ffffff;
-}
-
-section[data-testid="stSidebar"] [data-testid="stSidebarContent"] {
-  padding: 16px 12px 18px;
-}
-
-.rf-sidebar-logo {
-  padding: 0 8px 16px;
-  border-bottom: 1px solid var(--stroke);
-}
-
-.rf-sidebar-section-label {
-  margin: 20px 8px 8px;
-  color: var(--graphite-muted);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0;
-  text-transform: uppercase;
-}
-
-.rf-sidebar-divider {
-  height: 1px;
-  margin: 14px 8px;
-  background: var(--stroke);
-}
-
-section[data-testid="stSidebar"] [data-testid="stButton"] {
-  margin: 1px 0;
-}
-
-section[data-testid="stSidebar"] [data-testid="stButton"] button {
-  min-height: 38px;
-  justify-content: flex-start;
-  padding: 0 10px;
-  border: 0;
-  border-radius: 6px;
-  color: var(--graphite-soft);
-  font-size: 14px;
-  font-weight: 600;
-}
-
-section[data-testid="stSidebar"] [data-testid="stButton"] button:hover {
-  background: var(--surface-alt);
-  color: var(--graphite);
-}
-
-section[data-testid="stSidebar"] .st-key-rf_nav_active button {
-  background: var(--brand-light);
-  color: var(--brand);
-}
-
-section[data-testid="stSidebar"] .st-key-rf_nav_active button:hover {
-  background: var(--brand-light);
-  color: var(--brand);
-}
-
-.st-key-rf_sidebar_footer {
-  margin-top: 24px;
-  padding-top: 14px;
-  border-top: 1px solid var(--stroke);
-}
-
-.rf-user-summary {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 0 8px 10px;
-}
-
-.rf-user-name {
-  max-width: 150px;
-  overflow: hidden;
-  color: var(--graphite);
-  font-size: 14px;
-  font-weight: 700;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.rf-user-role {
-  color: var(--graphite-muted);
-  font-size: 12px;
-}
-
-section[data-testid="stSidebar"] .st-key-rf_logout button,
-section[data-testid="stSidebar"] .st-key-rf_logout button:hover {
-  color: var(--danger);
 }
 
 .rf-avatar {
@@ -260,10 +160,3 @@ section[data-testid="stSidebar"] .st-key-rf_logout button:hover {
 /* =========================================================
    RESPONSIVO GLOBAL
 ========================================================= */
-
-@media (max-width: 800px) {
-  section[data-testid="stSidebar"] {
-    width: min(82vw, 280px) !important;
-    min-width: min(82vw, 280px) !important;
-  }
-}
