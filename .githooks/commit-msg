@@ -1,0 +1,37 @@
+#!/bin/sh
+
+COMMIT_MSG_FILE="$1"
+
+COMMIT_MSG=$(sed -n '1p' "$COMMIT_MSG_FILE")
+
+if ! printf '%s\n' "$COMMIT_MSG" | grep -Eq '^(feat|fix|docs|test|build|perf|style|refactor|chore|ci|raw|cleanup|remove):[[:space:]]+[^[:space:]].*'; then
+    echo ""
+    echo "ERRO: mensagem de commit invalida."
+    echo ""
+    echo "Use o formato:"
+    echo "  tipo: descricao"
+    echo ""
+    echo "Tipos permitidos:"
+    echo "  feat"
+    echo "  fix"
+    echo "  docs"
+    echo "  test"
+    echo "  build"
+    echo "  perf"
+    echo "  style"
+    echo "  refactor"
+    echo "  chore"
+    echo "  ci"
+    echo "  raw"
+    echo "  cleanup"
+    echo "  remove"
+    echo ""
+    echo "Exemplos:"
+    echo "  feat: adicionar pagina de login"
+    echo "  fix: corrigir validacao do login"
+    echo "  docs: atualizar README"
+    echo ""
+    exit 1
+fi
+
+exit 0
