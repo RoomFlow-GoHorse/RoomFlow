@@ -1,45 +1,269 @@
+/* =========================================================
+   FONTS
+========================================================= */
+
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,600;1,9..144,300&family=JetBrains+Mono:wght@400;500&display=swap');
 
+
+/* =========================================================
+   TOKENS
+========================================================= */
+
 :root {
-    /* Fontes */
-    --font-sans: 'DM Sans', system-ui, sans-serif;
-    --font-display: 'Fraunces', Georgia, serif;
-    --font-mono: 'JetBrains Mono', monospace;
+  --brand: #6D28D9;
+  --brand-hover: #5B21B6;
+  --brand-light: #EDE9FE;
+  --brand-lighter: #F5F3FF;
 
-    /* Marca */
-    --color-brand: #6D28D9;
-    --color-brand-hover: #5B21B6;
-    --color-brand-light: #EDE9FE;
-    --color-brand-lighter: #F5F3FF;
+  --mustard: #B45309;
+  --mustard-light: #FEF3C7;
+  --mustard-border: #FCD34D;
 
-    /* Mostarda */
-    --color-mustard: #B45309;
-    --color-mustard-bg: #FEF3C7;
-    --color-mustard-border: #FCD34D;
+  --surface: #F8F7F4;
+  --surface-alt: #F0EEE9;
 
-    /* Superfícies */
-    --color-surface: #F8F7F4;
-    --color-surface-alt: #F0EEE9;
+  --graphite: #1C1C2E;
+  --graphite-soft: #52525B;
+  --graphite-muted: #A1A1AA;
+  --soft: var(--graphite-soft);
+  --muted: var(--graphite-muted);
 
-    /* Texto */
-    --color-graphite: #1C1C2E;
-    --color-graphite-soft: #52525B;
-    --color-graphite-muted: #A1A1AA;
+  --stroke: #E4E1DB;
+  --stroke-strong: #C8C4BC;
 
-    /* Bordas */
-    --color-stroke: #E4E1DB;
-    --color-stroke-strong: #C8C4BC;
+  --success: #16A34A;
+  --success-bg: #DCFCE7;
 
-    /* Estados */
-    --color-success: #16A34A;
-    --color-success-bg: #DCFCE7;
+  --danger: #DC2626;
+  --danger-bg: #FEE2E2;
 
-    --color-danger: #DC2626;
-    --color-danger-bg: #FEE2E2;
+  --warning: #D97706;
+  --warning-bg: #FEF3C7;
 
-    --color-warning: #D97706;
-    --color-warning-bg: #FEF3C7;
+  --font-sans: "DM Sans", system-ui, sans-serif;
+  --font-display: "Fraunces", Georgia, serif;
+  --font-mono: "JetBrains Mono", monospace;
+}
 
-    --color-info: #0EA5E9;
-    --color-info-bg: #E0F2FE;
+
+/* =========================================================
+   RESET
+========================================================= */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-sans);
+  background: var(--surface);
+  color: var(--graphite);
+}
+
+.stApp {
+  background: var(--surface);
+}
+
+.block-container {
+  max-width: none !important;
+  padding: 0 !important;
+}
+
+[data-testid="stVerticalBlock"] {
+  gap: 0;
+}
+
+[data-testid="stMainBlockContainer"] {
+  max-width: none !important;
+  padding: 0 !important;
+}
+
+
+/* =========================================================
+   SCROLLBAR
+========================================================= */
+
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #D1CFCA;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #A8A49E;
+}
+
+
+/* =========================================================
+   LOGO
+========================================================= */
+
+.rf-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--graphite);
+}
+
+/* =========================================================
+   SHELL INTERNO E NAVEGACAO
+========================================================= */
+
+section[data-testid="stSidebar"] {
+  width: 240px !important;
+  min-width: 240px !important;
+  background: #ffffff;
+  border-right: 1px solid var(--stroke);
+}
+
+section[data-testid="stSidebar"] > div:first-child {
+  background: #ffffff;
+}
+
+section[data-testid="stSidebar"] [data-testid="stSidebarContent"] {
+  padding: 16px 12px 18px;
+}
+
+.rf-sidebar-logo {
+  padding: 0 8px 16px;
+  border-bottom: 1px solid var(--stroke);
+}
+
+.rf-sidebar-section-label {
+  margin: 20px 8px 8px;
+  color: var(--graphite-muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.rf-sidebar-divider {
+  height: 1px;
+  margin: 14px 8px;
+  background: var(--stroke);
+}
+
+section[data-testid="stSidebar"] [data-testid="stButton"] {
+  margin: 1px 0;
+}
+
+section[data-testid="stSidebar"] [data-testid="stButton"] button {
+  min-height: 38px;
+  justify-content: flex-start;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 6px;
+  color: var(--graphite-soft);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+section[data-testid="stSidebar"] [data-testid="stButton"] button:hover {
+  background: var(--surface-alt);
+  color: var(--graphite);
+}
+
+section[data-testid="stSidebar"] .st-key-rf_nav_active button {
+  background: var(--brand-light);
+  color: var(--brand);
+}
+
+section[data-testid="stSidebar"] .st-key-rf_nav_active button:hover {
+  background: var(--brand-light);
+  color: var(--brand);
+}
+
+.st-key-rf_sidebar_footer {
+  margin-top: 24px;
+  padding-top: 14px;
+  border-top: 1px solid var(--stroke);
+}
+
+.rf-user-summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 8px 10px;
+}
+
+.rf-user-name {
+  max-width: 150px;
+  overflow: hidden;
+  color: var(--graphite);
+  font-size: 14px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rf-user-role {
+  color: var(--graphite-muted);
+  font-size: 12px;
+}
+
+section[data-testid="stSidebar"] .st-key-rf_logout button,
+section[data-testid="stSidebar"] .st-key-rf_logout button:hover {
+  color: var(--danger);
+}
+
+.rf-avatar {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--brand-light);
+  color: var(--brand);
+  font-weight: 700;
+}
+
+
+/* =========================================================
+   COMPONENTES COMPARTILHADOS
+========================================================= */
+
+.rf-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.rf-grid.two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.rf-card {
+  padding: 16px;
+  background: white;
+  border: 1px solid var(--stroke);
+  border-radius: 8px;
+}
+
+
+/* =========================================================
+   RESPONSIVO GLOBAL
+========================================================= */
+
+@media (max-width: 800px) {
+  section[data-testid="stSidebar"] {
+    width: min(82vw, 280px) !important;
+    min-width: min(82vw, 280px) !important;
+  }
 }

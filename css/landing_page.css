@@ -1,0 +1,1226 @@
+/* =========================================================
+   LANDING PAGE
+========================================================= */
+
+.rf-landing {
+    width: 100%;
+    overflow-x: hidden;
+    background: var(--surface);
+}
+
+
+/* =========================================================
+   CONTAINER
+========================================================= */
+
+.rf-container {
+    width: min(1152px, calc(100% - 40px));
+    margin: 0 auto;
+}
+
+
+/* =========================================================
+   HERO
+========================================================= */
+
+.rf-landing-hero {
+    position: relative;
+    overflow: hidden;
+    padding-top: 28px;
+    color: var(--graphite);
+
+    background:
+        radial-gradient(
+            ellipse 60% 70% at 0% 30%,
+            rgba(109, 74, 255, 0.16),
+            transparent 70%
+        ),
+        radial-gradient(
+            ellipse 45% 55% at 100% 15%,
+            rgba(212, 167, 44, 0.14),
+            transparent 70%
+        ),
+        radial-gradient(
+            ellipse 50% 40% at 55% 100%,
+            rgba(109, 74, 255, 0.08),
+            transparent 70%
+        ),
+        #F7F4ED;
+}
+
+
+/* =========================================================
+   HEADER
+========================================================= */
+
+.rf-landing-header {
+    position: relative;
+    z-index: 20;
+
+    padding-top: 0;
+}
+
+.rf-header-content {
+    height: 80px;
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.rf-header-logo {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+
+/* =========================================================
+   NAVEGACAO
+========================================================= */
+
+.rf-landing-nav {
+    display: flex;
+    align-items: center;
+    gap: 36px;
+}
+
+.rf-landing-nav a {
+    color: var(--soft);
+    text-decoration: none;
+
+    font-size: 14px;
+    font-weight: 400;
+
+    transition: color 0.2s ease;
+}
+
+.rf-landing-nav a:hover {
+    color: var(--brand);
+}
+
+
+/* =========================================================
+   ACOES DO HEADER
+========================================================= */
+
+.rf-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.rf-header-actions a {
+    text-decoration: none;
+}
+
+
+/* BOTAO ENTRAR */
+
+.rf-nav-login {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    min-height: 40px;
+
+    padding: 0 12px;
+
+    color: var(--soft);
+
+    font-size: 14px;
+    font-weight: 500;
+
+    border-radius: 8px;
+
+    cursor: pointer;
+
+    transition:
+        color 0.2s ease,
+        background 0.2s ease;
+}
+
+.rf-nav-login:hover {
+    color: var(--brand);
+    background: rgba(255, 255, 255, 0.5);
+}
+
+
+/* BOTAO CRIAR CONTA */
+
+.rf-nav-signup {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+
+    min-height: 42px;
+
+    padding: 0 20px;
+
+    background: var(--brand);
+    color: white;
+
+    border-radius: 8px;
+
+    font-size: 14px;
+    font-weight: 600;
+
+    box-shadow: 0 2px 5px rgba(109, 40, 217, 0.12);
+
+    cursor: pointer;
+
+    transition:
+        background 0.2s ease,
+        transform 0.2s ease;
+}
+
+.rf-nav-signup:hover {
+    background: var(--brand-hover);
+    transform: translateY(-1px);
+}
+
+
+/* =========================================================
+   HERO MAIN
+========================================================= */
+
+.rf-hero-main {
+    position: relative;
+    z-index: 10;
+
+    padding-top: 80px;
+    padding-bottom: 0;
+}
+
+
+.rf-hero-text {
+    max-width: 900px;
+    margin: 0 auto;
+
+    text-align: center;
+}
+
+
+/* =========================================================
+   BADGE
+========================================================= */
+
+.rf-hero-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+
+    padding: 8px 16px;
+
+    background: rgba(255, 255, 255, 0.7);
+
+    border: 1px solid rgba(109, 40, 217, 0.15);
+
+    border-radius: 999px;
+
+    color: var(--brand);
+
+    font-size: 12px;
+    font-weight: 500;
+
+    box-shadow: 0 2px 5px rgba(28, 28, 46, 0.04);
+}
+
+.rf-badge-dot {
+    width: 8px;
+    height: 8px;
+
+    flex-shrink: 0;
+
+    background: var(--mustard);
+
+    border-radius: 50%;
+
+    box-shadow: 0 0 10px rgba(180, 83, 9, 0.45);
+}
+
+
+/* =========================================================
+   TITULO
+========================================================= */
+
+.rf-hero-text h1 {
+    margin: 28px 0;
+
+    font-family: var(--font-display);
+
+    font-size: clamp(52px, 7vw, 84px);
+
+    font-weight: 600;
+
+    line-height: 0.98;
+
+    letter-spacing: -0.04em;
+
+    color: var(--graphite);
+}
+
+.rf-hero-text h1 span {
+    color: var(--brand);
+}
+
+
+/* =========================================================
+   DESCRICAO
+========================================================= */
+
+.rf-hero-description {
+    max-width: 720px;
+
+    margin:
+        0
+        auto
+        36px;
+
+    color: var(--soft);
+
+    font-size: clamp(16px, 2vw, 20px);
+
+    line-height: 1.6;
+}
+
+
+/* =========================================================
+   BOTOES DO HERO
+========================================================= */
+
+.rf-hero-actions {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    gap: 12px;
+
+    margin-top: 10px;
+}
+
+.rf-hero-actions a {
+    text-decoration: none;
+}
+
+
+/* BOTAO PRINCIPAL */
+
+.rf-hero-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    gap: 8px;
+
+    min-height: 52px;
+
+    padding: 0 28px;
+
+    background: var(--brand);
+
+    color: #ffffff;
+
+    border-radius: 8px;
+
+    font-size: 15px;
+    font-weight: 600;
+
+    box-shadow:
+        0 12px 25px rgba(109, 40, 217, 0.20);
+
+    cursor: pointer;
+
+    transition:
+        background 0.2s ease,
+        transform 0.2s ease,
+        box-shadow 0.2s ease;
+}
+
+.rf-hero-primary:hover {
+    background: var(--brand-hover);
+
+    transform: translateY(-2px);
+
+    box-shadow:
+        0 16px 30px rgba(109, 40, 217, 0.28);
+}
+
+
+/* SETA */
+
+.rf-hero-primary span {
+    font-size: 18px;
+    line-height: 1;
+}
+
+
+/* BOTAO SECUNDARIO */
+
+.rf-hero-secondary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    min-height: 52px;
+
+    padding: 0 28px;
+
+    background: rgba(255, 255, 255, 0.65);
+
+    color: var(--brand);
+
+    border: 1px solid rgba(109, 40, 217, 0.20);
+
+    border-radius: 8px;
+
+    font-size: 15px;
+    font-weight: 500;
+
+    backdrop-filter: blur(8px);
+
+    transition:
+        background 0.2s ease,
+        border-color 0.2s ease;
+}
+
+.rf-hero-secondary:hover {
+    background: #ffffff;
+
+    border-color: rgba(109, 40, 217, 0.35);
+}
+
+
+/* =========================================================
+   BENEFICIOS RAPIDOS
+========================================================= */
+
+.rf-quick-benefits {
+    display: flex;
+    flex-wrap: wrap;
+
+    align-items: center;
+    justify-content: center;
+
+    gap: 12px 28px;
+
+    margin-top: 24px;
+
+    color: var(--soft);
+
+    font-size: 14px;
+}
+
+.rf-quick-benefits div {
+    display: inline-flex;
+    align-items: center;
+
+    gap: 8px;
+
+    flex: 0 0 auto;
+    white-space: nowrap;
+}
+
+.rf-quick-benefits div span:first-child {
+    display: inline-flex;
+
+    align-items: center;
+    justify-content: center;
+
+    width: 16px;
+    height: 16px;
+
+    color: var(--mustard);
+
+    font-size: 14px;
+    font-weight: 700;
+}
+
+
+/* =========================================================
+   DASHBOARD MOCK
+========================================================= */
+
+.rf-dashboard-wrapper {
+  position: relative;
+  width: 100%;
+  max-width: 960px;
+  margin-top: 72px;
+  margin-bottom: 0;
+}
+
+.rf-dashboard-glow {
+  position: absolute;
+  inset: -70px;
+  z-index: 0;
+  border-radius: 60px;
+  background: radial-gradient(circle, rgba(109, 40, 217, 0.13), transparent 65%);
+  filter: blur(40px);
+}
+
+.rf-dashboard-mock {
+  position: relative;
+  z-index: 2;
+  overflow: hidden;
+  background: white;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  border-radius: 24px;
+  box-shadow: 0 30px 80px rgba(40, 30, 70, 0.18);
+}
+
+.rf-browser-bar,
+.rf-panel-header,
+.rf-progress-label,
+.rf-conflict-alert,
+.rf-footer-content,
+.rf-profiles-actions {
+  display: flex;
+  align-items: center;
+}
+
+.rf-browser-bar {
+  gap: 10px;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--stroke);
+  background: #FAFAFC;
+}
+
+.rf-browser-dots {
+  display: flex;
+  gap: 7px;
+}
+
+.rf-browser-dots span {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.rf-browser-dots span:nth-child(1) {
+  background: #FCA5A5;
+}
+
+.rf-browser-dots span:nth-child(2) {
+  background: #FCD34D;
+}
+
+.rf-browser-dots span:nth-child(3) {
+  background: #86EFAC;
+}
+
+.rf-browser-title {
+  margin-left: 4px;
+  color: var(--graphite-muted);
+  font-size: 12px;
+}
+
+.rf-dashboard-content {
+  padding: 28px;
+}
+
+.rf-dashboard-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+  margin-bottom: 22px;
+}
+
+.rf-dashboard-stat {
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+  text-align: left;
+  background: #FAFAFC;
+  border: 1px solid rgba(228, 225, 219, 0.7);
+  border-radius: 14px;
+}
+
+.rf-dashboard-stat strong {
+  font-size: 32px;
+  font-weight: 600;
+}
+
+.rf-dashboard-stat span {
+  margin-top: 5px;
+  color: var(--graphite-muted);
+  font-size: 12px;
+}
+
+.rf-success {
+  color: var(--success);
+}
+
+.rf-brand {
+  color: var(--brand);
+}
+
+.rf-mustard {
+  color: var(--mustard);
+}
+
+.rf-dashboard-grid {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr;
+  gap: 20px;
+}
+
+.rf-dashboard-panel {
+  padding: 20px;
+  border: 1px solid var(--stroke);
+  border-radius: 14px;
+  background: white;
+}
+
+.rf-panel-header {
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.rf-panel-header strong {
+  font-size: 14px;
+  color: var(--graphite);
+}
+
+.rf-panel-header span {
+  color: var(--brand);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.rf-reservation {
+  display: grid;
+  grid-template-columns: 10px 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 0;
+  border-bottom: 1px solid var(--stroke);
+}
+
+.rf-reservation:last-child {
+  border-bottom: none;
+}
+
+.rf-reservation-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--brand);
+}
+
+.rf-light-dot {
+  opacity: 0.55;
+}
+
+.rf-success-dot {
+  background: var(--success);
+}
+
+.rf-reservation div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.rf-reservation strong {
+  color: var(--graphite);
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rf-reservation small,
+.rf-reservation-type {
+  color: var(--graphite-muted);
+  font-size: 11px;
+}
+
+.rf-occupation-title {
+  margin-bottom: 22px;
+  color: var(--graphite);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.rf-progress-item {
+  margin-bottom: 20px;
+}
+
+.rf-progress-label {
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+
+.rf-progress-label span {
+  color: var(--graphite-soft);
+}
+
+.rf-progress-label strong {
+  color: var(--graphite);
+  font-weight: 600;
+}
+
+.rf-progress {
+  width: 100%;
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--brand-light);
+}
+
+.rf-progress-bar {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--brand);
+}
+
+.rf-mustard-bar {
+  background: var(--mustard);
+}
+
+.rf-total-occupation {
+  display: flex;
+  flex-direction: column;
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid var(--stroke);
+}
+
+.rf-total-occupation span {
+  color: var(--graphite-muted);
+  font-size: 11px;
+}
+
+.rf-total-occupation strong {
+  margin-top: 3px;
+  color: var(--brand);
+  font-size: 28px;
+  font-weight: 600;
+}
+
+.rf-conflict-alert {
+  position: absolute;
+  z-index: 3;
+  top: -20px;
+  right: -20px;
+  gap: 10px;
+  padding: 12px 16px;
+  background: #FFF8E1;
+  border: 1px solid var(--mustard-border);
+  border-radius: 12px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.12);
+}
+
+.rf-conflict-icon {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: rgba(180, 83, 9, 0.15);
+  color: var(--mustard);
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.rf-conflict-alert div:last-child {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.rf-conflict-alert strong {
+  color: var(--graphite);
+  font-size: 12px;
+}
+
+.rf-conflict-alert span {
+  color: var(--graphite-muted);
+  font-size: 10px;
+}
+
+.rf-hero-curve {
+  position: relative;
+  width: 100%;
+  height: 110px;
+  margin-top: -1px;
+}
+
+.rf-hero-curve svg {
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+
+/* =========================================================
+   SECOES DA LANDING
+========================================================= */
+
+.rf-features-section {
+  padding: 80px 0;
+  background: white;
+  border-top: 1px solid var(--stroke);
+  border-bottom: 1px solid var(--stroke);
+}
+
+.rf-section-heading {
+  max-width: 560px;
+  margin-bottom: 48px;
+}
+
+.rf-section-heading > span {
+  display: block;
+  margin-bottom: 14px;
+  color: var(--brand);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+.rf-section-heading h2 {
+  margin: 0 0 18px;
+  color: var(--graphite);
+  font-family: var(--font-display);
+  font-size: 42px;
+  font-weight: 300;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+
+.rf-section-heading p {
+  margin: 0;
+  color: var(--graphite-soft);
+  font-size: 16px;
+  line-height: 1.65;
+}
+
+.rf-features-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+}
+
+.rf-feature-card {
+  padding: 24px;
+  border: 1px solid var(--stroke);
+  border-radius: 14px;
+  background: white;
+  transition: 0.25s;
+}
+
+.rf-feature-card:hover {
+  background: var(--brand-lighter);
+  border-color: rgba(109, 40, 217, 0.3);
+  transform: translateY(-3px);
+}
+
+.rf-feature-card:hover .rf-feature-icon {
+  background: var(--brand);
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+.rf-feature-icon {
+  width: 42px;
+  height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 18px;
+  border-radius: 10px;
+  background: var(--brand-light);
+  color: var(--brand);
+  font-size: 20px;
+  line-height: 1;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease,
+    transform 0.2s ease;
+}
+
+.rf-feature-icon svg {
+  width: 22px;
+  height: 22px;
+  display: block;
+  flex-shrink: 0;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.rf-feature-card h3 {
+  margin: 0 0 10px;
+  color: var(--graphite);
+  font-size: 16px;
+}
+
+.rf-feature-card p {
+  margin: 0;
+  color: var(--graphite-soft);
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+.rf-benefits-section {
+  padding: 80px 0;
+  background: #F7F4ED;
+}
+
+.rf-mustard-text {
+  color: var(--mustard) !important;
+}
+
+.rf-benefits-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 24px;
+}
+
+.rf-benefit-card {
+  padding: 26px;
+  background: white;
+  border: 1px solid var(--stroke);
+  border-radius: 14px;
+}
+
+.rf-benefit-card > strong {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--brand);
+  font-family: var(--font-display);
+  font-size: 42px;
+  font-weight: 300;
+  letter-spacing: -0.03em;
+}
+
+.rf-benefit-card h3 {
+  margin: 0 0 14px;
+  color: var(--graphite);
+  font-size: 15px;
+}
+
+.rf-benefit-card p {
+  margin: 0;
+  color: var(--graphite-muted);
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.rf-profiles-section {
+  position: relative;
+  overflow: hidden;
+  padding: 90px 0;
+  color: white;
+  background:
+    radial-gradient(ellipse 60% 80% at 0% 100%, rgba(109, 40, 217, 0.38), transparent 65%),
+    radial-gradient(ellipse 45% 60% at 100% 0%, rgba(167, 139, 250, 0.14), transparent 65%),
+    linear-gradient(135deg, #2E1065 0%, #4C1D95 45%, #2E1065 100%);
+}
+
+.rf-profiles-heading {
+  max-width: 560px;
+  margin-bottom: 48px;
+}
+
+.rf-profiles-heading > span {
+  display: block;
+  margin-bottom: 14px;
+  color: #E5C158;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+.rf-profiles-heading h2 {
+  margin: 0 0 18px;
+  color: white;
+  font-family: var(--font-display);
+  font-size: 46px;
+  font-weight: 300;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+.rf-profiles-heading h2 strong {
+  color: #A78BFA;
+  font-weight: 300;
+}
+
+.rf-profiles-heading p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 16px;
+  line-height: 1.65;
+}
+
+.rf-profiles-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+
+.rf-profile-card {
+  position: relative;
+  overflow: hidden;
+  min-height: 290px;
+  padding: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 18px;
+  background: rgba(0, 0, 0, 0.10);
+  backdrop-filter: blur(10px);
+  transition: 0.25s;
+}
+
+.rf-profile-card:hover {
+  transform: translateY(-5px);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.rf-profile-number {
+  display: block;
+  margin-bottom: 46px;
+  color: rgba(255, 255, 255, 0.35);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.rf-profile-line {
+  width: 32px;
+  height: 4px;
+  margin-bottom: 22px;
+  border-radius: 999px;
+  background: #D4A72C;
+}
+
+.rf-profile-card h3 {
+  margin: 0 0 14px;
+  color: white;
+  font-size: 18px;
+}
+
+.rf-profile-card p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+.rf-profiles-actions {
+  gap: 12px;
+  margin-top: 36px;
+}
+
+.rf-profile-primary,
+.rf-profile-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 0 22px;
+  border-radius: 8px;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.rf-profile-primary {
+  gap: 8px;
+  background: white;
+  color: var(--brand);
+}
+
+.rf-profile-secondary {
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.26);
+}
+
+.rf-landing-footer {
+  padding: 40px 0;
+  background: white;
+  border-top: 1px solid var(--stroke);
+}
+
+.rf-footer-content {
+  justify-content: space-between;
+  gap: 30px;
+}
+
+.rf-footer-links {
+  display: flex;
+  gap: 28px;
+  color: var(--graphite-muted);
+  font-size: 14px;
+}
+
+.rf-footer-links a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.rf-landing-footer p {
+  margin: 0;
+  color: var(--graphite-muted);
+  font-size: 12px;
+}
+
+
+/* =========================================================
+   RESPONSIVO DA LANDING
+========================================================= */
+
+@media (max-width: 1000px) {
+  .rf-profiles-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .rf-benefits-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 800px) {
+  .rf-container {
+    width: min(100% - 36px, 1152px);
+  }
+
+  .rf-landing-hero {
+    padding-top: 14px;
+  }
+
+  .rf-landing-header {
+    padding-top: 0;
+  }
+
+  .rf-header-content {
+    height: 65px;
+  }
+
+  .rf-landing-nav {
+    display: none;
+  }
+
+  .rf-hero-main {
+    padding-top: 60px;
+  }
+
+  .rf-dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .rf-dashboard-wrapper {
+    margin-top: 55px;
+  }
+
+  .rf-conflict-alert {
+    top: -16px;
+    right: 8px;
+  }
+
+  .rf-features-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .rf-footer-content {
+    flex-direction: column;
+    text-align: center;
+  }
+}
+
+@media (max-width: 600px) {
+  .rf-header-actions {
+    gap: 4px;
+  }
+
+  .rf-nav-login {
+    padding: 8px;
+    font-size: 13px;
+  }
+
+  .rf-nav-signup {
+    padding: 9px 12px;
+    font-size: 12px;
+  }
+
+  .rf-hero-text h1 {
+    font-size: 52px;
+  }
+
+  .rf-hero-description {
+    font-size: 16px;
+  }
+
+  .rf-hero-actions,
+  .rf-profiles-actions {
+    width: 100%;
+    flex-direction: column;
+  }
+
+  .rf-hero-primary,
+  .rf-hero-secondary,
+  .rf-profile-primary,
+  .rf-profile-secondary {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .rf-dashboard-content {
+    padding: 16px;
+  }
+
+  .rf-dashboard-stats {
+    gap: 8px;
+  }
+
+  .rf-dashboard-stat {
+    padding: 12px;
+  }
+
+  .rf-dashboard-stat strong {
+    font-size: 24px;
+  }
+
+  .rf-dashboard-stat span {
+    font-size: 10px;
+  }
+
+  .rf-features-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .rf-benefits-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .rf-profiles-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .rf-section-heading h2,
+  .rf-profiles-heading h2 {
+    font-size: 36px;
+  }
+
+  .rf-quick-benefits {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .rf-quick-benefits div {
+    width: 100%;
+  }
+
+  .rf-footer-links {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+}
