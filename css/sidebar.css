@@ -95,8 +95,15 @@ section[data-testid="stSidebar"] [data-testid="stButton"] button {
   flex-wrap: nowrap !important;
 }
 
+section[data-testid="stSidebar"] [data-testid="stButton"] button > div {
+  width: 100% !important;
+  justify-content: flex-start !important;
+  text-align: left !important;
+}
+
 section[data-testid="stSidebar"] [data-testid="stButton"] button [data-testid="stMarkdownContainer"] {
   min-width: 0;
+  text-align: left !important;
 }
 
 section[data-testid="stSidebar"] [data-testid="stButton"] button [data-testid="stMarkdownContainer"] p {

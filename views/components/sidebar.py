@@ -55,14 +55,15 @@ def _navigate(page):
 
 
 def render_sidebar(user):
-    current_page = st.session_state.page
-    unread = sum(not item["read"] for item in notifications_for(user["role"]))
+    current_page = st.session_state.get("page", "landing")
+    role = user.get("role", "participante")
+    unread = sum(not item["read"] for item in notifications_for(role))
 
     with st.sidebar:
         st.html('<div class="rf-sidebar-logo">' + logo() + "</div>")
         st.html('<div class="rf-sidebar-section-label">Navegação</div>')
 
-        for group_index, group in enumerate(NAV_GROUPS[user["role"]]):
+        for group_index, group in enumerate(NAV_GROUPS.get(role, [])):
             if group_index:
                 st.html('<div class="rf-sidebar-divider"></div>')
 
@@ -83,10 +84,10 @@ def render_sidebar(user):
             st.html(
                 f"""
                 <div class="rf-user-summary">
-                  <span class="rf-avatar">{user['initials']}</span>
+                  <span class="rf-avatar">{user.get('initials', '')}</span>
                   <div>
-                    <div class="rf-user-name">{user['name']}</div>
-                    <div class="rf-user-role">{role_label(user['role'])}</div>
+                    <div class="rf-user-name">{user.get('name', 'Usuário')}</div>
+                    <div class="rf-user-role">{role_label(role)}</div>
                   </div>
                 </div>
                 """

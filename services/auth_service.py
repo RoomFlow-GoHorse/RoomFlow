@@ -25,4 +25,6 @@ def login(email, password):
 def logout():
     st.session_state.user = None
     st.session_state.page = "landing"
+    st.query_params.clear()
+    st.query_params["page"] = "landing"
     st.rerun()
