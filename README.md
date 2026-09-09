@@ -57,6 +57,11 @@ Com o ambiente virtual ativado:
 ```bash
 pip install -r requirements.txt
 ```
+ou
+
+```bash
+pip install streamlit 
+```
 
 ## Executando o projeto
 
