@@ -1,4 +1,4 @@
-from views.pages.notifications_page import notifications
+from views.pages.shared.notifications_page import notifications
 from views.components.ui_components import page_header
 
 

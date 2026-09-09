@@ -4,24 +4,13 @@ from services.app_state_service import boot_state, current_user
 from views.components.app_shell import shell_end, shell_start
 from views.components.ui_components import load_css, toast
 
-from views.pages import (
-    account_settings_page,
-    agenda_page,
-    changes_page,
-    conflicts_page,
-    dashboard_page,
-    forgot_password_page,
-    landing_page,
-    login_page,
-    notifications_page,
-    permissions_page,
-    reservations_page,
-    signup_choice_page,
-    signup_institution_page,
-    signup_member_page,
-    spaces_page,
-    users_page,
-)
+from views.pages.admin import admin_dashboard_page, permissions_page, users_page
+from views.pages.auth import forgot_password_page, login_page, signup_choice_page, signup_institution_page, signup_member_page
+from views.pages.manager import conflicts_page, manager_dashboard_page, requests_page, spaces_page
+from views.pages.participant import changes_page, find_space_page, participant_dashboard_page
+from views.pages.public import landing_page
+from views.pages.requester import my_requests_page, new_request_page, requester_dashboard_page
+from views.pages.shared import account_settings_page, agenda_page, notifications_page
 
 
 # =========================================================
@@ -69,25 +58,25 @@ PUBLIC_ROUTES = {
 
 APP_ROUTES = {
     # Dashboards
-    "admin_dashboard": dashboard_page.dashboard,
-    "gerente_dashboard": dashboard_page.dashboard,
-    "solicitante_dashboard": dashboard_page.dashboard,
-    "participante_dashboard": dashboard_page.dashboard,
+    "admin_dashboard": admin_dashboard_page.dashboard,
+    "gerente_dashboard": manager_dashboard_page.dashboard,
+    "solicitante_dashboard": requester_dashboard_page.dashboard,
+    "participante_dashboard": participant_dashboard_page.dashboard,
 
     # Agenda
     "agenda": agenda_page.agenda,
 
     # Reservas
-    "admin_reservas": reservations_page.reservations_admin,
-    "nova_reserva": reservations_page.new_reservation,
-    "minhas_reservas": reservations_page.minhas_reservas,
+    "admin_reservas": requests_page.reservations_admin,
+    "nova_reserva": new_request_page.new_reservation,
+    "minhas_reservas": my_requests_page.minhas_reservas,
 
     # Conflitos
     "admin_conflitos": conflicts_page.conflicts,
 
     # Espaços
     "espacos": spaces_page.spaces,
-    "localizar": spaces_page.localizar,
+    "localizar": find_space_page.localizar,
 
     # Usuários e permissões
     "usuarios": users_page.users_page,
@@ -177,7 +166,7 @@ def main():
 
     page_function = APP_ROUTES.get(
         page,
-        dashboard_page.dashboard,
+        manager_dashboard_page.dashboard,
     )
 
     page_function(user)
