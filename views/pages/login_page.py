@@ -1,6 +1,6 @@
 import streamlit as st
 
-from services import auth_service
+from controllers import auth_controller
 from services.app_state_service import go
 from views.components.ui_components import logo
 
@@ -27,7 +27,7 @@ def _target_for(user):
 
 
 def _attempt_login(email, password):
-    user, error = auth_service.login(email, password)
+    user, error = auth_controller.login(email, password)
     if error:
         st.session_state.login_error = error
         return

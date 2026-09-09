@@ -1,8 +1,8 @@
 import streamlit as st
 
-from services import auth_service
+from controllers import auth_controller
 from services.app_state_service import go
-from services.mock_data_service import notifications_for
+from controllers.notification_controller import notifications_for
 from views.components.ui_components import logo, role_label
 
 
@@ -106,7 +106,7 @@ def render_sidebar(user):
                 type="tertiary",
                 width="stretch",
             ):
-                auth_service.logout()
+                auth_controller.logout()
 
 
 def shell_start(user):

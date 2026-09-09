@@ -1,20 +1,13 @@
-import copy
 import streamlit as st
 
-from data import mock_data
+from models.store import initialize_data
 
 
 def boot_state():
+    initialize_data(st.session_state)
     defaults = {
         "page": "landing",
         "user": None,
-        "reservations": copy.deepcopy(mock_data.RESERVATIONS),
-        "spaces": copy.deepcopy(mock_data.SPACES),
-        "users": copy.deepcopy(mock_data.USERS),
-        "resources": copy.deepcopy(mock_data.RESOURCES),
-        "institutions": copy.deepcopy(mock_data.INSTITUTIONS),
-        "notifications": copy.deepcopy(mock_data.NOTIFICATIONS),
-        "conflicts": copy.deepcopy(mock_data.CONFLICTS),
         "agenda_view": "Semana",
         "toast": "",
     }
@@ -34,3 +27,8 @@ def current_user():
 
 def set_toast(message):
     st.session_state.toast = message
+
+
+def model_state():
+    """Fornece o armazenamento da sessão aos controllers."""
+    return st.session_state

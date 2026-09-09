@@ -1,7 +1,7 @@
+from controllers import user_controller
 import time
 import streamlit as st
 
-from services import mock_data_service
 from services.app_state_service import go
 from views.components.ui_components import logo
 
@@ -144,7 +144,7 @@ def _render_form():
                 placeholder="Ex: 202612345",
             )
 
-        institutions = mock_data_service.institutions()
+        institutions = user_controller.institutions()
         if not institutions:
             institutions = DEMO_INSTITUTIONS
 

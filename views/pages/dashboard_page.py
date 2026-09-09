@@ -1,13 +1,13 @@
+from controllers import dashboard_controller, reservation_controller
 import streamlit as st
 
 from config.constants import ROLE_LABELS
-from services import mock_data_service
 from views.components.reservation_cards import reservation_cards
 from views.components.ui_components import cards_grid, page_header, stat_card
 
 
 def dashboard(user):
-    stats = mock_data_service.dashboard_stats(user["role"], user["id"])
+    stats = dashboard_controller.dashboard_stats(user["role"], user["id"])
     subtitle = {
         "admin": "Operacao diaria de reservas, espacos e conflitos.",
         "gerente": "Governanca de usuarios, permissoes e configuracoes.",
@@ -27,4 +27,4 @@ def dashboard(user):
     cards_grid(cards)
     st.markdown("### Proximas atividades")
     requester_id = user["id"] if user["role"] == "solicitante" else None
-    reservation_cards(mock_data_service.reservations(requester_id=requester_id)[:3])
+    reservation_cards(reservation_controller.reservations(requester_id=requester_id)[:3])
