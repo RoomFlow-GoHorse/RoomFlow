@@ -1,6 +1,6 @@
 import streamlit as st
 
-from data.mock_data import USERS, password_hash
+from models.mock_data import USERS, password_hash
 
 
 def login(email, password):

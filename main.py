@@ -1,7 +1,7 @@
 import streamlit as st
 
 from config.constants import ROLE_NAV
-from services.app_state_service import boot_state, current_user
+from controllers.app_state_service import boot_state, current_user
 from views.components.app_shell import shell_end, shell_start
 from views.components.ui_components import load_auth_css, load_css, toast
 

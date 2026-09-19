@@ -1,6 +1,6 @@
 import streamlit as st
 
-from services import mock_data_service
+from controllers import mock_data_service
 from views.components.ui_components import page_header
 
 

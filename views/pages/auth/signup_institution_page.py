@@ -1,7 +1,7 @@
 import time
 import streamlit as st
 
-from services.app_state_service import go
+from controllers.app_state_service import go
 from views.components.ui_components import logo
 
 INSTITUTION_TYPES = [

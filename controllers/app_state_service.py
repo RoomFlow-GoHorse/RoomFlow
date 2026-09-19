@@ -1,7 +1,7 @@
 import copy
 import streamlit as st
 
-from data import mock_data
+from models import mock_data
 
 
 def boot_state():

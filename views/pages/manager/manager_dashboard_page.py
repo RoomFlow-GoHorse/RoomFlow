@@ -1,7 +1,7 @@
 import streamlit as st
 
 from config.constants import ROLE_LABELS
-from services import mock_data_service
+from controllers import mock_data_service
 from views.components.reservation_cards import reservation_cards
 from views.components.ui_components import cards_grid, page_header, stat_card
 

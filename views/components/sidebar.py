@@ -1,9 +1,9 @@
 import streamlit as st
 
 from config.constants import ROLE_NAV
-from services import auth_service
-from services.app_state_service import go
-from services.mock_data_service import notifications_for
+from controllers import auth_service
+from controllers.app_state_service import go
+from controllers.mock_data_service import notifications_for
 from views.components.ui_components import logo, role_label
 
 

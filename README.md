@@ -78,7 +78,7 @@ http://localhost:8501
 ## Estrutura do projeto
 
 ```text
-reserva_salas_GoHorse/
+RoomFlow/
 │
 ├── .venv/
 ├── controllers/

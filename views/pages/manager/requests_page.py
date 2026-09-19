@@ -1,7 +1,7 @@
 import streamlit as st
 
-from services import mock_data_service
-from services.app_state_service import go, set_toast
+from controllers import mock_data_service
+from controllers.app_state_service import go, set_toast
 from views.components.reservation_cards import reservation_cards
 from views.components.ui_components import badge, page_header, table
 
