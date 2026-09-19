@@ -32,8 +32,14 @@ LOGO_SIZES = {
 # CSS
 # ============================================================
 
+@lru_cache
+def _read_css_content(path):
+    content = Path(path).read_text(encoding="utf-8")
+    return f"<style>\n{content}\n</style>"
+
+
 def load_css_file(path):
-    st.html(Path(path))
+    st.html(_read_css_content(path))
 
 
 def load_css():

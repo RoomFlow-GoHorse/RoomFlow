@@ -221,8 +221,6 @@ def _render_validating():
         unsafe_allow_html=True,
     )
 
-    time.sleep(2.0)
-
     ra = st.session_state.signup_member_ra.strip().upper()
     if ra.startswith("ERR"):
         st.session_state.signup_member_screen = "error"

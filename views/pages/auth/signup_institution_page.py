@@ -129,7 +129,6 @@ def _submit():
     st.rerun()
 
 def _finish_verification():
-    time.sleep(2.2)
     st.session_state.signup_inst_screen = "success"
     st.rerun()
 
