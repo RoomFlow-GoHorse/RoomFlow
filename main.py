@@ -2,7 +2,7 @@ import streamlit as st
 
 from services.app_state_service import boot_state, current_user
 from views.components.app_shell import shell_end, shell_start
-from views.components.ui_components import load_css, toast
+from views.components.ui_components import load_auth_css, load_css, toast
 
 from views.pages.admin import admin_dashboard_page, permissions_page, users_page
 from views.pages.auth import forgot_password_page, login_page, signup_choice_page, signup_institution_page, signup_member_page
@@ -93,6 +93,21 @@ APP_ROUTES = {
 }
 
 
+# Rotas cujo conte\u00fado precisa de uma \u00e1rea de trabalho maior, mas ainda segue
+# o mesmo container global das demais telas internas.
+WIDE_APP_ROUTES = {
+    "admin_dashboard",
+    "gerente_dashboard",
+    "solicitante_dashboard",
+    "participante_dashboard",
+    "agenda",
+    "admin_reservas",
+    "espacos",
+    "usuarios",
+    "permissoes",
+}
+
+
 # =========================================================
 # SINCRONIZAÇÃO DA URL
 # =========================================================
@@ -142,6 +157,8 @@ def main():
         page_function = PUBLIC_ROUTES.get(page)
 
         if page_function:
+            if page != "landing":
+                load_auth_css()
             page_function()
             return
 
@@ -162,14 +179,13 @@ def main():
     # ROTAS INTERNAS
     # ---------------------------------------------------------
 
-    shell_start(user)
-
     page_function = APP_ROUTES.get(
         page,
         manager_dashboard_page.dashboard,
     )
 
-    page_function(user)
+    with shell_start(user, wide=page in WIDE_APP_ROUTES):
+        page_function(user)
 
     shell_end()
 
