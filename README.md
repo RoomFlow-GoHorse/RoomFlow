@@ -1,6 +1,6 @@
 # RoomFlow
 
-Sistema de gerenciamento e reserva de salas desenvolvido em **Python** com **Streamlit**, utilizando arquitetura **MVC**.
+Sistema de gerenciamento e reserva de salas desenvolvido em **Python** com **Streamlit**.
 
 ## Tecnologias
 
@@ -26,6 +26,7 @@ Entre na pasta do projeto:
 
 ```bash
 cd reserva_salas_GoHorse
+cd RoomFlow
 ```
 
 ### 2. Crie o ambiente virtual
@@ -56,11 +57,6 @@ Com o ambiente virtual ativado:
 
 ```bash
 pip install -r requirements.txt
-```
-ou
-
-```bash
-pip install streamlit 
 ```
 
 ## Executando o projeto
