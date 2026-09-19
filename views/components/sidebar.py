@@ -1,5 +1,6 @@
 import streamlit as st
 
+from config.constants import ROLE_NAV
 from services import auth_service
 from services.app_state_service import go
 from services.mock_data_service import notifications_for
@@ -10,23 +11,14 @@ NAV_GROUPS = {
     "admin": [
         [
             ("Início", "admin_dashboard", ":material/home:"),
-            ("Reservas", "admin_reservas", ":material/calendar_month:"),
-            ("Agenda", "agenda", ":material/schedule:"),
-            ("Espaços", "espacos", ":material/location_on:"),
-            ("Notificações", "notificacoes", ":material/notifications:"),
+            ("Usuários", "usuarios", ":material/group:"),
+            ("Permissões", "permissoes", ":material/shield:"),
+            ("Configurações da instituição", "configuracoes_instituicao", ":material/settings:"),
         ],
-        [("Conflitos", "admin_conflitos", ":material/warning:")],
     ],
     "gerente": [
         [
             ("Início", "gerente_dashboard", ":material/home:"),
-            ("Agenda", "agenda", ":material/schedule:"),
-            ("Espaços", "espacos", ":material/location_on:"),
-            ("Notificações", "notificacoes", ":material/notifications:"),
-        ],
-        [
-            ("Usuários", "usuarios", ":material/group:"),
-            ("Permissões", "permissoes", ":material/shield:"),
         ],
     ],
     "solicitante": [
@@ -57,6 +49,7 @@ def _navigate(page):
 def render_sidebar(user):
     current_page = st.session_state.get("page", "landing")
     role = user.get("role", "participante")
+    allowed_pages = {page for _, page in ROLE_NAV.get(role, [])}
     unread = sum(not item["read"] for item in notifications_for(role))
 
     with st.sidebar:
@@ -92,14 +85,15 @@ def render_sidebar(user):
                 </div>
                 """
             )
-            if st.button(
-                "Configurações da conta",
-                key="rf_account",
-                icon=":material/account_circle:",
-                type="tertiary",
-                width="stretch",
-            ):
-                _navigate("conta")
+            if "conta" in allowed_pages:
+                if st.button(
+                    "Configurações da conta",
+                    key="rf_account",
+                    icon=":material/account_circle:",
+                    type="tertiary",
+                    width="stretch",
+                ):
+                    _navigate("conta")
             if st.button(
                 "Sair",
                 key="rf_logout",

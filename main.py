@@ -5,7 +5,7 @@ from services.app_state_service import boot_state, current_user
 from views.components.app_shell import shell_end, shell_start
 from views.components.ui_components import load_auth_css, load_css, toast
 
-from views.pages.admin import admin_dashboard_page, permissions_page, users_page
+from views.pages.admin import admin_dashboard_page, permissions_page, settings_page, users_page
 from views.pages.auth import forgot_password_page, login_page, signup_choice_page, signup_institution_page, signup_member_page
 from views.pages.manager import conflicts_page, manager_dashboard_page, requests_page, spaces_page
 from views.pages.participant import changes_page, find_space_page, participant_dashboard_page
@@ -82,6 +82,7 @@ APP_ROUTES = {
     # Usuários e permissões
     "usuarios": users_page.users_page,
     "permissoes": permissions_page.permissions,
+    "configuracoes_instituicao": settings_page.settings,
 
     # Notificações
     "notificacoes": notifications_page.notifications,
@@ -106,6 +107,7 @@ WIDE_APP_ROUTES = {
     "espacos",
     "usuarios",
     "permissoes",
+    "configuracoes_instituicao",
 }
 
 

@@ -8,21 +8,12 @@ ROLE_LABELS = {
 ROLE_NAV = {
     "admin": [
         ("Dashboard", "admin_dashboard"),
-        ("Agenda", "agenda"),
-        ("Reservas", "admin_reservas"),
-        ("Conflitos", "admin_conflitos"),
-        ("Espacos", "espacos"),
-        ("Notificacoes", "notificacoes"),
-        ("Conta", "conta"),
+        ("Usuarios", "usuarios"),
+        ("Permissoes", "permissoes"),
+        ("Configuracoes da instituicao", "configuracoes_instituicao"),
     ],
     "gerente": [
         ("Dashboard", "gerente_dashboard"),
-        ("Agenda", "agenda"),
-        ("Espacos", "espacos"),
-        ("Usuarios", "usuarios"),
-        ("Permissoes", "permissoes"),
-        ("Notificacoes", "notificacoes"),
-        ("Conta", "conta"),
     ],
     "solicitante": [
         ("Dashboard", "solicitante_dashboard"),
@@ -66,19 +57,13 @@ STATUS_LABELS = {
 
 PERMISSIONS = {
     "admin": {
-        "Aprovar reservas",
-        "Rejeitar reservas",
-        "Alterar reservas",
-        "Resolver conflitos",
-        "Gerenciar espacos",
-        "Ver agenda",
-    },
-    "gerente": {
+        "Acessar dashboard do administrador",
         "Gerenciar usuarios",
         "Ver permissoes",
-        "Ver espacos",
-        "Ver agenda",
-        "Editar configuracoes",
+        "Editar configuracoes da instituicao",
+    },
+    "gerente": {
+        "Acessar dashboard do gerente",
     },
     "solicitante": {
         "Criar reserva",
