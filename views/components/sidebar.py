@@ -7,39 +7,44 @@ from services.mock_data_service import notifications_for
 from views.components.ui_components import logo, role_label
 
 
-NAV_GROUPS = {
-    "admin": [
-        [
-            ("Início", "admin_dashboard", ":material/home:"),
-            ("Usuários", "usuarios", ":material/group:"),
-            ("Permissões", "permissoes", ":material/shield:"),
-            ("Configurações da instituição", "configuracoes_instituicao", ":material/settings:"),
-        ],
-    ],
-    "gerente": [
-        [
-            ("Início", "gerente_dashboard", ":material/home:"),
-        ],
-    ],
-    "solicitante": [
-        [
-            ("Início", "solicitante_dashboard", ":material/home:"),
-            ("Nova reserva", "nova_reserva", ":material/add_circle:"),
-            ("Minhas reservas", "minhas_reservas", ":material/calendar_month:"),
-            ("Agenda", "agenda", ":material/schedule:"),
-            ("Notificações", "notificacoes", ":material/notifications:"),
-        ]
-    ],
-    "participante": [
-        [
-            ("Início", "participante_dashboard", ":material/home:"),
-            ("Agenda", "agenda", ":material/schedule:"),
-            ("Notificações", "notificacoes", ":material/notifications:"),
-            ("Localizar espaço", "localizar", ":material/location_on:"),
-            ("Alterações", "alteracoes", ":material/history:"),
-        ]
-    ],
+NAV_ICONS = {
+    "admin_dashboard": ":material/home:",
+    "gerente_dashboard": ":material/home:",
+    "solicitante_dashboard": ":material/home:",
+    "participante_dashboard": ":material/home:",
+    "usuarios": ":material/group:",
+    "permissoes": ":material/shield:",
+    "configuracoes_instituicao": ":material/settings:",
+    "nova_reserva": ":material/add_circle:",
+    "minhas_reservas": ":material/calendar_month:",
+    "agenda": ":material/schedule:",
+    "notificacoes": ":material/notifications:",
+    "localizar": ":material/location_on:",
+    "alteracoes": ":material/history:",
+    "conta": ":material/account_circle:",
 }
+
+NAV_LABEL_OVERRIDES = {
+    "admin_dashboard": "Início",
+    "gerente_dashboard": "Início",
+    "solicitante_dashboard": "Início",
+    "participante_dashboard": "Início",
+    "usuarios": "Usuários",
+    "permissoes": "Permissões",
+    "configuracoes_instituicao": "Configurações da instituição",
+    "notificacoes": "Notificações",
+    "localizar": "Localizar espaço",
+    "alteracoes": "Alterações",
+}
+
+
+def _sidebar_items(role):
+    for label, page in ROLE_NAV.get(role, []):
+        yield (
+            NAV_LABEL_OVERRIDES.get(page, label),
+            page,
+            NAV_ICONS.get(page, ":material/circle:"),
+        )
 
 
 def _navigate(page):
@@ -56,22 +61,21 @@ def render_sidebar(user):
         st.html('<div class="rf-sidebar-logo">' + logo() + "</div>")
         st.html('<div class="rf-sidebar-section-label">Navegação</div>')
 
-        for group_index, group in enumerate(NAV_GROUPS.get(role, [])):
-            if group_index:
-                st.html('<div class="rf-sidebar-divider"></div>')
+        for label, page, icon in _sidebar_items(role):
+            if page == "conta":
+                continue
 
-            for label, page, icon in group:
-                is_active = current_page == page
-                notification_suffix = f" ({unread})" if page == "notificacoes" and unread else ""
-                button_key = "rf_nav_active" if is_active else f"rf_nav_{page}"
-                if st.button(
-                    f"{label}{notification_suffix}",
-                    key=button_key,
-                    icon=icon,
-                    type="primary" if is_active else "tertiary",
-                    width="stretch",
-                ):
-                    _navigate(page)
+            is_active = current_page == page
+            notification_suffix = f" ({unread})" if page == "notificacoes" and unread else ""
+            button_key = "rf_nav_active" if is_active else f"rf_nav_{page}"
+            if st.button(
+                f"{label}{notification_suffix}",
+                key=button_key,
+                icon=icon,
+                type="primary" if is_active else "tertiary",
+                width="stretch",
+            ):
+                _navigate(page)
 
         with st.container(key="rf_sidebar_footer"):
             st.html(
@@ -89,7 +93,7 @@ def render_sidebar(user):
                 if st.button(
                     "Configurações da conta",
                     key="rf_account",
-                    icon=":material/account_circle:",
+                    icon=NAV_ICONS["conta"],
                     type="tertiary",
                     width="stretch",
                 ):
