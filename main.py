@@ -1,5 +1,6 @@
 import streamlit as st
 
+from config.constants import ROLE_NAV
 from services.app_state_service import boot_state, current_user
 from views.components.app_shell import shell_end, shell_start
 from views.components.ui_components import load_auth_css, load_css, toast
@@ -139,6 +140,23 @@ def get_dashboard_by_role(user):
     )
 
 
+def get_allowed_pages_by_role(role):
+    return {page for _, page in ROLE_NAV.get(role, [])}
+
+
+def ensure_allowed_internal_page(page, user):
+    role = user.get("role")
+    allowed_pages = get_allowed_pages_by_role(role)
+
+    if page in allowed_pages:
+        return page
+
+    dashboard = get_dashboard_by_role(user)
+    st.session_state.page = dashboard
+    st.query_params["page"] = dashboard
+    return dashboard
+
+
 # =========================================================
 # MAIN
 # =========================================================
@@ -178,6 +196,8 @@ def main():
     # ---------------------------------------------------------
     # ROTAS INTERNAS
     # ---------------------------------------------------------
+
+    page = ensure_allowed_internal_page(page, user)
 
     page_function = APP_ROUTES.get(
         page,
