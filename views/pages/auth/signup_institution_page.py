@@ -101,6 +101,7 @@ def _validate_step_two():
 def _exit_signup():
     _reset()
     go("signup_choice")
+    st.rerun()
 
 def _go_back():
     if st.session_state.signup_inst_step == 2:
@@ -343,6 +344,7 @@ def _render_success():
         if st.button("Acessar RoomFlow →", key="signup_inst_access", type="primary", use_container_width=True):
             _reset()
             go("login")
+            st.rerun()
 
 def signup_institution():
     _init_state()

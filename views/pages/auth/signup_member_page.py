@@ -92,6 +92,7 @@ def _render_topbar():
         if st.button("← Voltar", key="signup_member_back", type="tertiary"):
             _reset()
             go("signup_choice")
+            st.rerun()
 
     with col2:
         st.html(logo(size="small", class_name="rf-choice-logo"))
