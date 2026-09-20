@@ -705,46 +705,48 @@ def _render_rooms_panel(current_b: dict | None, current_f: dict | None, plan: di
         is_positioning_this = positioning == rid
 
         with st.container(border=True):
-            c1, c2 = st.columns([3, 1], vertical_alignment="center")
+            st.markdown(
+                f'<div style="font-size:14px; font-weight:600; color:#1C1C2E;">{room["name"]}</div>',
+                unsafe_allow_html=True,
+            )
+            st.caption(f'{room["type"]} · {room["capacity"]} pessoas')
 
-            with c1:
+            if is_positioned:
                 st.markdown(
-                    f'<div style="font-size:14px; font-weight:600; color:#1C1C2E;">{room["name"]}</div>',
+                    '<span style="background:#DCFCE7; color:#15803D; font-size:11px; font-weight:600; padding:2px 8px; border-radius:999px; display:inline-block; margin-bottom:8px;">✓ Posicionada</span>',
                     unsafe_allow_html=True,
                 )
-                st.caption(f'{room["type"]} · {room["capacity"]} pessoas')
+            else:
+                st.markdown(
+                    '<span style="background:#FEF3C7; color:#B45309; font-size:11px; font-weight:600; padding:2px 8px; border-radius:999px; display:inline-block; margin-bottom:8px;">! Não posicionada</span>',
+                    unsafe_allow_html=True,
+                )
 
-                if is_positioned:
-                    st.markdown(
-                        '<span style="background:#DCFCE7; color:#15803D; font-size:11px; font-weight:600; padding:2px 8px; border-radius:999px;">✓ Posicionada</span>',
-                        unsafe_allow_html=True,
-                    )
-                else:
-                    st.markdown(
-                        '<span style="background:#FEF3C7; color:#B45309; font-size:11px; font-weight:600; padding:2px 8px; border-radius:999px;">! Não posicionada</span>',
-                        unsafe_allow_html=True,
-                    )
-
-            with c2:
-                if has_plan:
-                    if is_positioning_this:
-                        # Modo de posicionamento ativo: mostrar percentuais de coordenadas
-                        st.caption("Informe a posição:")
+            if has_plan:
+                if is_positioning_this:
+                    st.caption("Informe a posição:")
+                    cx, cy = st.columns(2)
+                    with cx:
                         px = st.number_input("X (%)", 1, 99, 50, key=f"fp_px_{rid}", label_visibility="collapsed")
+                    with cy:
                         py = st.number_input("Y (%)", 1, 99, 50, key=f"fp_py_{rid}", label_visibility="collapsed")
-                        if st.button("✓ Confirmar", key=f"fp_confirm_pos_{rid}", type="primary", use_container_width=True):
+
+                    cb1, cb2 = st.columns(2)
+                    with cb1:
+                        if st.button("Confirmar", key=f"fp_confirm_pos_{rid}", type="primary", use_container_width=True):
                             new_positions = {**positions, rid: {"x": float(px), "y": float(py)}}
                             st.session_state.fp_plans[_plan_key()] = {**plan, "positions": new_positions}
                             st.session_state.fp_positioning = None
                             st.rerun()
-                        if st.button("✕ Cancelar", key=f"fp_cancel_pos_{rid}", type="tertiary", use_container_width=True):
+                    with cb2:
+                        if st.button("Cancelar", key=f"fp_cancel_pos_{rid}", type="tertiary", use_container_width=True):
                             st.session_state.fp_positioning = None
                             st.rerun()
-                    else:
-                        btn_label = "Editar posição" if is_positioned else "Posicionar"
-                        if st.button(btn_label, key=f"fp_pos_{rid}", use_container_width=True):
-                            st.session_state.fp_positioning = rid
-                            st.rerun()
+                else:
+                    btn_label = "Editar posição" if is_positioned else "Posicionar"
+                    if st.button(btn_label, key=f"fp_pos_{rid}", use_container_width=True):
+                        st.session_state.fp_positioning = rid
+                        st.rerun()
 
 
 # =========================================================
