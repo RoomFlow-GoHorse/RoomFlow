@@ -38,6 +38,9 @@ def boot_state():
     deep_defaults = {
         "reservations": mock_data.RESERVATIONS,
         "spaces": mock_data.SPACES,
+        "buildings": mock_data.BUILDINGS,
+        "floors": mock_data.FLOORS,
+        "plans": {},
         "users": mock_data.USERS,
         "resources": mock_data.RESOURCES,
         "institutions": mock_data.INSTITUTIONS,

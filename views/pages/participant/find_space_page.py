@@ -1,112 +1,8 @@
 import streamlit as st
 
+from controllers import mock_data_service
+from controllers.app_state_service import boot_state
 from views.components.ui_components import badge, esc, page_header
-
-
-# =========================================================
-# DADOS DE ESPAÇOS E PRÉDIOS DO ROOMFLOW
-# =========================================================
-
-FLOORS_BY_BUILDING = {
-    "Bloco A": ["Térreo", "1º andar", "2º andar", "3º andar"],
-    "Bloco B": ["Térreo", "1º andar", "2º andar"],
-    "Bloco C": ["Térreo", "1º andar"],
-}
-
-BUILDINGS = list(FLOORS_BY_BUILDING.keys())
-
-SPACES_DATA = [
-    {
-        "id": "s1",
-        "name": "Sala 101",
-        "building": "Bloco A",
-        "floor": "1º andar",
-        "type": "Sala",
-        "capacity": 20,
-        "location": "Bloco A - 1º andar",
-        "status": "disponivel",
-    },
-    {
-        "id": "s2",
-        "name": "Sala 204",
-        "building": "Bloco A",
-        "floor": "2º andar",
-        "type": "Sala",
-        "capacity": 30,
-        "location": "Bloco A - 2º andar",
-        "status": "ocupado",
-    },
-    {
-        "id": "s3",
-        "name": "Sala 205",
-        "building": "Bloco A",
-        "floor": "2º andar",
-        "type": "Sala",
-        "capacity": 25,
-        "location": "Bloco A - 2º andar",
-        "status": "disponivel",
-    },
-    {
-        "id": "s4",
-        "name": "Laboratório de Informática 1",
-        "building": "Bloco A",
-        "floor": "2º andar",
-        "type": "Laboratório",
-        "capacity": 40,
-        "location": "Bloco A - 2º andar",
-        "status": "disponivel",
-    },
-    {
-        "id": "s5",
-        "name": "Sala 206",
-        "building": "Bloco A",
-        "floor": "2º andar",
-        "type": "Sala",
-        "capacity": 35,
-        "location": "Bloco A - 2º andar",
-        "status": "bloqueado",
-    },
-    {
-        "id": "s6",
-        "name": "Auditório A",
-        "building": "Bloco A",
-        "floor": "2º andar",
-        "type": "Auditório",
-        "capacity": 80,
-        "location": "Bloco A - 2º andar",
-        "status": "ocupado",
-    },
-    {
-        "id": "s7",
-        "name": "Auditório Principal",
-        "building": "Bloco B",
-        "floor": "Térreo",
-        "type": "Auditório",
-        "capacity": 150,
-        "location": "Bloco B - Térreo",
-        "status": "disponivel",
-    },
-    {
-        "id": "s8",
-        "name": "Sala de Reuniões B",
-        "building": "Bloco B",
-        "floor": "1º andar",
-        "type": "Reunião",
-        "capacity": 8,
-        "location": "Bloco B - 1º andar",
-        "status": "disponivel",
-    },
-    {
-        "id": "s9",
-        "name": "Laboratório de Robótica",
-        "building": "Bloco C",
-        "floor": "Térreo",
-        "type": "Laboratório",
-        "capacity": 30,
-        "location": "Bloco C - Térreo",
-        "status": "disponivel",
-    },
-]
 
 
 # =========================================================
@@ -177,14 +73,27 @@ def _render_styles():
 # =========================================================
 
 def localizar(user: dict):
+    boot_state()
     _render_styles()
 
-    # Estado da sessão
+    b_list = mock_data_service.buildings()
+    buildings = [b["name"] for b in b_list] if b_list else ["Bloco A"]
+
     st.session_state.setdefault("find_search", "")
-    st.session_state.setdefault("find_building", "Bloco A")
-    st.session_state.setdefault("find_floor", "2º andar")
+    if "find_building" not in st.session_state or st.session_state.find_building not in buildings:
+        st.session_state.find_building = buildings[0]
+
+    curr_b_item = next((b for b in b_list if b["name"] == st.session_state.find_building), None)
+    f_list = mock_data_service.floors(curr_b_item["id"] if curr_b_item else None)
+    floors_list = [f["name"] for f in f_list] if f_list else ["Térreo"]
+
+    if "find_floor" not in st.session_state or st.session_state.find_floor not in floors_list:
+        st.session_state.find_floor = floors_list[0]
+
     st.session_state.setdefault("find_selected_space_id", None)
     st.session_state.setdefault("find_show_directions", False)
+
+    all_spaces = mock_data_service.spaces()
 
     # 1. Cabeçalho
     page_header(
@@ -207,8 +116,8 @@ def localizar(user: dict):
 
     with col_action:
         if st.button("📍 Minha localização", key="btn_my_location", type="secondary"):
-            st.session_state.find_building = "Bloco A"
-            st.session_state.find_floor = "2º andar"
+            st.session_state.find_building = buildings[0]
+            st.session_state.find_floor = floors_list[0]
             st.session_state.find_search = ""
             st.rerun()
 
@@ -216,10 +125,10 @@ def localizar(user: dict):
     search_query = st.session_state.find_search.strip().lower()
     if search_query:
         filtered = [
-            sp for sp in SPACES_DATA
+            sp for sp in all_spaces
             if search_query in sp["name"].lower()
-            or search_query in sp["building"].lower()
-            or search_query in sp["location"].lower()
+            or search_query in sp.get("building", "").lower()
+            or search_query in sp.get("location", "").lower()
         ]
 
         st.html(
@@ -247,14 +156,14 @@ def localizar(user: dict):
                         f"""
                         <div style="margin-bottom:8px;">
                             <p style="font-size:14px; font-weight:600; color:#1C1C2E; margin:0;">{esc(sp['name'])}</p>
-                            <p style="font-size:12px; color:#71717A; margin:2px 0 0 0;">{esc(sp['building'])} &middot; {esc(sp['floor'])} &middot; {esc(sp['location'])}</p>
+                            <p style="font-size:12px; color:#71717A; margin:2px 0 0 0;">{esc(sp.get('building', ''))} &middot; {esc(sp.get('floor', ''))} &middot; {esc(sp.get('location', ''))}</p>
                         </div>
                         """
                     )
                 with col_sp_btn:
                     if st.button(f"Selecionar {sp['name']}", key=f"btn_select_search_{sp['id']}"):
-                        st.session_state.find_building = sp["building"]
-                        st.session_state.find_floor = sp["floor"]
+                        st.session_state.find_building = sp.get("building", buildings[0])
+                        st.session_state.find_floor = sp.get("floor", floors_list[0])
                         st.session_state.find_selected_space_id = sp["id"]
                         st.session_state.find_show_directions = False
                         st.session_state.find_search = ""
@@ -281,22 +190,24 @@ def localizar(user: dict):
         c_bld, c_flr = st.columns([1, 2], vertical_alignment="center")
 
         with c_bld:
+            sel_bld_idx = buildings.index(st.session_state.find_building) if st.session_state.find_building in buildings else 0
             sel_bld = st.selectbox(
                 "Prédio",
-                BUILDINGS,
-                index=BUILDINGS.index(st.session_state.find_building) if st.session_state.find_building in BUILDINGS else 0,
+                buildings,
+                index=sel_bld_idx,
                 key="find_building_select",
                 label_visibility="collapsed",
             )
             if sel_bld != st.session_state.find_building:
                 st.session_state.find_building = sel_bld
-                st.session_state.find_floor = FLOORS_BY_BUILDING[sel_bld][0]
+                new_b_item = next((b for b in b_list if b["name"] == sel_bld), None)
+                new_floors = [f["name"] for f in mock_data_service.floors(new_b_item["id"] if new_b_item else None)]
+                st.session_state.find_floor = new_floors[0] if new_floors else "Térreo"
                 st.session_state.find_selected_space_id = None
                 st.session_state.find_show_directions = False
                 st.rerun()
 
         with c_flr:
-            floors_list = FLOORS_BY_BUILDING.get(st.session_state.find_building, ["Térreo"])
             sel_flr = st.segmented_control(
                 "Andar",
                 floors_list,
@@ -314,14 +225,11 @@ def localizar(user: dict):
     # Obter salas do andar selecionado
     curr_bld = st.session_state.find_building
     curr_flr = st.session_state.find_floor
-    floor_spaces = [
-        sp for sp in SPACES_DATA
-        if sp["building"] == curr_bld and sp["floor"] == curr_flr
-    ]
+    floor_spaces = mock_data_service.spaces(building=curr_bld, floor=curr_flr)
 
     # Obter sala selecionada no estado
     selected_space = next(
-        (sp for sp in SPACES_DATA if sp["id"] == st.session_state.find_selected_space_id),
+        (sp for sp in all_spaces if sp["id"] == st.session_state.find_selected_space_id),
         None,
     )
 

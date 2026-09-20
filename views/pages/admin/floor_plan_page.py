@@ -65,47 +65,37 @@ def _uid() -> str:
 # =========================================================
 
 def _boot():
-    if "fp_buildings" not in st.session_state:
-        buildings = []
-        seen = set()
-        for s in _MOCK_SPACES:
-            b = s["building"]
-            if b not in seen:
-                seen.add(b)
-                buildings.append({"id": f"b-{len(buildings)+1}", "name": b})
-        st.session_state.fp_buildings = sorted(buildings, key=lambda x: x["name"])
+    if "buildings" not in st.session_state or not st.session_state.buildings:
+        st.session_state.buildings = [
+            {"id": "b-1", "name": "Bloco A"},
+            {"id": "b-2", "name": "Bloco B"},
+            {"id": "b-3", "name": "Bloco C"},
+            {"id": "b-4", "name": "Bloco D"},
+        ]
+    if "floors" not in st.session_state or not st.session_state.floors:
+        st.session_state.floors = [
+            {"id": "b-1-f-1", "buildingId": "b-1", "name": "Térreo"},
+            {"id": "b-1-f-2", "buildingId": "b-1", "name": "1º andar"},
+            {"id": "b-1-f-3", "buildingId": "b-1", "name": "2º andar"},
+            {"id": "b-2-f-1", "buildingId": "b-2", "name": "Térreo"},
+            {"id": "b-2-f-2", "buildingId": "b-2", "name": "2º andar"},
+            {"id": "b-3-f-1", "buildingId": "b-3", "name": "Térreo"},
+            {"id": "b-4-f-1", "buildingId": "b-4", "name": "Térreo"},
+        ]
+    if "plans" not in st.session_state:
+        st.session_state.plans = {}
 
-    if "fp_floors" not in st.session_state:
-        floors = []
-        bname_to_id = {b["name"]: b["id"] for b in st.session_state.fp_buildings}
-        seen = set()
-        for s in _MOCK_SPACES:
-            key = (s["building"], s["floor"])
-            if key not in seen:
-                seen.add(key)
-                bid = bname_to_id.get(s["building"], "")
-                fid = f"{bid}-f-{len(floors)+1}"
-                floors.append({"id": fid, "buildingId": bid, "name": s["floor"]})
-        st.session_state.fp_floors = floors
-
-    if "fp_extra_rooms" not in st.session_state:
-        st.session_state.fp_extra_rooms = []
-
-    if "fp_plans" not in st.session_state:
-        # {plan_key: {"src": str|None, "positions": {room_id: {"x": float, "y": float}}}}
-        st.session_state.fp_plans = {}
-
-    if "fp_sel_building" not in st.session_state:
-        blist = st.session_state.fp_buildings
+    blist = _buildings()
+    if "fp_sel_building" not in st.session_state or not any(b["id"] == st.session_state.fp_sel_building for b in blist):
         st.session_state.fp_sel_building = blist[0]["id"] if blist else ""
 
-    if "fp_sel_floor" not in st.session_state:
-        bid = st.session_state.fp_sel_building
-        matching = _sort_floors([f for f in st.session_state.fp_floors if f["buildingId"] == bid])
+    bid = st.session_state.fp_sel_building
+    matching = _building_floors(bid)
+    if "fp_sel_floor" not in st.session_state or not any(f["id"] == st.session_state.fp_sel_floor for f in matching):
         st.session_state.fp_sel_floor = matching[0]["id"] if matching else ""
 
     if "fp_positioning" not in st.session_state:
-        st.session_state.fp_positioning = None  # room_id being positioned
+        st.session_state.fp_positioning = None
 
 
 # =========================================================
@@ -113,11 +103,11 @@ def _boot():
 # =========================================================
 
 def _buildings() -> list[dict]:
-    return st.session_state.fp_buildings
+    return st.session_state.get("buildings", [])
 
 
 def _all_floors() -> list[dict]:
-    return st.session_state.fp_floors
+    return st.session_state.get("floors", [])
 
 
 def _current_building() -> dict | None:
@@ -131,7 +121,7 @@ def _current_floor() -> dict | None:
 
 
 def _building_floors(bid: str) -> list[dict]:
-    return _sort_floors([f for f in _all_floors() if f["buildingId"] == bid])
+    return _sort_floors([f for f in _all_floors() if f.get("buildingId") == bid])
 
 
 def _plan_key() -> str:
@@ -139,13 +129,14 @@ def _plan_key() -> str:
 
 
 def _current_plan() -> dict:
-    return st.session_state.fp_plans.get(_plan_key(), {"src": None, "positions": {}})
+    return st.session_state.plans.get(_plan_key(), {"src": None, "positions": {}})
 
 
 def _rooms_for(building_name: str, floor_name: str) -> list[dict]:
-    mock = [s for s in _MOCK_SPACES if s["building"] == building_name and s["floor"] == floor_name]
-    extra = [r for r in st.session_state.fp_extra_rooms if r["building"] == building_name and r["floor"] == floor_name]
-    return mock + extra
+    return [
+        s for s in st.session_state.get("spaces", [])
+        if s.get("building") == building_name and s.get("floor") == floor_name
+    ]
 
 
 # =========================================================
@@ -177,8 +168,8 @@ def _dialog_add_building():
                 st.rerun()
                 return
             new_id = f"b-{_uid()}"
-            st.session_state.fp_buildings.append({"id": new_id, "name": name})
-            st.session_state.fp_buildings = sorted(st.session_state.fp_buildings, key=lambda x: x["name"])
+            st.session_state.buildings.append({"id": new_id, "name": name})
+            st.session_state.buildings = sorted(st.session_state.buildings, key=lambda x: x["name"])
             st.session_state.fp_sel_building = new_id
             st.session_state.fp_sel_floor = ""
             st.session_state.pop("fp_add_building_err", None)
@@ -201,10 +192,7 @@ def _dialog_rename_building(building: dict):
     with c2:
         if st.button("Salvar", type="primary", use_container_width=True):
             new_name = new_name.strip()
-            if not new_name:
-                st.rerun()
-                return
-            if new_name == building["name"]:
+            if not new_name or new_name == building["name"]:
                 st.rerun()
                 return
             exists = any(b["id"] != building["id"] and b["name"].lower() == new_name.lower() for b in _buildings())
@@ -213,12 +201,13 @@ def _dialog_rename_building(building: dict):
                 st.rerun()
                 return
             old_name = building["name"]
-            for b in st.session_state.fp_buildings:
+            for b in st.session_state.buildings:
                 if b["id"] == building["id"]:
                     b["name"] = new_name
-            for r in st.session_state.fp_extra_rooms:
-                if r["building"] == old_name:
-                    r["building"] = new_name
+            for s in st.session_state.spaces:
+                if s.get("building") == old_name:
+                    s["building"] = new_name
+                    s["location"] = f"{new_name}, {s.get('floor', '')}"
             st.session_state.pop("fp_rename_building_err", None)
             set_toast("Bloco renomeado.")
             st.rerun()
@@ -226,9 +215,9 @@ def _dialog_rename_building(building: dict):
 
 @st.dialog("Remover bloco")
 def _dialog_confirm_remove_building(building: dict):
-    has_floors = any(f["buildingId"] == building["id"] for f in _all_floors())
-    has_rooms = any(r["building"] == building["name"] for r in st.session_state.fp_extra_rooms)
-    has_plans = any(k.startswith(f"{building['id']}__") for k in st.session_state.fp_plans)
+    has_floors = any(f.get("buildingId") == building["id"] for f in _all_floors())
+    has_rooms = any(s.get("building") == building["name"] for s in st.session_state.spaces)
+    has_plans = any(k.startswith(f"{building['id']}__") for k in st.session_state.plans)
 
     if has_floors or has_rooms or has_plans:
         st.warning("Este bloco possui andares, salas ou plantas cadastradas. Ao remover, esses dados serão perdidos.")
@@ -239,14 +228,14 @@ def _dialog_confirm_remove_building(building: dict):
             st.rerun()
     with c2:
         if st.button("Remover bloco", type="primary", use_container_width=True):
-            remaining = [b for b in st.session_state.fp_buildings if b["id"] != building["id"]]
+            remaining = [b for b in st.session_state.buildings if b["id"] != building["id"]]
             next_building = remaining[0] if remaining else None
-            st.session_state.fp_buildings = remaining
-            st.session_state.fp_floors = [f for f in _all_floors() if f["buildingId"] != building["id"]]
-            st.session_state.fp_extra_rooms = [r for r in st.session_state.fp_extra_rooms if r["building"] != building["name"]]
-            to_del = [k for k in st.session_state.fp_plans if k.startswith(f"{building['id']}__")]
+            st.session_state.buildings = remaining
+            st.session_state.floors = [f for f in _all_floors() if f.get("buildingId") != building["id"]]
+            st.session_state.spaces = [s for s in st.session_state.spaces if s.get("building") != building["name"]]
+            to_del = [k for k in st.session_state.plans if k.startswith(f"{building['id']}__")]
             for k in to_del:
-                del st.session_state.fp_plans[k]
+                del st.session_state.plans[k]
             if st.session_state.fp_sel_building == building["id"]:
                 st.session_state.fp_sel_building = next_building["id"] if next_building else ""
                 next_floors = _building_floors(next_building["id"]) if next_building else []
@@ -285,7 +274,7 @@ def _dialog_add_floor(building: dict):
                 st.rerun()
                 return
             new_id = f"f-{_uid()}"
-            st.session_state.fp_floors.append({"id": new_id, "buildingId": building["id"], "name": name})
+            st.session_state.floors.append({"id": new_id, "buildingId": building["id"], "name": name})
             st.session_state.fp_sel_floor = new_id
             st.session_state.pop("fp_add_floor_err", None)
             set_toast(f'Andar "{name}" adicionado ao {building["name"]}.')
@@ -316,12 +305,13 @@ def _dialog_rename_floor(floor: dict, building: dict):
                 st.rerun()
                 return
             old_name = floor["name"]
-            for f in st.session_state.fp_floors:
+            for f in st.session_state.floors:
                 if f["id"] == floor["id"]:
                     f["name"] = new_name
-            for r in st.session_state.fp_extra_rooms:
-                if r["building"] == building["name"] and r["floor"] == old_name:
-                    r["floor"] = new_name
+            for s in st.session_state.spaces:
+                if s.get("building") == building["name"] and s.get("floor") == old_name:
+                    s["floor"] = new_name
+                    s["location"] = f"{building['name']}, {new_name}"
             st.session_state.pop("fp_rename_floor_err", None)
             set_toast("Andar renomeado.")
             st.rerun()
@@ -330,11 +320,11 @@ def _dialog_rename_floor(floor: dict, building: dict):
 @st.dialog("Remover andar")
 def _dialog_confirm_remove_floor(floor: dict, building: dict):
     has_rooms = any(
-        r["building"] == building["name"] and r["floor"] == floor["name"]
-        for r in st.session_state.fp_extra_rooms
+        s.get("building") == building["name"] and s.get("floor") == floor["name"]
+        for s in st.session_state.spaces
     )
     plan_key = f"{building['id']}__{floor['id']}"
-    has_plan = plan_key in st.session_state.fp_plans
+    has_plan = plan_key in st.session_state.plans
 
     if has_rooms or has_plan:
         st.warning("Este andar possui salas ou uma planta cadastrada. Ao remover, esses dados serão perdidos.")
@@ -347,13 +337,13 @@ def _dialog_confirm_remove_floor(floor: dict, building: dict):
         if st.button("Remover andar", type="primary", use_container_width=True):
             b_floors = _building_floors(building["id"])
             remaining = [f for f in b_floors if f["id"] != floor["id"]]
-            st.session_state.fp_floors = [f for f in _all_floors() if f["id"] != floor["id"]]
-            st.session_state.fp_extra_rooms = [
-                r for r in st.session_state.fp_extra_rooms
-                if not (r["building"] == building["name"] and r["floor"] == floor["name"])
+            st.session_state.floors = [f for f in _all_floors() if f["id"] != floor["id"]]
+            st.session_state.spaces = [
+                s for s in st.session_state.spaces
+                if not (s.get("building") == building["name"] and s.get("floor") == floor["name"])
             ]
-            if plan_key in st.session_state.fp_plans:
-                del st.session_state.fp_plans[plan_key]
+            if plan_key in st.session_state.plans:
+                del st.session_state.plans[plan_key]
             if st.session_state.fp_sel_floor == floor["id"]:
                 st.session_state.fp_sel_floor = remaining[0]["id"] if remaining else ""
             set_toast(f'Andar "{floor["name"]}" removido.')
@@ -387,13 +377,17 @@ def _dialog_add_room(building: dict, floor: dict):
                 st.session_state.fp_add_room_err = "Já existe uma sala com esse nome neste andar."
                 st.rerun()
                 return
-            st.session_state.fp_extra_rooms.append({
-                "id": f"local-{_uid()}",
+            st.session_state.spaces.append({
+                "id": f"s-{_uid()}",
                 "name": name,
                 "building": building["name"],
                 "floor": floor["name"],
                 "type": room_type,
                 "capacity": int(capacity),
+                "location": f"{building['name']}, {floor['name']}",
+                "status": "disponivel",
+                "resources": [],
+                "occupancy": 0,
             })
             st.session_state.pop("fp_add_room_err", None)
             set_toast(f'Sala "{name}" adicionada ao {floor["name"]}.')
@@ -626,12 +620,12 @@ def _render_floor_plan(current_b: dict | None, current_f: dict | None, plan: dic
                 data = base64.b64encode(uploaded.read()).decode()
                 mime = uploaded.type or "image/png"
                 src = f"data:{mime};base64,{data}"
-                st.session_state.fp_plans[_plan_key()] = {**plan, "src": src}
+                st.session_state.plans[_plan_key()] = {**plan, "src": src}
                 st.rerun()
 
             st.write("")
             if st.button("Usar planta de exemplo", key="fp_demo_plan", use_container_width=True):
-                st.session_state.fp_plans[_plan_key()] = {**plan, "src": "demo"}
+                st.session_state.plans[_plan_key()] = {**plan, "src": "demo"}
                 st.rerun()
         return
 
@@ -645,7 +639,7 @@ def _render_floor_plan(current_b: dict | None, current_f: dict | None, plan: dic
             st.caption(f"{b_label} · {f_label}")
         with pc2:
             if st.button("🗑 Remover planta", key="fp_remove_plan", type="tertiary"):
-                st.session_state.fp_plans[_plan_key()] = {"src": None, "positions": {}}
+                st.session_state.plans[_plan_key()] = {"src": None, "positions": {}}
                 st.rerun()
 
         # Planta SVG ou imagem
@@ -670,7 +664,10 @@ def _render_floor_plan(current_b: dict | None, current_f: dict | None, plan: dic
                 with mc3:
                     if st.button("✕", key=f"fp_unpin_{room_id}", help="Remover da planta"):
                         new_pos = {k: v for k, v in positions.items() if k != room_id}
-                        st.session_state.fp_plans[_plan_key()] = {**plan, "positions": new_pos}
+                        st.session_state.plans[_plan_key()] = {**plan, "positions": new_pos}
+                        for s in st.session_state.spaces:
+                            if s["id"] == room_id:
+                                s.pop("position", None)
                         if st.session_state.fp_positioning == room_id:
                             st.session_state.fp_positioning = None
                         st.rerun()
@@ -705,10 +702,23 @@ def _render_rooms_panel(current_b: dict | None, current_f: dict | None, plan: di
         is_positioning_this = positioning == rid
 
         with st.container(border=True):
-            st.markdown(
-                f'<div style="font-size:14px; font-weight:600; color:#1C1C2E;">{room["name"]}</div>',
-                unsafe_allow_html=True,
-            )
+            r_head1, r_head2 = st.columns([4, 1])
+            with r_head1:
+                st.markdown(
+                    f'<div style="font-size:14px; font-weight:600; color:#1C1C2E;">{room["name"]}</div>',
+                    unsafe_allow_html=True,
+                )
+            with r_head2:
+                if st.button("🗑", key=f"fp_del_room_{rid}", help="Remover sala"):
+                    st.session_state.spaces = [s for s in st.session_state.spaces if s["id"] != rid]
+                    if rid in positions:
+                        new_pos = {k: v for k, v in positions.items() if k != rid}
+                        st.session_state.plans[_plan_key()] = {**plan, "positions": new_pos}
+                    if st.session_state.fp_positioning == rid:
+                        st.session_state.fp_positioning = None
+                    set_toast(f'Sala "{room["name"]}" removida.')
+                    st.rerun()
+
             st.caption(f'{room["type"]} · {room["capacity"]} pessoas')
 
             if is_positioned:
@@ -734,8 +744,12 @@ def _render_rooms_panel(current_b: dict | None, current_f: dict | None, plan: di
                     cb1, cb2 = st.columns(2)
                     with cb1:
                         if st.button("Confirmar", key=f"fp_confirm_pos_{rid}", type="primary", use_container_width=True):
-                            new_positions = {**positions, rid: {"x": float(px), "y": float(py)}}
-                            st.session_state.fp_plans[_plan_key()] = {**plan, "positions": new_positions}
+                            pos_data = {"x": float(px), "y": float(py)}
+                            new_positions = {**positions, rid: pos_data}
+                            st.session_state.plans[_plan_key()] = {**plan, "positions": new_positions}
+                            for s in st.session_state.spaces:
+                                if s["id"] == rid:
+                                    s["position"] = pos_data
                             st.session_state.fp_positioning = None
                             st.rerun()
                     with cb2:

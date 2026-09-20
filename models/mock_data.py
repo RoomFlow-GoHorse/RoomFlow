@@ -52,13 +52,30 @@ def seed_demo_users():
 
 seed_demo_users()
 
+BUILDINGS = [
+    {"id": "b-1", "name": "Bloco A"},
+    {"id": "b-2", "name": "Bloco B"},
+    {"id": "b-3", "name": "Bloco C"},
+    {"id": "b-4", "name": "Bloco D"},
+]
+
+FLOORS = [
+    {"id": "b-1-f-1", "buildingId": "b-1", "name": "Térreo"},
+    {"id": "b-1-f-2", "buildingId": "b-1", "name": "1º andar"},
+    {"id": "b-1-f-3", "buildingId": "b-1", "name": "2º andar"},
+    {"id": "b-2-f-1", "buildingId": "b-2", "name": "Térreo"},
+    {"id": "b-2-f-2", "buildingId": "b-2", "name": "2º andar"},
+    {"id": "b-3-f-1", "buildingId": "b-3", "name": "Térreo"},
+    {"id": "b-4-f-1", "buildingId": "b-4", "name": "Térreo"},
+]
+
 SPACES = [
-    {"id": "s1", "name": "Sala 101", "type": "Sala", "capacity": 20, "location": "Bloco A - 1 andar", "status": "disponivel", "resources": ["Projetor", "Quadro branco"], "occupancy": 64},
-    {"id": "s2", "name": "Sala 204", "type": "Sala", "capacity": 30, "location": "Bloco B - 2 andar", "status": "ocupado", "resources": ["TV", "Ar-condicionado"], "occupancy": 78},
-    {"id": "s3", "name": "Auditorio Principal", "type": "Auditorio", "capacity": 150, "location": "Bloco Central", "status": "disponivel", "resources": ["Audio", "Microfones", "Projetor"], "occupancy": 52},
-    {"id": "s4", "name": "Laboratorio de Informatica", "type": "Laboratorio", "capacity": 40, "location": "Bloco C - Terreo", "status": "disponivel", "resources": ["Computadores", "Projetor"], "occupancy": 71},
-    {"id": "s5", "name": "Auditorio A", "type": "Auditorio", "capacity": 80, "location": "Bloco D", "status": "bloqueado", "resources": ["Audio"], "occupancy": 12},
-    {"id": "s6", "name": "Sala de Reunioes B", "type": "Reuniao", "capacity": 8, "location": "Administrativo", "status": "disponivel", "resources": ["Videoconferencia"], "occupancy": 46},
+    {"id": "s1", "name": "Sala 101", "type": "Sala de aula", "capacity": 20, "building": "Bloco A", "floor": "1º andar", "location": "Bloco A, 1º andar", "status": "disponivel", "resources": ["Projetor", "Quadro branco"], "occupancy": 64},
+    {"id": "s2", "name": "Sala 204", "type": "Sala de aula", "capacity": 30, "building": "Bloco B", "floor": "2º andar", "location": "Bloco B, 2º andar", "status": "ocupado", "resources": ["TV", "Ar-condicionado"], "occupancy": 78},
+    {"id": "s3", "name": "Auditório Principal", "type": "Auditório", "capacity": 150, "building": "Bloco A", "floor": "Térreo", "location": "Bloco A, Térreo", "status": "disponivel", "resources": ["Audio", "Microfones", "Projetor"], "occupancy": 52},
+    {"id": "s4", "name": "Laboratório de Informática", "type": "Laboratório", "capacity": 40, "building": "Bloco C", "floor": "Térreo", "location": "Bloco C, Térreo", "status": "disponivel", "resources": ["Computadores", "Projetor"], "occupancy": 71},
+    {"id": "s5", "name": "Auditório A", "type": "Auditório", "capacity": 80, "building": "Bloco D", "floor": "Térreo", "location": "Bloco D, Térreo", "status": "bloqueado", "resources": ["Audio"], "occupancy": 12},
+    {"id": "s6", "name": "Sala de Reuniões B", "type": "Sala de reuniões", "capacity": 8, "building": "Bloco A", "floor": "1º andar", "location": "Bloco A, 1º andar", "status": "disponivel", "resources": ["Videoconferencia"], "occupancy": 46},
 ]
 
 RESERVATIONS = [

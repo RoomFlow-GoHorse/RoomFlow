@@ -28,12 +28,37 @@ def create_reservation(data):
     return data
 
 
-def spaces(status=None, query=""):
-    items = st.session_state.spaces
+def buildings():
+    return st.session_state.get("buildings", [])
+
+
+def floors(building_id=None):
+    items = st.session_state.get("floors", [])
+    if building_id:
+        return [f for f in items if f.get("buildingId") == building_id]
+    return items
+
+
+def plans():
+    return st.session_state.get("plans", {})
+
+
+def spaces(status=None, query="", building=None, floor=None):
+    items = st.session_state.get("spaces", [])
     if status and status != "Todos":
         items = [item for item in items if item["status"] == status]
+    if building:
+        items = [item for item in items if item.get("building") == building]
+    if floor:
+        items = [item for item in items if item.get("floor") == floor]
     if query:
-        items = [item for item in items if query.lower() in item["name"].lower()]
+        q = query.lower()
+        items = [
+            item for item in items
+            if q in item["name"].lower()
+            or q in item.get("building", "").lower()
+            or q in item.get("location", "").lower()
+        ]
     return items
 
 
