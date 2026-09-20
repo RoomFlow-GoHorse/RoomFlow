@@ -8,7 +8,7 @@ from views.components.ui_components import load_auth_css, load_css, toast
 from views.pages.admin import admin_dashboard_page, permissions_page, settings_page, users_page
 from views.pages.auth import forgot_password_page, login_page, signup_choice_page, signup_institution_page, signup_member_page
 from views.pages.manager import conflicts_page, manager_dashboard_page, requests_page, spaces_page
-from views.pages.participant import changes_page, find_space_page, participant_dashboard_page
+from views.pages.participant import find_space_page, participant_dashboard_page
 from views.pages.public import landing_page
 from views.pages.requester import my_requests_page, new_request_page, requester_dashboard_page
 from views.pages.shared import account_settings_page, agenda_page, notifications_page
@@ -89,13 +89,10 @@ APP_ROUTES = {
 
     # Conta
     "conta": account_settings_page.account,
-
-    # Alterações
-    "alteracoes": changes_page.alteracoes,
 }
 
 
-# Rotas cujo conte\u00fado precisa de uma \u00e1rea de trabalho maior, mas ainda segue
+# Rotas cujo conteúdo precisa de uma área de trabalho maior, mas ainda segue
 # o mesmo container global das demais telas internas.
 WIDE_APP_ROUTES = {
     "admin_dashboard",

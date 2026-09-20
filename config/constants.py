@@ -27,7 +27,6 @@ ROLE_NAV = {
         ("Dashboard", "participante_dashboard"),
         ("Agenda", "agenda"),
         ("Localizar", "localizar"),
-        ("Alteracoes", "alteracoes"),
         ("Notificacoes", "notificacoes"),
         ("Conta", "conta"),
     ],
@@ -74,7 +73,6 @@ PERMISSIONS = {
     "participante": {
         "Ver agenda",
         "Localizar espacos",
-        "Ver alteracoes",
         "Ver notificacoes",
     },
 }

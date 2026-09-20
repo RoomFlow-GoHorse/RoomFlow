@@ -20,7 +20,6 @@ NAV_ICONS = {
     "agenda": ":material/schedule:",
     "notificacoes": ":material/notifications:",
     "localizar": ":material/location_on:",
-    "alteracoes": ":material/history:",
     "conta": ":material/account_circle:",
 }
 
@@ -34,7 +33,6 @@ NAV_LABEL_OVERRIDES = {
     "configuracoes_instituicao": "Configurações",
     "notificacoes": "Notificações",
     "localizar": "Localizar espaço",
-    "alteracoes": "Alterações",
 }
 
 
@@ -55,7 +53,7 @@ def render_sidebar(user):
     current_page = st.session_state.get("page", "landing")
     role = user.get("role", "participante")
     allowed_pages = {page for _, page in ROLE_NAV.get(role, [])}
-    unread = sum(not item["read"] for item in notifications_for(role))
+    unread = sum(not item["read"] for item in notifications_for(role) if item.get("category") != "sistema")
 
     with st.sidebar:
         st.html('<div class="rf-sidebar-logo">' + logo() + "</div>")

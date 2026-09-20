@@ -288,7 +288,7 @@ def dashboard(user: dict):
 
             with hdr_c_right:
                 if st.button("Ver todas →", key="btn_ver_alteracoes", type="tertiary"):
-                    _navigate("alteracoes")
+                    _navigate("notificacoes")
 
             # Lista de alterações
             for chg in changes_list:
