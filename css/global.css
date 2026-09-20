@@ -70,9 +70,12 @@ body {
 }
 
 
-[data-testid="stAppViewContainer"],
-[data-testid="stMain"] {
+[data-testid="stAppViewContainer"] {
   padding-top: 0 !important;
+}
+
+[data-testid="stMain"] {
+  padding-top: 3.75rem !important;
 }
 
 [data-testid="stMainBlockContainer"] {
