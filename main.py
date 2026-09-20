@@ -1,27 +1,17 @@
 import streamlit as st
 
-from services.app_state_service import boot_state, current_user
+from config.constants import ROLE_NAV
+from controllers.app_state_service import boot_state, current_user
 from views.components.app_shell import shell_end, shell_start
-from views.components.ui_components import load_css, toast
+from views.components.ui_components import load_auth_css, load_css, toast
 
-from views.pages import (
-    account_settings_page,
-    agenda_page,
-    changes_page,
-    conflicts_page,
-    dashboard_page,
-    forgot_password_page,
-    landing_page,
-    login_page,
-    notifications_page,
-    permissions_page,
-    reservations_page,
-    signup_choice_page,
-    signup_institution_page,
-    signup_member_page,
-    spaces_page,
-    users_page,
-)
+from views.pages.admin import admin_dashboard_page, permissions_page, settings_page, users_page
+from views.pages.auth import forgot_password_page, login_page, signup_choice_page, signup_institution_page, signup_member_page
+from views.pages.manager import conflicts_page, manager_dashboard_page, requests_page, spaces_page
+from views.pages.participant import changes_page, find_space_page, participant_dashboard_page
+from views.pages.public import landing_page
+from views.pages.requester import my_requests_page, new_request_page, requester_dashboard_page
+from views.pages.shared import account_settings_page, agenda_page, notifications_page
 
 
 # =========================================================
@@ -69,29 +59,30 @@ PUBLIC_ROUTES = {
 
 APP_ROUTES = {
     # Dashboards
-    "admin_dashboard": dashboard_page.dashboard,
-    "gerente_dashboard": dashboard_page.dashboard,
-    "solicitante_dashboard": dashboard_page.dashboard,
-    "participante_dashboard": dashboard_page.dashboard,
+    "admin_dashboard": admin_dashboard_page.dashboard,
+    "gerente_dashboard": manager_dashboard_page.dashboard,
+    "solicitante_dashboard": requester_dashboard_page.dashboard,
+    "participante_dashboard": participant_dashboard_page.dashboard,
 
     # Agenda
     "agenda": agenda_page.agenda,
 
     # Reservas
-    "admin_reservas": reservations_page.reservations_admin,
-    "nova_reserva": reservations_page.new_reservation,
-    "minhas_reservas": reservations_page.minhas_reservas,
+    "admin_reservas": requests_page.reservations_admin,
+    "nova_reserva": new_request_page.new_reservation,
+    "minhas_reservas": my_requests_page.minhas_reservas,
 
     # Conflitos
     "admin_conflitos": conflicts_page.conflicts,
 
     # Espaços
     "espacos": spaces_page.spaces,
-    "localizar": spaces_page.localizar,
+    "localizar": find_space_page.localizar,
 
     # Usuários e permissões
     "usuarios": users_page.users_page,
     "permissoes": permissions_page.permissions,
+    "configuracoes_instituicao": settings_page.settings,
 
     # Notificações
     "notificacoes": notifications_page.notifications,
@@ -101,6 +92,22 @@ APP_ROUTES = {
 
     # Alterações
     "alteracoes": changes_page.alteracoes,
+}
+
+
+# Rotas cujo conte\u00fado precisa de uma \u00e1rea de trabalho maior, mas ainda segue
+# o mesmo container global das demais telas internas.
+WIDE_APP_ROUTES = {
+    "admin_dashboard",
+    "gerente_dashboard",
+    "solicitante_dashboard",
+    "participante_dashboard",
+    "agenda",
+    "admin_reservas",
+    "espacos",
+    "usuarios",
+    "permissoes",
+    "configuracoes_instituicao",
 }
 
 
@@ -135,6 +142,23 @@ def get_dashboard_by_role(user):
     )
 
 
+def get_allowed_pages_by_role(role):
+    return {page for _, page in ROLE_NAV.get(role, [])}
+
+
+def ensure_allowed_internal_page(page, user):
+    role = user.get("role")
+    allowed_pages = get_allowed_pages_by_role(role)
+
+    if page in allowed_pages:
+        return page
+
+    dashboard = get_dashboard_by_role(user)
+    st.session_state.page = dashboard
+    st.query_params["page"] = dashboard
+    return dashboard
+
+
 # =========================================================
 # MAIN
 # =========================================================
@@ -153,6 +177,8 @@ def main():
         page_function = PUBLIC_ROUTES.get(page)
 
         if page_function:
+            if page != "landing":
+                load_auth_css()
             page_function()
             return
 
@@ -173,14 +199,15 @@ def main():
     # ROTAS INTERNAS
     # ---------------------------------------------------------
 
-    shell_start(user)
+    page = ensure_allowed_internal_page(page, user)
 
     page_function = APP_ROUTES.get(
         page,
-        dashboard_page.dashboard,
+        manager_dashboard_page.dashboard,
     )
 
-    page_function(user)
+    with shell_start(user, wide=page in WIDE_APP_ROUTES):
+        page_function(user)
 
     shell_end()
 
