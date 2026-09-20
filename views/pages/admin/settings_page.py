@@ -106,12 +106,6 @@ def _section_conflitos():
         key="cfg_sugestao",
     )
 
-    st.checkbox(
-        "Bloquear espaço automaticamente ao atingir 100% de ocupação",
-        value=False,
-        key="cfg_bloqueio_auto",
-    )
-
 
 def _section_notificacoes():
     for key, label, description in NOTIFICATION_OPTIONS:
