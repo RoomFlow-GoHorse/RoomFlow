@@ -69,20 +69,6 @@ body {
   background: var(--surface);
 }
 
-/* Keep Streamlit's native sidebar-expansion control when the sidebar is closed. */
-header[data-testid="stHeader"]:not(:has([data-testid="stExpandSidebarButton"])) {
-  display: none !important;
-}
-
-header[data-testid="stHeader"]:has([data-testid="stExpandSidebarButton"]) {
-  display: block !important;
-}
-
-header[data-testid="stHeader"] [data-testid="stExpandSidebarButton"] {
-  visibility: visible !important;
-  opacity: 1 !important;
-  pointer-events: auto !important;
-}
 
 [data-testid="stAppViewContainer"],
 [data-testid="stMain"] {
