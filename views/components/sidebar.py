@@ -31,7 +31,7 @@ NAV_LABEL_OVERRIDES = {
     "participante_dashboard": "Início",
     "usuarios": "Usuários",
     "permissoes": "Permissões",
-    "configuracoes_instituicao": "Configurações da instituição",
+    "configuracoes_instituicao": "Configurações",
     "notificacoes": "Notificações",
     "localizar": "Localizar espaço",
     "alteracoes": "Alterações",
