@@ -7,7 +7,7 @@ from views.components.ui_components import load_auth_css, load_css, toast
 
 from views.pages.admin import admin_dashboard_page, floor_plan_page, permissions_page, settings_page, users_page
 from views.pages.auth import forgot_password_page, login_page, signup_choice_page, signup_institution_page, signup_member_page
-from views.pages.manager import conflicts_page, manager_dashboard_page, requests_page, spaces_page
+from views.pages.manager import conflicts_page, manager_dashboard_page, occupancy_page, requests_page, spaces_page
 from views.pages.participant import find_space_page, participant_dashboard_page
 from views.pages.public import landing_page
 from views.pages.requester import my_requests_page, new_request_page, requester_dashboard_page
@@ -70,14 +70,17 @@ APP_ROUTES = {
 
     # Reservas
     "admin_reservas": requests_page.reservations_admin,
+    "gerente_reservas": requests_page.manager_reservations,
     "nova_reserva": new_request_page.new_reservation,
     "minhas_reservas": my_requests_page.minhas_reservas,
 
     # Conflitos
     "admin_conflitos": conflicts_page.conflicts,
+    "gerente_conflitos": conflicts_page.conflicts,
 
     # Espaços
     "espacos": spaces_page.spaces,
+    "ocupacao": occupancy_page.occupancy,
     "localizar": find_space_page.localizar,
 
     # Usuários e permissões
@@ -103,7 +106,10 @@ WIDE_APP_ROUTES = {
     "participante_dashboard",
     "agenda",
     "admin_reservas",
+    "gerente_reservas",
+    "gerente_conflitos",
     "espacos",
+    "ocupacao",
     "usuarios",
     "permissoes",
     "planta_instituicao",

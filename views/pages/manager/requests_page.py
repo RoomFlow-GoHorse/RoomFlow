@@ -32,6 +32,53 @@ def reservations_admin(user):
                 st.rerun()
 
 
+@st.dialog("Alterar sala da reserva")
+def change_room_dialog(reservation):
+    st.caption(f"{reservation['type']} · {reservation['date']} · {reservation['start']}–{reservation['end']}")
+    st.info("Apenas o local da reserva pode ser alterado neste fluxo.", icon=":material/meeting_room:")
+    rooms = mock_data_service.available_spaces_for_reservation(reservation)
+    if not rooms:
+        st.warning("Não há salas compatíveis e disponíveis para esta data e horário.")
+        return
+    selected = st.selectbox(
+        "Sala disponível",
+        rooms,
+        format_func=lambda room: f"{room['name']} · {room['location']} · {room['capacity']} pessoas",
+        index=None,
+        placeholder="Selecione uma nova sala",
+    )
+    if st.button("Salvar nova sala", type="primary", disabled=selected is None):
+        mock_data_service.update_reservation_space(reservation["id"], selected["name"])
+        set_toast("Local da reserva atualizado.")
+        st.rerun()
+
+
+def manager_reservations(user):
+    page_header("Reservas", "Analise solicitações e ajuste somente a sala quando necessário.")
+    status = st.selectbox("Status", ["Todas", "pendente", "em_analise", "aprovada", "rejeitada", "conflito"])
+    for item in mock_data_service.reservations(status=status):
+        with st.container(border=True):
+            details, state = st.columns([4, 1], vertical_alignment="center")
+            with details:
+                st.markdown(f"**{item['title']}**")
+                st.caption(f"{item['requester']} · {item['space']} · {item['date']} · {item['start']}–{item['end']}")
+            with state:
+                st.html(badge(item["status"]))
+            with st.expander("Ver detalhes e ações"):
+                st.write(item.get("justification", "Sem justificativa informada."))
+                with st.container(horizontal=True):
+                    if item["status"] in {"pendente", "em_analise", "conflito"} and st.button("Aprovar", key=f"manager_approve_{item['id']}", type="primary"):
+                        mock_data_service.update_reservation_status(item["id"], "aprovada")
+                        set_toast("Reserva aprovada.")
+                        st.rerun()
+                    if item["status"] in {"pendente", "em_analise", "conflito"} and st.button("Rejeitar", key=f"manager_reject_{item['id']}"):
+                        mock_data_service.update_reservation_status(item["id"], "rejeitada")
+                        set_toast("Reserva rejeitada.")
+                        st.rerun()
+                    if st.button("Alterar sala", key=f"manager_room_{item['id']}", icon=":material/edit_location:"):
+                        change_room_dialog(item)
+
+
 def new_reservation(user):
     page_header("Nova reserva", "Solicite um espaco disponivel.")
     with st.form("new_reservation"):

@@ -1,30 +1,29 @@
 import streamlit as st
 
-from config.constants import ROLE_LABELS
 from controllers import mock_data_service
-from views.components.reservation_cards import reservation_cards
-from views.components.ui_components import cards_grid, page_header, stat_card
+from views.components.ui_components import badge, page_header
 
 
 def dashboard(user):
-    stats = mock_data_service.dashboard_stats(user["role"], user["id"])
-    subtitle = {
-        "admin": "Operacao diaria de reservas, espacos e conflitos.",
-        "gerente": "Governanca de usuarios, permissoes e configuracoes.",
-        "solicitante": "Acompanhe suas solicitacoes e proximas reservas.",
-        "participante": "Consulte agenda, alteracoes e localizacao de espacos.",
-    }[user["role"]]
-    page_header(f"Dashboard {ROLE_LABELS[user['role']]}", subtitle)
-    cards = [
-        stat_card("Reservas", stats["reservas"], "total visivel"),
-        stat_card("Aprovadas", stats["aprovadas"], "confirmadas"),
-        stat_card("Pendentes", stats["pendentes"], "aguardando decisao"),
-        stat_card("Espacos livres", stats["espacos_livres"], stats["hoje"]),
-    ]
-    if user["role"] in {"admin", "gerente"}:
-        cards.append(stat_card("Conflitos", stats["conflitos"], "ativos"))
-        cards.append(stat_card("Usuarios", stats["usuarios"], "na instituicao"))
-    cards_grid(cards)
-    st.markdown("### Proximas atividades")
-    requester_id = user["id"] if user["role"] == "solicitante" else None
-    reservation_cards(mock_data_service.reservations(requester_id=requester_id)[:3])
+    reservations = mock_data_service.reservations()
+    spaces = mock_data_service.spaces()
+    metrics = (
+        ("Reservas do dia", len(reservations)),
+        ("Solicitações pendentes", sum(item["status"] in {"pendente", "em_analise"} for item in reservations)),
+        ("Salas ocupadas", sum(item["status"] == "ocupado" for item in spaces)),
+        ("Salas disponíveis", sum(item["status"] == "disponivel" for item in spaces)),
+        ("Conflitos pendentes", sum(item["status"] != "resolvido" for item in st.session_state.conflicts)),
+    )
+    page_header("Painel do gerente", "Visão operacional das salas, reservas e situações que exigem atenção.")
+    for column, (label, value) in zip(st.columns(5), metrics):
+        with column:
+            st.metric(label, value)
+    st.subheader("Solicitações recentes")
+    for reservation in reservations[:5]:
+        with st.container(border=True):
+            details, status = st.columns([4, 1], vertical_alignment="center")
+            with details:
+                st.markdown(f"**{reservation['title']}**")
+                st.caption(f"{reservation['space']} · {reservation['date']} · {reservation['start']}–{reservation['end']}")
+            with status:
+                st.html(badge(reservation["status"]))

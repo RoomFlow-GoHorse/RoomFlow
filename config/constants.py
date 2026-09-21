@@ -15,7 +15,12 @@ ROLE_NAV = {
         ("Conta", "conta"),
     ],
     "gerente": [
-        ("Dashboard", "gerente_dashboard"),
+        ("Início", "gerente_dashboard"),
+        ("Reservas", "gerente_reservas"),
+        ("Espaços", "espacos"),
+        ("Ocupação", "ocupacao"),
+        ("Conflitos", "gerente_conflitos"),
+        ("Conta", "conta"),
     ],
     "solicitante": [
         ("Dashboard", "solicitante_dashboard"),
@@ -49,6 +54,8 @@ STATUS_LABELS = {
     "rejeitada": "Rejeitada",
     "conflito": "Conflito",
     "em_analise": "Em analise",
+    "nao_resolvido": "Não resolvido",
+    "resolvido": "Resolvido",
     "disponivel": "Disponivel",
     "ocupado": "Ocupado",
     "bloqueado": "Bloqueado",
@@ -65,6 +72,9 @@ PERMISSIONS = {
     },
     "gerente": {
         "Acessar dashboard do gerente",
+        "Analisar reservas",
+        "Gerenciar operação dos espaços",
+        "Resolver conflitos de reservas",
     },
     "solicitante": {
         "Criar reserva",
