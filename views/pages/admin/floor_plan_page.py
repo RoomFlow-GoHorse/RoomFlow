@@ -65,6 +65,8 @@ def _uid() -> str:
 # =========================================================
 
 def _boot():
+    st.session_state.pop("fp_select_building_widget", None)
+
     if "buildings" not in st.session_state or not st.session_state.buildings:
         st.session_state.buildings = [
             {"id": "b-1", "name": "Bloco A"},
@@ -122,6 +124,13 @@ def _current_floor() -> dict | None:
 
 def _building_floors(bid: str) -> list[dict]:
     return _sort_floors([f for f in _all_floors() if f.get("buildingId") == bid])
+
+
+def _select_building(building_id: str) -> None:
+    floors = _building_floors(building_id)
+    st.session_state.fp_sel_building = building_id
+    st.session_state.fp_sel_floor = floors[0]["id"] if floors else ""
+    st.session_state.fp_positioning = None
 
 
 def _plan_key() -> str:
@@ -470,10 +479,7 @@ def _render_structure_config():
                                 use_container_width=True,
                             ):
                                 if not is_sel:
-                                    floors = _building_floors(b["id"])
-                                    st.session_state.fp_sel_building = b["id"]
-                                    st.session_state.fp_sel_floor = floors[0]["id"] if floors else ""
-                                    st.session_state.fp_positioning = None
+                                    _select_building(b["id"])
                                     st.rerun()
                         with rc2:
                             if st.button("✏️", key=f"fp_ren_b_{b['id']}", help="Renomear"):
@@ -536,24 +542,17 @@ def _render_selectors():
 
     col_b, col_f, _ = st.columns([2, 2, 3])
 
-    building_names = [b["name"] for b in buildings]
-    current_b = _current_building()
-    sel_b_idx = next((i for i, b in enumerate(buildings) if b["id"] == st.session_state.fp_sel_building), 0)
+    building_ids = [b["id"] for b in buildings]
+    building_names = {b["id"]: b["name"] for b in buildings}
 
     with col_b:
-        chosen_b_name = st.selectbox(
+        st.selectbox(
             "Prédio",
-            building_names,
-            index=sel_b_idx,
-            key="fp_select_building_widget",
+            building_ids,
+            format_func=building_names.get,
+            key="fp_sel_building",
+            on_change=lambda: _select_building(st.session_state.fp_sel_building),
         )
-        chosen_b = next((b for b in buildings if b["name"] == chosen_b_name), None)
-        if chosen_b and chosen_b["id"] != st.session_state.fp_sel_building:
-            floors = _building_floors(chosen_b["id"])
-            st.session_state.fp_sel_building = chosen_b["id"]
-            st.session_state.fp_sel_floor = floors[0]["id"] if floors else ""
-            st.session_state.fp_positioning = None
-            st.rerun()
 
     bid = st.session_state.fp_sel_building
     b_floors = _building_floors(bid)
