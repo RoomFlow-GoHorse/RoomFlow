@@ -20,6 +20,7 @@ _ACTIVITY_TYPES = (
     "Workshop",
     "Reunião",
     "Monitoria",
+    "Outro",
 )
 
 _LOCAL_TIMEZONE = ZoneInfo("America/Porto_Velho")
@@ -85,6 +86,7 @@ def _state():
     defaults = {
         "new_request_step": 0,
         "new_request_type": None,
+        "new_request_custom_type": "",
         "new_request_date": _local_today(),
         "new_request_start": None,
         "new_request_end": None,
@@ -263,6 +265,12 @@ def _validate(step: int) -> str | None:
                 "para continuar."
             )
 
+        if (
+            st.session_state.new_request_type == "Outro"
+            and not st.session_state.new_request_custom_type.strip()
+        ):
+            return "Informe o tipo de atividade para continuar."
+
     elif step == 1:
         if st.session_state.new_request_date is None:
             return "Informe a data para continuar."
@@ -338,7 +346,11 @@ def _submit(user):
             return
 
     space = _selected_space()
-    activity = st.session_state.new_request_type
+    activity = (
+        st.session_state.new_request_custom_type.strip()
+        if st.session_state.new_request_type == "Outro"
+        else st.session_state.new_request_type
+    )
 
     mock_data_service.create_reservation(
         {
@@ -410,6 +422,15 @@ def _render_step(step: int):
             width="stretch",
             on_change=_clear_error,
         )
+
+        if st.session_state.new_request_type == "Outro":
+            st.text_input(
+                "Qual é o tipo de atividade?",
+                key="new_request_custom_type",
+                placeholder="Ex.: Evento institucional",
+                max_chars=80,
+                on_change=_clear_error,
+            )
 
     # ---------------------------------------------------------
     # ETAPA 2 — DATA E HORÁRIO
@@ -759,4 +780,3 @@ def new_reservation(user):
     # ---------------------------------------------------------
     with summary_column:
         _summary(step)
-
