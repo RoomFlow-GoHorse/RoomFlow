@@ -32,7 +32,8 @@ st.set_page_config(
 
 boot_state()
 load_css()
-toast()
+if st.session_state.get("page") != "planta_instituicao":
+    toast()
 
 
 # =========================================================
@@ -206,6 +207,8 @@ def main():
     )
 
     with shell_start(user, wide=page in WIDE_APP_ROUTES):
+        if page == "planta_instituicao":
+            toast(width=360, aligned_right=True)
         page_function(user)
 
     shell_end()

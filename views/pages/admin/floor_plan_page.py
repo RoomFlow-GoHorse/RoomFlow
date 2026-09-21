@@ -364,6 +364,9 @@ def _dialog_add_room(building: dict, floor: dict):
     st.caption(f"{building['name']} · {floor['name']}")
     name = st.text_input("Nome da sala *", placeholder="Ex: Sala 102", key="fp_new_room_name")
     room_type = st.selectbox("Tipo *", ROOM_TYPES, key="fp_new_room_type")
+    custom_room_type = ""
+    if room_type == "Outro":
+        custom_room_type = st.text_input("Tipo da sala", key="fp_new_custom_room_type")
     capacity = st.number_input("Capacidade *", min_value=1, value=30, key="fp_new_room_cap")
     err = st.session_state.get("fp_add_room_err", "")
     if err:
@@ -381,6 +384,10 @@ def _dialog_add_room(building: dict, floor: dict):
                 st.session_state.fp_add_room_err = "Nome da sala é obrigatório."
                 st.rerun()
                 return
+            if room_type == "Outro" and not custom_room_type.strip():
+                st.session_state.fp_add_room_err = "Informe o tipo da sala."
+                st.rerun()
+                return
             existing = _rooms_for(building["name"], floor["name"])
             if any(r["name"].lower() == name.lower() for r in existing):
                 st.session_state.fp_add_room_err = "Já existe uma sala com esse nome neste andar."
@@ -391,7 +398,7 @@ def _dialog_add_room(building: dict, floor: dict):
                 "name": name,
                 "building": building["name"],
                 "floor": floor["name"],
-                "type": room_type,
+                "type": custom_room_type.strip() if room_type == "Outro" else room_type,
                 "capacity": int(capacity),
                 "location": f"{building['name']}, {floor['name']}",
                 "status": "disponivel",
@@ -701,35 +708,36 @@ def _render_rooms_panel(current_b: dict | None, current_f: dict | None, plan: di
         is_positioning_this = positioning == rid
 
         with st.container(border=True):
-            r_head1, r_head2 = st.columns([4, 1])
-            with r_head1:
-                st.markdown(
-                    f'<div style="font-size:14px; font-weight:600; color:#1C1C2E;">{room["name"]}</div>',
-                    unsafe_allow_html=True,
-                )
-            with r_head2:
-                if st.button("🗑", key=f"fp_del_room_{rid}", help="Remover sala"):
-                    st.session_state.spaces = [s for s in st.session_state.spaces if s["id"] != rid]
-                    if rid in positions:
-                        new_pos = {k: v for k, v in positions.items() if k != rid}
-                        st.session_state.plans[_plan_key()] = {**plan, "positions": new_pos}
-                    if st.session_state.fp_positioning == rid:
-                        st.session_state.fp_positioning = None
-                    set_toast(f'Sala "{room["name"]}" removida.')
-                    st.rerun()
+            with st.container(gap=None):
+                r_head1, r_head2 = st.columns([4, 1])
+                with r_head1:
+                    st.markdown(
+                        f'<div style="font-size:14px; font-weight:600; color:#1C1C2E;">{room["name"]}</div>',
+                        unsafe_allow_html=True,
+                    )
+                with r_head2:
+                    if st.button("🗑", key=f"fp_del_room_{rid}", help="Remover sala"):
+                        st.session_state.spaces = [s for s in st.session_state.spaces if s["id"] != rid]
+                        if rid in positions:
+                            new_pos = {k: v for k, v in positions.items() if k != rid}
+                            st.session_state.plans[_plan_key()] = {**plan, "positions": new_pos}
+                        if st.session_state.fp_positioning == rid:
+                            st.session_state.fp_positioning = None
+                        set_toast(f'Sala "{room["name"]}" removida.')
+                        st.rerun()
 
-            st.caption(f'{room["type"]} · {room["capacity"]} pessoas')
+                st.caption(f'{room["type"]} · {room["capacity"]} pessoas')
 
-            if is_positioned:
-                st.markdown(
-                    '<span style="background:#DCFCE7; color:#15803D; font-size:11px; font-weight:600; padding:2px 8px; border-radius:999px; display:inline-block; margin-bottom:8px;">✓ Posicionada</span>',
-                    unsafe_allow_html=True,
-                )
-            else:
-                st.markdown(
-                    '<span style="background:#FEF3C7; color:#B45309; font-size:11px; font-weight:600; padding:2px 8px; border-radius:999px; display:inline-block; margin-bottom:8px;">! Não posicionada</span>',
-                    unsafe_allow_html=True,
-                )
+                if is_positioned:
+                    st.markdown(
+                        '<span style="background:#DCFCE7; color:#15803D; font-size:11px; font-weight:600; padding:2px 8px; border-radius:999px; display:inline-block; margin-bottom:0;">✓ Posicionada</span>',
+                        unsafe_allow_html=True,
+                    )
+                else:
+                    st.markdown(
+                        '<span style="background:#FEF3C7; color:#B45309; font-size:11px; font-weight:600; padding:2px 8px; border-radius:999px; display:inline-block; margin-bottom:0;">Não posicionada</span>',
+                        unsafe_allow_html=True,
+                    )
 
             if has_plan:
                 if is_positioning_this:

@@ -269,9 +269,13 @@ def empty_state(title, body):
 # TOAST
 # ============================================================
 
-def toast():
+def toast(width="stretch", aligned_right=False):
     message = st.session_state.get("toast")
 
     if message:
-        st.success(message)
+        if aligned_right:
+            with st.container(horizontal_alignment="right"):
+                st.success(message, width=width)
+        else:
+            st.success(message, width=width)
         st.session_state.toast = ""
