@@ -70,8 +70,8 @@ def _user_dialog(editing_user: dict | None = None):
     default_email = editing_user.get("email", "") if is_edit else ""
     default_role  = editing_user.get("role", "solicitante") if is_edit else "solicitante"
 
-    name  = st.text_input("Nome completo", value=default_name,  placeholder="Ex: Carlos Andrade")
-    email = st.text_input("E-mail",        value=default_email, placeholder="usuario@instituicao.com")
+    name  = st.text_input("Nome completo", value=default_name,  placeholder="Ex: Carlos Andrade", disabled=is_edit)
+    email = st.text_input("E-mail",        value=default_email, placeholder="usuario@instituicao.com", disabled=is_edit)
 
     role_options = list(ROLE_LABELS.keys())
     role_labels  = [ROLE_LABELS[r] for r in role_options]
@@ -107,7 +107,7 @@ def _user_dialog(editing_user: dict | None = None):
     with col_save:
         label = "Salvar alterações" if is_edit else "Criar usuário"
         if st.button(label, type="primary", use_container_width=True):
-            if not name.strip() or not email.strip():
+            if not is_edit and (not name.strip() or not email.strip()):
                 st.warning("Preencha nome e e-mail.")
                 return
 
@@ -115,12 +115,7 @@ def _user_dialog(editing_user: dict | None = None):
                 # Atualiza o usuário no session_state
                 for u in st.session_state.users:
                     if u["id"] == editing_user["id"]:
-                        u["name"]  = name.strip()
-                        u["email"] = email.strip()
                         u["role"]  = selected_role
-                        # Recalcula iniciais
-                        parts = name.strip().split()
-                        u["initials"] = (parts[0][0] + parts[-1][0]).upper() if len(parts) >= 2 else parts[0][:2].upper()
                         break
                 set_toast("Usuário atualizado com sucesso.")
             else:
