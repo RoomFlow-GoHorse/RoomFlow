@@ -12,6 +12,7 @@ ROLE_NAV = {
         ("Permissoes", "permissoes"),
         ("Planta da instituição", "planta_instituicao"),
         ("Configuracoes da instituicao", "configuracoes_instituicao"),
+        ("Conta", "conta"),
     ],
     "gerente": [
         ("Dashboard", "gerente_dashboard"),
