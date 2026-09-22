@@ -10,10 +10,17 @@ ROLE_NAV = {
         ("Dashboard", "admin_dashboard"),
         ("Usuarios", "usuarios"),
         ("Permissoes", "permissoes"),
+        ("Planta da instituição", "planta_instituicao"),
         ("Configuracoes da instituicao", "configuracoes_instituicao"),
+        ("Conta", "conta"),
     ],
     "gerente": [
-        ("Dashboard", "gerente_dashboard"),
+        ("Início", "gerente_dashboard"),
+        ("Reservas", "gerente_reservas"),
+        ("Espaços", "espacos"),
+        ("Ocupação", "ocupacao"),
+        ("Conflitos", "gerente_conflitos"),
+        ("Conta", "conta"),
     ],
     "solicitante": [
         ("Dashboard", "solicitante_dashboard"),
@@ -27,7 +34,6 @@ ROLE_NAV = {
         ("Dashboard", "participante_dashboard"),
         ("Agenda", "agenda"),
         ("Localizar", "localizar"),
-        ("Alteracoes", "alteracoes"),
         ("Notificacoes", "notificacoes"),
         ("Conta", "conta"),
     ],
@@ -48,6 +54,8 @@ STATUS_LABELS = {
     "rejeitada": "Rejeitada",
     "conflito": "Conflito",
     "em_analise": "Em analise",
+    "nao_resolvido": "Não resolvido",
+    "resolvido": "Resolvido",
     "disponivel": "Disponivel",
     "ocupado": "Ocupado",
     "bloqueado": "Bloqueado",
@@ -64,6 +72,9 @@ PERMISSIONS = {
     },
     "gerente": {
         "Acessar dashboard do gerente",
+        "Analisar reservas",
+        "Gerenciar operação dos espaços",
+        "Resolver conflitos de reservas",
     },
     "solicitante": {
         "Criar reserva",
@@ -74,7 +85,6 @@ PERMISSIONS = {
     "participante": {
         "Ver agenda",
         "Localizar espacos",
-        "Ver alteracoes",
         "Ver notificacoes",
     },
 }

@@ -36,18 +36,15 @@ section[data-testid="stSidebar"] [data-testid="stSidebarContent"] {
    LOGO
 ========================================================= */
 
-.rf-sidebar-logo {
-  padding: 0 8px 20px;
-  margin: 0 0 20px;
-
-  border-bottom: 1px solid var(--stroke);
+.st-key-rf_sidebar_logo {
+  padding: 0 8px 4px;
 }
 
 /* =========================================================
    NAVEGAÇÃO
 ========================================================= */
 
-.rf-sidebar-section-label {
+.st-key-rf_sidebar_navigation_label [data-testid="stCaptionContainer"] p {
   margin: 0 8px 10px;
 
   color: var(--graphite-muted);
@@ -152,18 +149,6 @@ section[data-testid="stSidebar"]
 }
 
 /* =========================================================
-   DIVISOR
-========================================================= */
-
-.rf-sidebar-divider {
-  height: 1px;
-
-  margin: 14px 8px;
-
-  background: var(--stroke);
-}
-
-/* =========================================================
    FOOTER
 ========================================================= */
 
@@ -193,40 +178,39 @@ section[data-testid="stSidebar"] .st-key-rf_sidebar_footer {
    USUÁRIO
 ========================================================= */
 
-.rf-user-summary {
-  display: flex;
-
-  align-items: center;
-
-  gap: 10px;
-
+.st-key-rf_sidebar_footer [data-testid="stHorizontalBlock"] {
   padding: 0 8px 12px;
 }
 
-section[data-testid="stSidebar"] .rf-avatar {
-  flex: 0 0 auto;
+.st-key-rf_sidebar_avatar [data-testid="stMarkdownContainer"] p {
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  border-radius: 50%;
+  background: var(--brand-light);
+  color: var(--brand);
+  font-size: 12px;
+  font-weight: 700;
 }
 
-.rf-user-name {
+.st-key-rf_sidebar_profile_text [data-testid="stMarkdownContainer"] p {
   max-width: 150px;
-
+  margin: 0;
   overflow: hidden;
-
   color: var(--graphite);
-
   font-size: 14px;
   line-height: 18px;
   font-weight: 700;
-
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.rf-user-role {
-  margin-top: 2px;
-
+.st-key-rf_sidebar_profile_text [data-testid="stCaptionContainer"] p {
+  margin: 2px 0 0;
   color: var(--graphite-muted);
-
   font-size: 12px;
   line-height: 16px;
 }

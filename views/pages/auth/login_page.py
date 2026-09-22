@@ -1,7 +1,7 @@
 import streamlit as st
 
 from controllers import auth_service
-from controllers.app_state_service import go
+from controllers.app_state_service import go, go_authenticated
 from views.components.ui_components import logo
 
 
@@ -33,7 +33,7 @@ def _attempt_login(email, password):
         return
 
     st.session_state.login_error = ""
-    go(_target_for(user))
+    go_authenticated(_target_for(user), user)
 
 
 def _render_styles():

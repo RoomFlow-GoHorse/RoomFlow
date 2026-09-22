@@ -10,6 +10,7 @@
 ========================================================= */
 
 :root {
+  /* Colors */
   --brand: #6D28D9;
   --brand-hover: #5B21B6;
   --brand-light: #EDE9FE;
@@ -20,6 +21,7 @@
   --mustard-border: #FCD34D;
 
   --surface: #F8F7F4;
+  --surface-card: #FFFFFF;
   --surface-alt: #F0EEE9;
 
   --graphite: #1C1C2E;
@@ -27,6 +29,7 @@
   --graphite-muted: #A1A1AA;
   --soft: var(--graphite-soft);
   --muted: var(--graphite-muted);
+  --text-muted: var(--graphite-muted);
 
   --stroke: #E4E1DB;
   --stroke-strong: #C8C4BC;
@@ -40,9 +43,37 @@
   --warning: #D97706;
   --warning-bg: #FEF3C7;
 
+  --info: #2563EB;
+  --info-bg: #DBEAFE;
+
+  /* Radius */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-pill: 999px;
+
+  /* Spacing */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  /* Typography */
   --font-sans: "DM Sans", system-ui, sans-serif;
   --font-display: "Fraunces", Georgia, serif;
   --font-mono: "JetBrains Mono", monospace;
+
+  --text-page-title: 30px;
+  --text-section-title: 20px;
+  --text-card-title: 16px;
+  --text-metric: 24px;
+  --text-body: 14px;
+  --text-secondary: 13px;
+  --text-label: 12px;
+  --text-badge: 11px;
+  --text-button: 14px;
 }
 
 
@@ -69,24 +100,13 @@ body {
   background: var(--surface);
 }
 
-/* Keep Streamlit's native sidebar-expansion control when the sidebar is closed. */
-header[data-testid="stHeader"]:not(:has([data-testid="stExpandSidebarButton"])) {
-  display: none !important;
-}
 
-header[data-testid="stHeader"]:has([data-testid="stExpandSidebarButton"]) {
-  display: block !important;
-}
-
-header[data-testid="stHeader"] [data-testid="stExpandSidebarButton"] {
-  visibility: visible !important;
-  opacity: 1 !important;
-  pointer-events: auto !important;
-}
-
-[data-testid="stAppViewContainer"],
-[data-testid="stMain"] {
+[data-testid="stAppViewContainer"] {
   padding-top: 0 !important;
+}
+
+[data-testid="stMain"] {
+  padding-top: 3.75rem !important;
 }
 
 [data-testid="stMainBlockContainer"] {
@@ -197,11 +217,45 @@ header[data-testid="stHeader"] [data-testid="stExpandSidebarButton"] {
 }
 
 .rf-card {
-  padding: 16px;
-  background: white;
+  padding: var(--space-4);
+  background: var(--surface-card);
   border: 1px solid var(--stroke);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
 }
+
+/* Native bordered containers are the shared card primitive. */
+[data-testid="stVerticalBlockBorderWrapper"] {
+  background: var(--surface-card);
+  border-color: var(--stroke);
+  border-radius: var(--radius-md);
+}
+
+/* Shared operational-table language; rows and actions remain page-owned. */
+.st-key-rf_users_table,
+.st-key-rf_space_table,
+.st-key-manager_reservations_table {
+  background: var(--surface-card);
+  border-color: var(--stroke);
+  border-radius: var(--radius-md);
+}
+
+.st-key-rf_users_table [data-testid="stHorizontalBlock"],
+.st-key-rf_space_table [data-testid="stHorizontalBlock"],
+.st-key-manager_reservations_table [data-testid="stHorizontalBlock"] {
+  padding-inline: var(--space-4);
+}
+
+.st-key-rf_users_table [data-testid="stCaptionContainer"],
+.st-key-rf_space_table [data-testid="stCaptionContainer"],
+.st-key-manager_reservations_table [data-testid="stCaptionContainer"] {
+  color: var(--graphite-muted);
+  font-size: var(--text-label);
+  font-weight: 600;
+}
+
+.rf-stat-label { color: var(--graphite-muted); font-size: var(--text-label); font-weight: 600; }
+.rf-stat-value { margin-top: var(--space-1); color: var(--graphite); font-size: var(--text-metric); font-weight: 600; }
+.rf-stat-subtext { margin-top: var(--space-1); color: var(--graphite-muted); font-size: var(--text-secondary); }
 
 .rf-table-wrap {
   width: 100%;
