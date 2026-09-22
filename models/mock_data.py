@@ -84,11 +84,16 @@ RESERVATIONS = [
     {"id": "r3", "requester": "Ana Beatriz", "requester_id": "u3", "title": "Workshop de Pesquisa", "space": "Auditorio Principal", "date": (TODAY + timedelta(days=1)).isoformat(), "start": "14:00", "end": "17:00", "type": "Workshop", "status": "em_analise", "priority": "media", "participants": 90, "justification": "Evento institucional."},
     {"id": "r4", "requester": "Rafael Nunes", "requester_id": "u2", "title": "Reuniao de coordenacao", "space": "Sala de Reunioes B", "date": (TODAY + timedelta(days=2)).isoformat(), "start": "10:00", "end": "11:30", "type": "Reuniao", "status": "aprovada", "priority": "baixa", "participants": 6, "justification": "Alinhamento semanal."},
     {"id": "r5", "requester": "Ana Beatriz", "requester_id": "u3", "title": "Monitoria", "space": "Laboratorio de Informatica", "date": (TODAY - timedelta(days=1)).isoformat(), "start": "16:00", "end": "18:00", "type": "Monitoria", "status": "rejeitada", "priority": "baixa", "participants": 22, "justification": "Conflito de recursos."},
+    {"id": "r6", "requester": "Rafael Nunes", "requester_id": "u2", "title": "Reunião com coordenação", "space": "Sala 204", "date": TODAY.isoformat(), "start": "10:00", "end": "11:30", "type": "Reunião", "status": "conflito", "priority": "alta", "participants": 10, "justification": "Reunião extraordinária da coordenação."},
+    {"id": "r7", "requester": "Marina Costa", "requester_id": "u1", "title": "Encontro de docentes", "space": "Auditorio Principal", "date": (TODAY + timedelta(days=1)).isoformat(), "start": "14:00", "end": "16:00", "type": "Reunião", "status": "conflito", "priority": "alta", "participants": 45, "justification": "Planejamento do próximo período letivo."},
+    {"id": "r8", "requester": "Lucas Lima", "requester_id": "u4", "title": "Palestra de carreiras", "space": "Auditorio Principal", "date": (TODAY + timedelta(days=1)).isoformat(), "start": "15:00", "end": "17:00", "type": "Palestra", "status": "conflito", "priority": "media", "participants": 80, "justification": "Atividade aberta aos estudantes."},
+    {"id": "r9", "requester": "Rafael Nunes", "requester_id": "u2", "title": "Treinamento de equipe", "space": "Sala 101", "date": TODAY.isoformat(), "start": "09:00", "end": "11:00", "type": "Treinamento", "status": "aprovada", "priority": "media", "participants": 16, "justification": "Capacitação interna da equipe."},
 ]
 
 CONFLICTS = [
-    {"id": "c1", "space": "Sala 204", "status": "nao_resolvido", "severity": "alta", "reservation_a": "r2", "reservation_b": "r6", "reason": "Sobreposicao entre 09:30 e 10:30", "decision": ""},
-    {"id": "c2", "space": "Auditorio Principal", "status": "em_analise", "severity": "media", "reservation_a": "r3", "reservation_b": "r7", "reason": "Evento institucional disputa mesmo periodo", "decision": ""},
+    {"id": "c1", "space": "Sala 204", "status": "nao_resolvido", "severity": "alta", "reservation_a": "r2", "reservation_b": "r6", "affected_reservations": ["r2", "r6"], "reason": "Sobreposicao entre 10:00 e 11:00", "decision": ""},
+    {"id": "c2", "space": "Auditorio Principal", "status": "em_analise", "severity": "media", "reservation_a": "r3", "reservation_b": "r7", "affected_reservations": ["r3", "r7", "r8"], "reason": "Evento institucional disputa mesmo periodo", "decision": ""},
+    {"id": "c3", "space": "Sala 101", "status": "resolvido", "severity": "baixa", "reservation_a": "r1", "reservation_b": "r9", "affected_reservations": ["r1", "r9"], "reason": "Sobreposicao entre 09:00 e 10:00", "decision": "Mantida a reserva de Aula de Metodologia."},
 ]
 
 NOTIFICATIONS = [

@@ -189,11 +189,13 @@ def agenda_events(space="Todos", event_type="Todos"):
     return sorted(items, key=lambda item: (item["date"], item["start"]))
 
 
-def resolve_conflict(conflict_id, decision):
+def resolve_conflict(conflict_id, decision, outcome=None):
     for item in st.session_state.conflicts:
         if item["id"] == conflict_id:
-            item["status"] = "em_analise" if decision == "alterar" else "resolvido"
+            item["status"] = "em_analise" if decision == "alterar" and outcome is None else "resolvido"
             item["decision"] = decision
+            if outcome:
+                item["outcome"] = outcome
             return item
     return None
 
