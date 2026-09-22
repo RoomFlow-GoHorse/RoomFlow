@@ -49,6 +49,9 @@ No Prompt de Comando (CMD):
 
 ```cmd
 .venv\Scripts\activate
+
+No linux 
+source .venv/bin/activate
 ```
 
 ### 4. Instale as dependências
@@ -75,26 +78,29 @@ Normalmente:
 http://localhost:8501
 ```
 
-## Estrutura do projeto
+## Tabelas no PostgreSQL
 
-```text
-RoomFlow/
-│
-├── .venv/
-├── controllers/
-├── models/
-├── views/
-├── config/
-├── css/
-├── assets/
-│
-├── main.py
-├── requirements.txt
-└── README.md
+Instale as dependências e configure no `.env` o banco PostgreSQL que será usado
+em produção, usando `.env.example` como referência. O nome em `DB_NAME` deve ser
+exatamente o nome do banco existente. A porta usual do PostgreSQL é `5432`;
+`8501` é a porta do Streamlit. O servidor precisa estar em execução e o usuário
+configurado precisa ter acesso ao banco.
+
+```bash
+# Alembic cria as tabelas e registra a versão
+.venv/bin/alembic upgrade head
+```
+
+
+Para alterações futuras nos modelos, use o Alembic:
+
+```bash
+.venv/bin/alembic revision --autogenerate -m "descreva a mudanca"
+# Revise o arquivo gerado em migrations/versions antes de aplicar.
+.venv/bin/alembic upgrade head
 ```
 
 ### Arquitetura
-
 * **Views:** responsáveis pela interface da aplicação.
 * **Controllers:** responsáveis pela lógica e controle das ações.
 * **Models:** representam os dados e entidades do sistema.
