@@ -94,8 +94,9 @@ def render_sidebar(user):
                 with st.container(key="rf_sidebar_avatar"):
                     st.markdown(f"**{user.get('initials', '')}**")
             with profile_column:
-                st.markdown(f"**{user.get('name', 'Usuário')}**")
-                st.caption(role_label(role))
+                with st.container(key="rf_sidebar_profile_text"):
+                    st.markdown(f"**{user.get('name', 'Usuário')}**")
+                    st.caption(role_label(role))
             if "conta" in allowed_pages:
                 if st.button(
                     "Configurações da conta",

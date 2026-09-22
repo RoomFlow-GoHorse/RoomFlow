@@ -112,6 +112,12 @@ def _load_css():
             .account-compact {
                 margin-top: -8px;
             }
+
+            /* Sidebar - conta e sair sem negrito */
+            div.st-key-rf_account button,
+            div.st-key-rf_logout button {
+                font-weight: 400 !important;
+            }
         </style>
         """,
         unsafe_allow_html=True,
@@ -285,8 +291,6 @@ def _profile(user):
                 label_visibility="collapsed",
                 key="account_avatar",
             )
-
-
 
     st.divider()
 

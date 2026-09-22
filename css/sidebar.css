@@ -196,7 +196,7 @@ section[data-testid="stSidebar"] .st-key-rf_sidebar_footer {
   font-weight: 700;
 }
 
-.st-key-rf_sidebar_footer [data-testid="stMarkdownContainer"] p {
+.st-key-rf_sidebar_profile_text [data-testid="stMarkdownContainer"] p {
   max-width: 150px;
   margin: 0;
   overflow: hidden;
@@ -208,7 +208,7 @@ section[data-testid="stSidebar"] .st-key-rf_sidebar_footer {
   white-space: nowrap;
 }
 
-.st-key-rf_sidebar_footer [data-testid="stCaptionContainer"] p {
+.st-key-rf_sidebar_profile_text [data-testid="stCaptionContainer"] p {
   margin: 2px 0 0;
   color: var(--graphite-muted);
   font-size: 12px;
