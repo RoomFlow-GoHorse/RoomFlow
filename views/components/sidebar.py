@@ -4,7 +4,7 @@ from config.constants import ROLE_NAV
 from controllers import auth_service
 from controllers.app_state_service import go
 from controllers.mock_data_service import notifications_for
-from views.components.ui_components import logo, role_label
+from views.components.ui_components import ASSETS_DIR, LOGO_FILES, role_label
 
 
 NAV_ICONS = {
@@ -62,8 +62,12 @@ def render_sidebar(user):
     unread = sum(not item["read"] for item in notifications_for(role) if item.get("category") != "sistema")
 
     with st.sidebar:
-        st.html('<div class="rf-sidebar-logo">' + logo() + "</div>")
-        st.html('<div class="rf-sidebar-section-label">Navegação</div>')
+        with st.container(key="rf_sidebar_logo"):
+            st.image(ASSETS_DIR / LOGO_FILES["dark"], width=150)
+
+        st.divider()
+        with st.container(key="rf_sidebar_navigation_label"):
+            st.caption("Navegação")
 
         for label, page, icon in _sidebar_items(role):
             if page == "conta":
@@ -82,17 +86,16 @@ def render_sidebar(user):
                 _navigate(page)
 
         with st.container(key="rf_sidebar_footer"):
-            st.html(
-                f"""
-                <div class="rf-user-summary">
-                  <span class="rf-avatar">{user.get('initials', '')}</span>
-                  <div>
-                    <div class="rf-user-name">{user.get('name', 'Usuário')}</div>
-                    <div class="rf-user-role">{role_label(role)}</div>
-                  </div>
-                </div>
-                """
+            avatar_column, profile_column = st.columns(
+                [1, 4],
+                vertical_alignment="center",
             )
+            with avatar_column:
+                with st.container(key="rf_sidebar_avatar"):
+                    st.markdown(f"**{user.get('initials', '')}**")
+            with profile_column:
+                st.markdown(f"**{user.get('name', 'Usuário')}**")
+                st.caption(role_label(role))
             if "conta" in allowed_pages:
                 if st.button(
                     "Configurações da conta",
