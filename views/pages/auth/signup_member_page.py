@@ -1,8 +1,8 @@
 import time
 import streamlit as st
 
-from services import mock_data_service
-from services.app_state_service import go
+from controllers import mock_data_service
+from controllers.app_state_service import go
 from views.components.ui_components import logo
 
 DEMO_INSTITUTIONS = [
@@ -92,6 +92,7 @@ def _render_topbar():
         if st.button("← Voltar", key="signup_member_back", type="tertiary"):
             _reset()
             go("signup_choice")
+            st.rerun()
 
     with col2:
         st.html(logo(size="small", class_name="rf-choice-logo"))
@@ -220,8 +221,6 @@ def _render_validating():
         """,
         unsafe_allow_html=True,
     )
-
-    time.sleep(2.0)
 
     ra = st.session_state.signup_member_ra.strip().upper()
     if ra.startswith("ERR"):

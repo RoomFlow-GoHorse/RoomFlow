@@ -1,7 +1,7 @@
 import streamlit as st
 
-from services import auth_service
-from services.app_state_service import go
+from controllers import auth_service
+from controllers.app_state_service import go
 from views.components.ui_components import logo
 
 

@@ -1,7 +1,7 @@
 import time
 import streamlit as st
 
-from services.app_state_service import go
+from controllers.app_state_service import go
 from views.components.ui_components import logo
 
 INSTITUTION_TYPES = [
@@ -101,6 +101,7 @@ def _validate_step_two():
 def _exit_signup():
     _reset()
     go("signup_choice")
+    st.rerun()
 
 def _go_back():
     if st.session_state.signup_inst_step == 2:
@@ -129,7 +130,6 @@ def _submit():
     st.rerun()
 
 def _finish_verification():
-    time.sleep(2.2)
     st.session_state.signup_inst_screen = "success"
     st.rerun()
 
@@ -344,6 +344,7 @@ def _render_success():
         if st.button("Acessar RoomFlow →", key="signup_inst_access", type="primary", use_container_width=True):
             _reset()
             go("login")
+            st.rerun()
 
 def signup_institution():
     _init_state()
