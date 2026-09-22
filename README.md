@@ -90,14 +90,15 @@ configurado precisa ter acesso ao banco.
 # Alembic cria as tabelas e registra a versão
 .venv/bin/alembic upgrade head
 ```
-
-
 Para alterações futuras nos modelos, use o Alembic:
 
 ```bash
-.venv/bin/alembic revision --autogenerate -m "descreva a mudanca"
+ 1.Defina a classe da tabela em models/database_models.py.
+2. .venv/bin/alembic revision --autogenerate -m "descreva a mudanca"
 # Revise o arquivo gerado em migrations/versions antes de aplicar.
-.venv/bin/alembic upgrade head
+
+ # crie a tabela
+ .venv/bin/alembic upgrade head
 ```
 
 ### Arquitetura
