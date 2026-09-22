@@ -71,6 +71,14 @@ def toggle_space(space_id):
     return None
 
 
+def update_reservation(reservation_id, changes):
+    for item in st.session_state.reservations:
+        if item["id"] == reservation_id:
+            item.update(changes)
+            return item
+    return None
+
+
 def update_space(space_id, capacity, resources):
     for item in st.session_state.spaces:
         if item["id"] == space_id:
