@@ -18,6 +18,13 @@ def _recover_user_from_query():
     return next((u for u in USERS if u.get("id") == uid), None)
 
 
+def _clear_occupancy_modal_state():
+    """Ensure modal state for the occupancy page does not leak across navigation."""
+    st.session_state.pop("occupancy_detail_id", None)
+    st.session_state.pop("occupancy_edit_id", None)
+    st.session_state.pop("occupancy_reservation_selector", None)
+
+
 def boot_state():
     simple_defaults = {
         "page": "landing",
@@ -54,12 +61,14 @@ def boot_state():
 
 def go(page):
     st.session_state.page = page
+    _clear_occupancy_modal_state()
     st.query_params["page"] = page
 
 
 def go_authenticated(page, user):
     """Navigate to an internal page and persist the user id in the URL."""
     st.session_state.page = page
+    _clear_occupancy_modal_state()
     st.query_params["page"] = page
     st.query_params["uid"] = user["id"]
 
