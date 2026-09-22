@@ -102,7 +102,13 @@ def _state():
     }
 
     for key, value in defaults.items():
-        st.session_state.setdefault(key, value)
+        if key not in st.session_state:
+            st.session_state[key] = value
+        else:
+            # Os campos pertencem a etapas condicionais. Reatribuí-los antes
+            # da criação dos widgets evita que o Streamlit os descarte quando
+            # a etapa anterior deixa de ser renderizada.
+            st.session_state[key] = st.session_state[key]
 
 
 def _selected_space():
@@ -421,6 +427,7 @@ def _render_step(step: int):
             key="new_request_type",
             width="stretch",
             on_change=_clear_error,
+            persist_state="page",
         )
 
         if st.session_state.new_request_type == "Outro":
@@ -430,6 +437,7 @@ def _render_step(step: int):
                 placeholder="Ex.: Evento institucional",
                 max_chars=80,
                 on_change=_clear_error,
+                persist_state="page",
             )
 
     # ---------------------------------------------------------
@@ -450,20 +458,25 @@ def _render_step(step: int):
             min_value=_local_today(),
             format="DD/MM/YYYY",
             on_change=_clear_error,
+            persist_state="page",
         )
 
         start_column, end_column = st.columns(2)
 
         start_column.time_input(
             "Horário de início",
+            value=None,
             key="new_request_start",
             on_change=_clear_error,
+            persist_state="page",
         )
 
         end_column.time_input(
             "Horário de término",
+            value=None,
             key="new_request_end",
             on_change=_clear_error,
+            persist_state="page",
         )
 
         start = st.session_state.new_request_start
@@ -502,6 +515,7 @@ def _render_step(step: int):
             ),
             key="new_request_space_mode",
             width="stretch",
+            persist_state="page",
         )
 
         if mode == "Escolher espaço":
@@ -532,6 +546,7 @@ def _render_step(step: int):
                 "Capacidade mínima",
                 min_value=1,
                 key="new_request_capacity",
+                persist_state="page",
             )
 
             type_column.selectbox(
@@ -544,6 +559,7 @@ def _render_step(step: int):
                     "Laboratório",
                 ),
                 key="new_request_space_type",
+                persist_state="page",
             )
 
             st.multiselect(
@@ -551,6 +567,7 @@ def _render_step(step: int):
                 _resource_names(),
                 key="new_request_resources",
                 placeholder="Selecione os recursos",
+                persist_state="page",
             )
 
             st.selectbox(
@@ -563,6 +580,7 @@ def _render_step(step: int):
                     ),
                 ),
                 key="new_request_building",
+                persist_state="page",
             )
 
             matches = _matching_spaces()
@@ -622,6 +640,7 @@ def _render_step(step: int):
             max_chars=600,
             height=180,
             on_change=_clear_error,
+            persist_state="page",
             placeholder=(
                 "Ex.: Aula de Cálculo II para turma "
                 "do 3º semestre. Necessidade de projetor "

@@ -60,9 +60,11 @@ def boot_state():
 
 
 def go(page):
+    """Navega imediatamente para uma rota pública ou interna."""
     st.session_state.page = page
     _clear_occupancy_modal_state()
     st.query_params["page"] = page
+    st.rerun()
 
 
 def go_authenticated(page, user):
@@ -71,6 +73,7 @@ def go_authenticated(page, user):
     _clear_occupancy_modal_state()
     st.query_params["page"] = page
     st.query_params["uid"] = user["id"]
+    st.rerun()
 
 
 def current_user():

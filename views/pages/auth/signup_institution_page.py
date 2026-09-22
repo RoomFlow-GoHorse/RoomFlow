@@ -305,7 +305,7 @@ def _render_verifying():
 def _render_success():
     check_circle_svg = '<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>'
     
-    st.markdown(
+    st.html(
         f"""
         <div class="rf-state-wrapper">
             <div class="rf-state-card">
@@ -336,7 +336,6 @@ def _render_success():
             </div>
         </div>
         """,
-        unsafe_allow_html=True,
     )
 
     col1, col2, col3 = st.columns([1, 2, 1])
