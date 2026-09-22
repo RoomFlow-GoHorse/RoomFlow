@@ -1,8 +1,8 @@
 import streamlit as st
 
-from config.constants import ROLE_LABELS
 from controllers import mock_data_service
 from controllers.app_state_service import go
+from views.components.badges import badge
 from views.components.ui_components import page_header
 
 
@@ -59,14 +59,6 @@ QUICK_ACTIONS = [
 ]
 
 
-ROLE_BADGE_STYLES = {
-    "admin": "background:#EDE9FE; color:#6D28D9;",
-    "gerente": "background:#FEF3C7; color:#B45309;",
-    "solicitante": "background:#F4F4F5; color:#52525B;",
-    "participante": "background:#F4F4F5; color:#52525B;",
-}
-
-
 # =========================================================
 # HELPERS
 # =========================================================
@@ -97,24 +89,8 @@ def _avatar_html(initials: str, size: int = 28) -> str:
 
 
 def _role_badge_html(role: str) -> str:
-    """Cria o badge visual do perfil."""
-    label = ROLE_LABELS.get(role, role)
-
-    style = ROLE_BADGE_STYLES.get(
-        role,
-        "background:#F4F4F5; color:#52525B;",
-    )
-
-    return (
-        f'<span style="'
-        f"display:inline-block;"
-        f"padding:2px 10px;"
-        f"border-radius:999px;"
-        f"font-size:11px;"
-        f"font-weight:600;"
-        f"{style}"
-        f'">{label}</span>'
-    )
+    """Compatibility wrapper for the shared semantic role badge."""
+    return badge(role, category="role")
 
 
 def _get_user_stats(users: list) -> dict:

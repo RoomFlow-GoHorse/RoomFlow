@@ -3,6 +3,8 @@ import streamlit as st
 from config.constants import ROLE_LABELS
 from controllers import mock_data_service
 from controllers.app_state_service import set_toast
+from views.components.badges import badge
+from views.components.tables import operational_table_container
 from views.components.ui_components import page_header
 
 
@@ -22,38 +24,11 @@ def _avatar_html(initials: str) -> str:
 
 
 def _role_badge_html(role: str) -> str:
-    styles = {
-        "admin":        "background:#EDE9FE; color:#6D28D9;",
-        "gerente":      "background:#FEF3C7; color:#B45309;",
-        "solicitante":  "background:#F4F4F5; color:#52525B;",
-        "participante": "background:#F4F4F5; color:#52525B;",
-    }
-    label = ROLE_LABELS.get(role, role)
-    style = styles.get(role, "background:#F4F4F5; color:#52525B;")
-    return (
-        f'<span style="'
-        f"display:inline-block; padding:2px 10px; border-radius:999px;"
-        f"font-size:11px; font-weight:600; white-space:nowrap; {style}"
-        f'">{label}</span>'
-    )
+    return badge(role, category="role")
 
 
 def _status_badge_html(status: str) -> str:
-    if status == "ativo":
-        return (
-            '<span style="'
-            "display:inline-block; padding:2px 10px; border-radius:999px;"
-            "font-size:11px; font-weight:600;"
-            "background:#DCFCE7; color:#16A34A;"
-            '">Ativo</span>'
-        )
-    return (
-        '<span style="'
-        "display:inline-block; padding:2px 10px; border-radius:999px;"
-        "font-size:11px; font-weight:600;"
-        "background:#F4F4F5; color:#A1A1AA;"
-        '">Inativo</span>'
-    )
+    return badge(status, category="status")
 
 
 # =========================================================
@@ -263,5 +238,5 @@ def users_page(user):
     # ---------------------------------------------------------
     # Tabela
     # ---------------------------------------------------------
-    with st.container(border=True):
+    with operational_table_container("rf_users_table"):
         _render_users_table(filtered)

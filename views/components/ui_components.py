@@ -5,7 +5,8 @@ from pathlib import Path
 
 import streamlit as st
 
-from config.constants import ROLE_LABELS, STATUS_LABELS
+from config.constants import ROLE_LABELS
+from views.components.badges import badge
 
 
 # ============================================================
@@ -63,24 +64,6 @@ def esc(value):
 # ============================================================
 # COMPONENTES
 # ============================================================
-
-def badge(value):
-    label = STATUS_LABELS.get(value, value.replace("_", " ").title())
-    status_styles = {
-        "aprovada": "background:#DCFCE7; border:1px solid #BBF7D0; color:#15803D;",
-        "rejeitada": "background:#FEE2E2; border:1px solid #FECACA; color:#B91C1C;",
-        "em_analise": "background:#FEF3C7; border:1px solid #FDE68A; color:#B45309;",
-        "pendente": "background:#EDE9FE; border:1px solid #DDD6FE; color:#6D28D9;",
-        "conflito": "background:#FFF7ED; border:1px solid #FED7AA; color:#C2410C;",
-    }
-    style = status_styles.get(value, "")
-    return (
-        f'<span class="rf-badge {esc(value)}" style="'
-        f'display:inline-block; padding:2px 10px; border-radius:999px; '
-        f'font-size:11px; font-weight:600; white-space:nowrap; {style}">'
-        f'{esc(label)}</span>'
-    )
-
 
 def role_label(role):
     return ROLE_LABELS.get(role, role)
@@ -194,6 +177,13 @@ def page_header(title, subtitle="", action_html=""):
     )
 
 
+def section_header(title, subtitle=""):
+    """Consistent internal section heading without replacing page-level headers."""
+    st.markdown(f"**{esc(title)}**")
+    if subtitle:
+        st.caption(subtitle)
+
+
 # ============================================================
 # CARDS
 # ============================================================
@@ -286,9 +276,5 @@ def toast(width="stretch", aligned_right=False):
     message = st.session_state.get("toast")
 
     if message:
-        if aligned_right:
-            with st.container(horizontal_alignment="right"):
-                st.success(message, width=width)
-        else:
-            st.success(message, width=width)
+        st.toast(message, icon=":material/check_circle:")
         st.session_state.toast = ""

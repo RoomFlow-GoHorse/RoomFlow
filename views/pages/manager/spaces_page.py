@@ -2,6 +2,7 @@ import streamlit as st
 
 from controllers import mock_data_service
 from controllers.app_state_service import set_toast
+from views.components.tables import operational_table_container
 from views.components.ui_components import badge, page_header
 
 
@@ -245,7 +246,7 @@ def _space_actions(space, layout_key):
 
 
 def _space_table(items):
-    with st.container(key="rf_space_table", border=True):
+    with operational_table_container("rf_space_table"):
         header = st.columns(
             [2.1, 1.6, 1.25, 1.05, 2.1, 1.2, 1.8]
         )

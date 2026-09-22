@@ -217,11 +217,45 @@ body {
 }
 
 .rf-card {
-  padding: 16px;
-  background: white;
+  padding: var(--space-4);
+  background: var(--surface-card);
   border: 1px solid var(--stroke);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
 }
+
+/* Native bordered containers are the shared card primitive. */
+[data-testid="stVerticalBlockBorderWrapper"] {
+  background: var(--surface-card);
+  border-color: var(--stroke);
+  border-radius: var(--radius-md);
+}
+
+/* Shared operational-table language; rows and actions remain page-owned. */
+.st-key-rf_users_table,
+.st-key-rf_space_table,
+.st-key-manager_reservations_table {
+  background: var(--surface-card);
+  border-color: var(--stroke);
+  border-radius: var(--radius-md);
+}
+
+.st-key-rf_users_table [data-testid="stHorizontalBlock"],
+.st-key-rf_space_table [data-testid="stHorizontalBlock"],
+.st-key-manager_reservations_table [data-testid="stHorizontalBlock"] {
+  padding-inline: var(--space-4);
+}
+
+.st-key-rf_users_table [data-testid="stCaptionContainer"],
+.st-key-rf_space_table [data-testid="stCaptionContainer"],
+.st-key-manager_reservations_table [data-testid="stCaptionContainer"] {
+  color: var(--graphite-muted);
+  font-size: var(--text-label);
+  font-weight: 600;
+}
+
+.rf-stat-label { color: var(--graphite-muted); font-size: var(--text-label); font-weight: 600; }
+.rf-stat-value { margin-top: var(--space-1); color: var(--graphite); font-size: var(--text-metric); font-weight: 600; }
+.rf-stat-subtext { margin-top: var(--space-1); color: var(--graphite-muted); font-size: var(--text-secondary); }
 
 .rf-table-wrap {
   width: 100%;
