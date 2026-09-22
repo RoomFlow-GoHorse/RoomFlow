@@ -5,7 +5,8 @@ from pathlib import Path
 
 import streamlit as st
 
-from config.constants import ROLE_LABELS, STATUS_LABELS
+from config.constants import ROLE_LABELS
+from views.components.badges import badge
 
 
 # ============================================================
@@ -63,11 +64,6 @@ def esc(value):
 # ============================================================
 # COMPONENTES
 # ============================================================
-
-def badge(value):
-    label = STATUS_LABELS.get(value, value.replace("_", " ").title())
-    return f'<span class="rf-badge {esc(value)}">{esc(label)}</span>'
-
 
 def role_label(role):
     return ROLE_LABELS.get(role, role)
@@ -181,6 +177,13 @@ def page_header(title, subtitle="", action_html=""):
     )
 
 
+def section_header(title, subtitle=""):
+    """Consistent internal section heading without replacing page-level headers."""
+    st.markdown(f"**{esc(title)}**")
+    if subtitle:
+        st.caption(subtitle)
+
+
 # ============================================================
 # CARDS
 # ============================================================
@@ -269,9 +272,9 @@ def empty_state(title, body):
 # TOAST
 # ============================================================
 
-def toast():
+def toast(width="stretch", aligned_right=False):
     message = st.session_state.get("toast")
 
     if message:
-        st.success(message)
+        st.toast(message, icon=":material/check_circle:")
         st.session_state.toast = ""
