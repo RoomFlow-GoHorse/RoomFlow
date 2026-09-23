@@ -1,6 +1,19 @@
 [theme]
 base = "light"
 primaryColor = "#6D28D9"
-backgroundColor = "#F8F7F4"
-secondaryBackgroundColor = "#F0EEE9"
-textColor = "#1C1C2E"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F4F4F5"
+textColor = "#18181B"
+borderColor = "#E4E4E7"
+linkColor = "#6D28D9"
+baseRadius = "0.75rem"
+showWidgetBorder = true
+showSidebarBorder = true
+
+[theme.dark]
+primaryColor = "#8B5CF6"
+backgroundColor = "#09090B"
+secondaryBackgroundColor = "#27272A"
+textColor = "#FAFAFA"
+borderColor = "#3F3F46"
+linkColor = "#A78BFA"

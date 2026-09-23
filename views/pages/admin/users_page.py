@@ -76,12 +76,12 @@ def _user_dialog(editing_user: dict | None = None):
     col_cancel, col_save = st.columns(2)
 
     with col_cancel:
-        if st.button("Cancelar", use_container_width=True):
+        if st.button("Cancelar", width="stretch"):
             st.rerun()
 
     with col_save:
         label = "Salvar alterações" if is_edit else "Criar usuário"
-        if st.button(label, type="primary", use_container_width=True):
+        if st.button(label, type="primary", width="stretch"):
             if not is_edit and (not name.strip() or not email.strip()):
                 st.warning("Preencha nome e e-mail.")
                 return
@@ -192,8 +192,8 @@ def users_page(user):
             "Gerencie contas, perfis e acesso ao sistema.",
         )
     with col_action:
-        st.html('<div style="height:24px;"></div>')
-        if st.button("＋ Novo usuário", type="primary", use_container_width=True):
+        st.space("small")
+        if st.button("Novo usuário", type="primary", icon=":material/person_add:", width="stretch"):
             _user_dialog(editing_user=None)
 
     # ---------------------------------------------------------
