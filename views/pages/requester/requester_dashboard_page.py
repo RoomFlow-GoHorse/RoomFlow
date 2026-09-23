@@ -34,7 +34,7 @@ def _render_styles():
         """
         <style>
         [class*="st-key-rf_requester_notification_unread_"] {
-            background: #F5F3FF !important;
+            background: var(--brand-lighter) !important;
             border-color: rgba(109, 40, 217, 0.25) !important;
         }
         </style>
@@ -66,13 +66,13 @@ def _render_reservations(reservations: list[dict]):
             st.markdown("**Minhas reservas**")
             st.caption("Acompanhe suas solicitações e reservas")
         with action:
-            if st.button("Ver todas →", key="requester_all_reservations", type="tertiary"):
+            if st.button("", key="requester_all_reservations", icon=":material/arrow_forward:", type="tertiary"):
                 go("minhas_reservas")
                 st.rerun()
 
         if not reservations:
             st.info("Nenhuma reserva encontrada.")
-            if st.button("Solicitar uma reserva →", key="requester_empty_reservations", type="tertiary"):
+            if st.button("", key="requester_empty_reservations", icon=":material/arrow_forward:", type="tertiary"):
                 go("nova_reserva")
                 st.rerun()
             return
@@ -97,7 +97,7 @@ def _render_notifications(notifications: list[dict]):
             st.markdown("**Notificações**")
             st.caption("Atualizações recentes")
         with action:
-            if st.button("Ver todas →", key="requester_all_notifications", type="tertiary"):
+            if st.button("", key="requester_all_notifications", icon=":material/arrow_forward:", type="tertiary"):
                 go("notificacoes")
                 st.rerun()
 

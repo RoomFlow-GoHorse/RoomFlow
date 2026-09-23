@@ -28,15 +28,15 @@ def _stat_card(label, value, tone="default"):
         f"""
         <style>
             .st-key-{card_key} {{
-                background: #FFFFFF;
-                border: 1px solid #E7E5E0;
+                background: var(--surface-card);
+                border: 1px solid var(--stroke);
                 border-radius: 14px;
                 padding: 18px;
                 min-height: 128px;
             }}
 
             .st-key-{card_key} [data-testid="stMetricLabel"] {{
-                color: #73706A;
+                color: var(--graphite-muted);
                 font-size: 11px;
                 font-weight: 600;
                 letter-spacing: 0.06em;
@@ -85,8 +85,9 @@ def _quick_action(icon, title, description, key, target):
 
         with columns[2]:
             if st.button(
-                "→",
+                "",
                 key=key,
+                icon=":material/arrow_forward:",
                 help=f"Acessar {title.lower()}",
             ):
                 go(target)
@@ -102,7 +103,7 @@ def _reservation_row(reservation, key):
         )
 
         with columns[0]:
-            st.write("◫")
+            st.write(":material/meeting_room:")
 
         with columns[1]:
             title = reservation.get(
@@ -294,7 +295,7 @@ def dashboard(user):
         st.subheader("Acesso rápido")
 
         _quick_action(
-            "◫",
+            ":material/meeting_room:",
             "Reservas",
             "Analisar e decidir sobre solicitações",
             "manager_dashboard_reservas",
@@ -302,7 +303,7 @@ def dashboard(user):
         )
 
         _quick_action(
-            "⌂",
+            ":material/home_work:",
             "Espaços",
             "Gerenciar capacidade e recursos das salas",
             "manager_dashboard_espacos",
@@ -310,7 +311,7 @@ def dashboard(user):
         )
 
         _quick_action(
-            "!",
+            ":material/warning:",
             "Conflitos",
             "Resolver conflitos de reservas e horários",
             "manager_dashboard_conflitos",
@@ -337,8 +338,9 @@ def dashboard(user):
 
             with header_columns[1]:
                 if st.button(
-                    "Ver todas →",
+                    "Ver todas",
                     key="manager_dashboard_ver_reservas",
+                    icon=":material/arrow_forward:",
                 ):
                     go("reservas")
 
@@ -380,8 +382,9 @@ def dashboard(user):
 
             with header_columns[1]:
                 if st.button(
-                    "Gerenciar →",
+                    "Gerenciar",
                     key="manager_dashboard_gerenciar_espacos",
+                    icon=":material/arrow_forward:",
                 ):
                     go("espacos")
 
@@ -407,8 +410,9 @@ def dashboard(user):
 
             with header_columns[1]:
                 if st.button(
-                    "Ver mais →",
+                    "Ver mais",
                     key="manager_dashboard_ver_ocupacao",
+                    icon=":material/arrow_forward:",
                 ):
                     go("ocupacao")
 

@@ -17,7 +17,7 @@ def _avatar_html(initials: str) -> str:
         f'<span style="'
         f"display:inline-flex; align-items:center; justify-content:center;"
         f"width:32px; height:32px; border-radius:50%;"
-        f"background:#EDE9FE; color:#6D28D9;"
+        f"background:var(--brand-light); color:var(--brand);"
         f"font-size:12px; font-weight:700; flex-shrink:0;"
         f'">{initials}</span>'
     )
@@ -57,16 +57,16 @@ def _user_dialog(editing_user: dict | None = None):
     if not is_edit:
         st.text_input("Senha temporária", type="password", placeholder="••••••••")
 
-    # Dica de perfis
+    # Dica de perfis com variáveis de tema
     st.html("""
         <div style="
-            background:#EDE9FE; border:1px solid rgba(109,40,217,0.2);
+            background:var(--brand-light); border:1px solid var(--stroke);
             border-radius:8px; padding:10px 12px; margin-top:4px;
         ">
-            <p style="margin:0 0 4px; font-size:12px; color:#6D28D9; font-weight:600;">
+            <p style="margin:0 0 4px; font-size:12px; color:var(--brand); font-weight:600;">
                 Sobre os perfis
             </p>
-            <p style="margin:0; font-size:12px; color:#52525B; line-height:1.5;">
+            <p style="margin:0; font-size:12px; color:var(--graphite-soft); line-height:1.5;">
                 Gerente: gestão operacional · Administrador: governança ·
                 Solicitante: reservas · Participante: consulta
             </p>
@@ -116,7 +116,7 @@ def _user_dialog(editing_user: dict | None = None):
 # =========================================================
 
 def _render_users_table(filtered: list):
-    """Renderiza a tabela de usuários com avatar, badges e botões."""
+    """Renderiza a tabela de usuários com avatar, badges e botões com Material Symbols."""
 
     if not filtered:
         st.info("Nenhum usuário encontrado.")
@@ -129,12 +129,12 @@ def _render_users_table(filtered: list):
     header[2].caption("**Perfil**")
     header[3].caption("**Status**")
     header[4].caption("**Editar**")
-    header[5].caption("**Ativar/Desativar**")
+    header[5].caption("**Ação**")
 
     st.divider()
 
     for u in filtered:
-        cols = st.columns([3, 3, 2, 2, 1, 1])
+        cols = st.columns([3, 3, 2, 2, 1, 1], vertical_alignment="center")
 
         # Nome + avatar
         with cols[0]:
@@ -142,36 +142,36 @@ def _render_users_table(filtered: list):
             st.html(
                 f'<div style="display:flex; align-items:center; gap:10px; padding:4px 0;">'
                 f'{_avatar_html(initials)}'
-                f'<span style="font-size:13px; font-weight:600; color:#1C1C2E;">{u["name"]}</span>'
+                f'<span style="font-size:13px; font-weight:600; color:var(--graphite);">{u["name"]}</span>'
                 f'</div>'
             )
 
         # E-mail
         with cols[1]:
-            st.html(f'<p style="font-size:12px; color:#52525B; margin:8px 0;">{u["email"]}</p>')
+            st.html(f'<p style="font-size:12px; color:var(--graphite-muted); margin:0;">{u["email"]}</p>')
 
         # Perfil
         with cols[2]:
-            st.html(f'<div style="padding:6px 0;">{_role_badge_html(u["role"])}</div>')
+            st.html(f'<div style="padding:4px 0;">{_role_badge_html(u["role"])}</div>')
 
         # Status
         with cols[3]:
-            st.html(f'<div style="padding:6px 0;">{_status_badge_html(u["status"])}</div>')
+            st.html(f'<div style="padding:4px 0;">{_status_badge_html(u["status"])}</div>')
 
-        # Botão Editar
+        # Botão Editar (Material Symbol)
         with cols[4]:
-            if st.button("✏️", key=f"edit_{u['id']}", help="Editar usuário"):
+            if st.button("", key=f"edit_{u['id']}", icon=":material/edit:", help="Editar usuário"):
                 _user_dialog(editing_user=u)
 
-        # Botão Ativar / Desativar
+        # Botão Ativar / Desativar (Material Symbol)
         with cols[5]:
             if u["status"] == "ativo":
-                if st.button("🚫", key=f"toggle_{u['id']}", help="Desativar usuário"):
+                if st.button("", key=f"toggle_{u['id']}", icon=":material/block:", help="Desativar usuário"):
                     mock_data_service.toggle_user(u["id"])
                     set_toast(f"{u['name']} foi desativado.")
                     st.rerun()
             else:
-                if st.button("✅", key=f"toggle_{u['id']}", help="Ativar usuário"):
+                if st.button("", key=f"toggle_{u['id']}", icon=":material/check_circle:", help="Ativar usuário"):
                     mock_data_service.toggle_user(u["id"])
                     set_toast(f"{u['name']} foi ativado.")
                     st.rerun()
@@ -185,14 +185,13 @@ def users_page(user):
     # ---------------------------------------------------------
     # Cabeçalho
     # ---------------------------------------------------------
-    col_header, col_action = st.columns([5, 1])
+    col_header, col_action = st.columns([5, 1], vertical_alignment="bottom")
     with col_header:
         page_header(
             "Usuários",
             "Gerencie contas, perfis e acesso ao sistema.",
         )
     with col_action:
-        st.space("small")
         if st.button("Novo usuário", type="primary", icon=":material/person_add:", width="stretch"):
             _user_dialog(editing_user=None)
 

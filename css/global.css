@@ -26,7 +26,7 @@
 
   --graphite: #18181B;
   --graphite-soft: #52525B;
-  --graphite-muted: #A1A1AA;
+  --graphite-muted: #71717A;
   --soft: var(--graphite-soft);
   --muted: var(--graphite-muted);
   --text-muted: var(--graphite-muted);
@@ -97,6 +97,29 @@
   }
 }
 
+:root[data-theme="dark"],
+.stApp[data-theme="dark"],
+[data-testid="stApp"][data-theme="dark"],
+.rf-theme-dark,
+.rf-theme-dark :root {
+  --brand: #8B5CF6;
+  --brand-hover: #A78BFA;
+  --brand-light: #2E1065;
+  --brand-lighter: #1F113D;
+  --surface: #09090B;
+  --surface-card: #18181B;
+  --surface-alt: #27272A;
+  --graphite: #FAFAFA;
+  --graphite-soft: #D4D4D8;
+  --graphite-muted: #A1A1AA;
+  --stroke: #3F3F46;
+  --stroke-strong: #52525B;
+  --success-bg: #052E16;
+  --danger-bg: #450A0A;
+  --warning-bg: #451A03;
+  --info-bg: #172554;
+}
+
 
 /* =========================================================
    RESET
@@ -138,7 +161,7 @@ body {
 
 
 /* =========================================================
-   SHELL DE P\u00c1GINAS INTERNAS
+   SHELL DE PÁGINAS INTERNAS
 ========================================================= */
 
 .st-key-rf_page_container,
@@ -216,13 +239,13 @@ body {
   font-weight: 600;
   line-height: 1.2;
   letter-spacing: -0.025em;
-  color: #171717;
+  color: var(--graphite);
   margin: 0 0 8px 0;
 }
 
 .rf-page-header p {
   font-size: 14px;
-  color: #737373;
+  color: var(--graphite-muted);
   line-height: 1.6;
   margin: 0;
 }
@@ -268,6 +291,15 @@ body {
   }
 }
 
+:root[data-theme="dark"] [data-testid="stSidebar"],
+:root[data-theme="dark"] [data-testid="stSidebar"] > div:first-child,
+.stApp[data-theme="dark"] [data-testid="stSidebar"],
+.stApp[data-theme="dark"] [data-testid="stSidebar"] > div:first-child,
+.rf-theme-dark [data-testid="stSidebar"],
+.rf-theme-dark [data-testid="stSidebar"] > div:first-child {
+  background: var(--surface-card) !important;
+}
+
 /* Shared operational-table language; rows and actions remain page-owned. */
 .st-key-rf_users_table,
 .st-key-rf_space_table,
@@ -304,6 +336,26 @@ body {
   width: 100%;
   min-width: 720px;
 }
+
+/* Badges semânticos com suporte a Dark Mode */
+.rf-badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-badge);
+  font-weight: 600;
+  white-space: nowrap;
+  border-width: 1px;
+  border-style: solid;
+}
+
+.rf-badge--approved { background: var(--success-bg) !important; color: var(--success) !important; border-color: rgba(22, 163, 74, 0.3) !important; }
+.rf-badge--rejected { background: var(--danger-bg) !important; color: var(--danger) !important; border-color: rgba(220, 38, 38, 0.3) !important; }
+.rf-badge--pending { background: var(--brand-light) !important; color: var(--brand) !important; border-color: rgba(109, 40, 217, 0.3) !important; }
+.rf-badge--warning { background: var(--warning-bg) !important; color: var(--warning) !important; border-color: rgba(217, 119, 6, 0.3) !important; }
+.rf-badge--conflict { background: var(--warning-bg) !important; color: #EA580C !important; border-color: rgba(234, 88, 12, 0.3) !important; }
+.rf-badge--neutral { background: var(--surface-alt) !important; color: var(--graphite-soft) !important; border-color: var(--stroke) !important; }
+.rf-badge--inactive { background: var(--surface-alt) !important; color: var(--graphite-muted) !important; border-color: var(--stroke) !important; }
 
 
 /* =========================================================

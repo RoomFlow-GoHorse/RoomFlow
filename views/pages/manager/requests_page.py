@@ -28,21 +28,21 @@ def _load_reservations_table_style():
         <style>
             /* Área geral da tabela */
             .st-key-manager_reservations_table {
-                border: 1px solid #E7E5E0;
+                border: 1px solid var(--stroke);
                 border-radius: 12px;
                 overflow: hidden;
-                background: #FFFFFF;
+                background: var(--surface-card);
             }
 
             /* Cabeçalho */
             .st-key-manager_reservation_header {
-                background: #F8F7F4;
-                border-bottom: 1px solid #E7E5E0;
+                background: var(--surface-alt);
+                border-bottom: 1px solid var(--stroke);
                 min-height: 42px;
             }
 
             .st-key-manager_reservation_header [data-testid="stMarkdownContainer"] p {
-                color: #73706A;
+                color: var(--graphite-muted);
                 font-size: 11px;
                 font-weight: 600;
                 letter-spacing: 0.04em;
@@ -52,13 +52,13 @@ def _load_reservations_table_style():
             /* Linhas */
             [class*="manager_reservation_row_"] {
                 min-height: 68px;
-                border-bottom: 1px solid #EEECE7;
-                background: #FFFFFF;
+                border-bottom: 1px solid var(--stroke);
+                background: var(--surface-card);
                 transition: background-color 0.15s ease;
             }
 
             [class*="manager_reservation_row_"]:hover {
-                background: #FAF9F7;
+                background: var(--surface-alt);
             }
 
             [class*="manager_reservation_row_"]:last-child {
@@ -72,7 +72,7 @@ def _load_reservations_table_style():
 
             /* Nome do solicitante */
             .reservation-requester {
-                color: #231F20;
+                color: var(--graphite);
                 font-size: 13px;
                 font-weight: 600;
                 line-height: 1.35;
@@ -80,13 +80,13 @@ def _load_reservations_table_style():
 
             /* Textos secundários */
             .reservation-secondary {
-                color: #73706A;
+                color: var(--graphite-muted);
                 font-size: 12px;
                 line-height: 1.4;
             }
 
             .reservation-date {
-                color: #4A4742;
+                color: var(--graphite-soft);
                 font-size: 12px;
                 line-height: 1.4;
             }
@@ -96,19 +96,19 @@ def _load_reservations_table_style():
                 height: 32px;
                 min-height: 32px;
                 padding: 0 13px;
-                border: 1px solid #D9D6D0;
+                border: 1px solid var(--stroke-strong);
                 border-radius: 7px;
-                background: #FFFFFF;
-                color: #4A4742;
+                background: var(--surface-card);
+                color: var(--graphite-soft);
                 font-size: 12px;
                 font-weight: 600;
                 box-shadow: none;
             }
 
             [class*="manager_reservation_row_"] [data-testid="stButton"] button:hover {
-                border-color: #6D28D9;
-                color: #6D28D9;
-                background: #FAF7FF;
+                border-color: var(--brand);
+                color: var(--brand);
+                background: var(--brand-lighter);
             }
 
             /* Espaçamento interno das células */
@@ -120,7 +120,7 @@ def _load_reservations_table_style():
             .reservation-empty {
                 padding: 42px 20px;
                 text-align: center;
-                color: #73706A;
+                color: var(--graphite-muted);
                 font-size: 13px;
             }
         </style>

@@ -93,7 +93,7 @@ def _render_styles():
         """
         <style>
             .st-key-rf_next_activity_card {
-                background: #1C1C2E !important;
+                background: var(--brand) !important;
                 border: none !important;
                 border-radius: 16px !important;
                 padding: 24px !important;
@@ -119,15 +119,15 @@ def _render_styles():
 
             .st-key-rf_agenda_card,
             .st-key-rf_changes_card {
-                background: #FFFFFF !important;
-                border: 1px solid #E4E1DB !important;
+                background: var(--surface-card) !important;
+                border: 1px solid var(--stroke) !important;
                 border-radius: 12px !important;
                 padding: 20px !important;
             }
 
             .st-key-rf_agenda_card button[kind="tertiary"],
             .st-key-rf_changes_card button[kind="tertiary"] {
-                color: #6D28D9 !important;
+                color: var(--brand) !important;
                 font-size: 12px !important;
                 font-weight: 600 !important;
                 padding: 0 !important;
@@ -138,7 +138,7 @@ def _render_styles():
 
             .st-key-rf_agenda_card button[kind="tertiary"]:hover,
             .st-key-rf_changes_card button[kind="tertiary"]:hover {
-                color: #5B21B6 !important;
+                color: var(--brand-hover) !important;
                 text-decoration: underline !important;
             }
         </style>
@@ -169,10 +169,10 @@ def dashboard(user: dict):
     st.html(
         f"""
         <div style="margin-bottom: 28px;">
-            <h1 style="font-size: 22px; font-weight: 600; color: #1C1C2E; margin: 0 0 4px 0; letter-spacing: -0.01em;">
+            <h1 style="font-size: 22px; font-weight: 600; color: var(--graphite); margin: 0 0 4px 0; letter-spacing: -0.01em;">
                 Olá, {esc(first_name)}!
             </h1>
-            <p style="font-size: 14px; color: #71717A; margin: 0;">
+            <p style="font-size: 14px; color: var(--graphite-muted); margin: 0;">
                 Sexta-feira, 21 de agosto de 2026
             </p>
         </div>
@@ -233,29 +233,29 @@ def dashboard(user: dict):
 
             with hdr_left:
                 st.html(
-                    '<h2 style="font-size: 14px; font-weight: 600; color: #1C1C2E; margin: 0 0 16px 0;">Minha agenda</h2>'
+                    '<h2 style="font-size: 14px; font-weight: 600; color: var(--graphite); margin: 0 0 16px 0;">Minha agenda</h2>'
                 )
 
             with hdr_right:
-                if st.button("Ver calendário →", key="btn_ver_agenda", type="tertiary"):
+                if st.button("", key="btn_ver_agenda", icon=":material/arrow_forward:", type="tertiary"):
                     _navigate("agenda")
 
             # Lista de eventos
             for ev in agenda_list:
                 st.html(
                     f"""
-                    <div style="display: flex; align-items: center; gap: 12px; padding: 12px; border: 1px solid #E4E1DB; border-radius: 8px; margin-bottom: 10px; background: #FFFFFF;">
+                    <div style="display: flex; align-items: center; gap: 12px; padding: 12px; border: 1px solid var(--stroke); border-radius: 8px; margin-bottom: 10px; background: var(--surface-card);">
                         <div style="width: 4px; height: 40px; border-radius: 999px; flex-shrink: 0; background: {ev['color']};"></div>
                         <div style="flex: 1; min-width: 0;">
-                            <p style="font-size: 14px; font-weight: 500; color: #1C1C2E; margin: 0 0 2px 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                            <p style="font-size: 14px; font-weight: 500; color: var(--graphite); margin: 0 0 2px 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
                                 {esc(ev['title'])}
                             </p>
-                            <div style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #71717A;">
+                            <div style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--graphite-muted);">
                                 <span style="display: inline-flex; align-items: center; gap: 4px;">
                                     <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-                                    {esc(ev['startTime'])}–{esc(ev['endTime'])}
+                                    {esc(ev['startTime'])}\u2013{esc(ev['endTime'])}
                                 </span>
-                                <span>·</span>
+                                <span>\u00b7</span>
                                 <span style="display: inline-flex; align-items: center; gap: 4px;">
                                     <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
                                     {esc(ev['space'])}
@@ -263,10 +263,10 @@ def dashboard(user: dict):
                             </div>
                         </div>
                         <div style="text-align: right; flex-shrink: 0;">
-                            <span style="display: inline-block; padding: 2px 8px; border-radius: 4px; background: #F0EEE9; color: #52525B; font-size: 11px; font-weight: 600;">
+                            <span style="display: inline-block; padding: 2px 8px; border-radius: 4px; background: var(--surface-alt); color: var(--graphite-soft); font-size: 11px; font-weight: 600;">
                                 {esc(ev['weekday'])}
                             </span>
-                            <p style="font-size: 12px; color: #A1A1AA; margin: 4px 0 0 0;">
+                            <p style="font-size: 12px; color: var(--graphite-muted); margin: 4px 0 0 0;">
                                 {esc(ev['date'])}
                             </p>
                         </div>
@@ -283,11 +283,11 @@ def dashboard(user: dict):
 
             with hdr_c_left:
                 st.html(
-                    '<h2 style="font-size: 14px; font-weight: 600; color: #1C1C2E; margin: 0 0 16px 0;">Alterações recentes</h2>'
+                    '<h2 style="font-size: 14px; font-weight: 600; color: var(--graphite); margin: 0 0 16px 0;">Alterações recentes</h2>'
                 )
 
             with hdr_c_right:
-                if st.button("Ver todas →", key="btn_ver_alteracoes", type="tertiary"):
+                if st.button("", key="btn_ver_alteracoes", icon=":material/arrow_forward:", type="tertiary"):
                     _navigate("notificacoes")
 
             # Lista de alterações
@@ -299,18 +299,18 @@ def dashboard(user: dict):
                 from_to_html = ""
                 if chg.get("from") and chg.get("to") and chg.get("to") != "—":
                     from_to_html = f"""
-                    <p style="font-size: 12px; color: #71717A; margin: 4px 0 0 0;">
-                        <span style="text-decoration: line-through;">{esc(chg['from'])}</span> &rarr; <strong style="color: #6D28D9;">{esc(chg['to'])}</strong>
+                    <p style="font-size: 12px; color: var(--graphite-muted); margin: 4px 0 0 0;">
+                        <span style="text-decoration: line-through;">{esc(chg['from'])}</span> &rarr; <strong style="color: var(--brand);">{esc(chg['to'])}</strong>
                     </p>
                     """
 
                 st.html(
                     f"""
                     <div style="padding: 12px; border-radius: 8px; border: 1px solid {border_color}; background: {bg_color}; margin-bottom: 12px;">
-                        <p style="font-size: 12px; font-weight: 600; color: #1C1C2E; margin: 0 0 4px 0;">
+                        <p style="font-size: 12px; font-weight: 600; color: var(--graphite); margin: 0 0 4px 0;">
                             {esc(chg['event'])}
                         </p>
-                        <p style="font-size: 12px; color: #52525B; margin: 0;">
+                        <p style="font-size: 12px; color: var(--graphite-soft); margin: 0;">
                             {esc(chg['change'])}
                         </p>
                         {from_to_html}

@@ -82,8 +82,8 @@ def _render_styles():
            ================================================= */
 
         .rf-calendar-card {
-            background: #FFFFFF;
-            border: 1px solid #E4E1DB;
+            background: var(--surface-card);
+            border: 1px solid var(--stroke);
             border-radius: 14px;
             overflow: hidden;
         }
@@ -95,14 +95,14 @@ def _render_styles():
         .rf-week-header {
             display: grid;
             grid-template-columns: repeat(7, 1fr);
-            border-bottom: 1px solid #E4E1DB;
+            border-bottom: 1px solid var(--stroke);
         }
 
         .rf-week-day {
             min-height: 96px;
             padding: 18px 12px;
             text-align: center;
-            border-right: 1px solid #E4E1DB;
+            border-right: 1px solid var(--stroke);
         }
 
         .rf-week-day:last-child {
@@ -111,24 +111,24 @@ def _render_styles():
 
         .rf-week-day-name {
             font-size: 11px;
-            color: #71717A;
+            color: var(--graphite-muted);
             margin-bottom: 8px;
         }
 
         .rf-week-day-number {
             font-size: 16px;
             font-weight: 600;
-            color: #1C1C2E;
+            color: var(--graphite);
         }
 
         .rf-week-day-month {
             font-size: 10px;
-            color: #A1A1AA;
+            color: var(--graphite-muted);
             margin-top: 3px;
         }
 
         .rf-week-day.active {
-            background: #6D28D9;
+            background: var(--brand);
         }
 
         .rf-week-day.active .rf-week-day-name,
@@ -149,7 +149,7 @@ def _render_styles():
         .rf-week-column {
             min-height: 210px;
             padding: 12px;
-            border-right: 1px solid #E4E1DB;
+            border-right: 1px solid var(--stroke);
         }
 
         .rf-week-column:last-child {
@@ -158,17 +158,17 @@ def _render_styles():
 
         .rf-empty-day {
             height: 130px;
-            border: 1px solid #E4E1DB;
+            border: 1px solid var(--stroke);
             border-radius: 10px;
             display: flex;
             align-items: center;
             justify-content: center;
-            color: #A1A1AA;
+            color: var(--graphite-muted);
             font-size: 11px;
         }
 
         .rf-week-column.active {
-            background: #FAF9FF;
+            background: var(--brand-lighter);
         }
 
         .rf-event {
@@ -181,13 +181,13 @@ def _render_styles():
         .rf-event-title {
             font-size: 11px;
             font-weight: 600;
-            color: #1C1C2E;
+            color: var(--graphite);
             margin: 0 0 3px 0;
         }
 
         .rf-event-time {
             font-size: 10px;
-            color: #71717A;
+            color: var(--graphite-muted);
             margin: 0;
         }
 
@@ -205,15 +205,15 @@ def _render_styles():
             text-align: center;
             font-size: 11px;
             font-weight: 600;
-            color: #71717A;
-            border-bottom: 1px solid #E4E1DB;
+            color: var(--graphite-muted);
+            border-bottom: 1px solid var(--stroke);
         }
 
         .rf-month-cell {
             min-height: 90px;
             padding: 10px;
-            border-right: 1px solid #E4E1DB;
-            border-bottom: 1px solid #E4E1DB;
+            border-right: 1px solid var(--stroke);
+            border-bottom: 1px solid var(--stroke);
         }
 
         .rf-month-cell:nth-child(7n) {
@@ -223,15 +223,15 @@ def _render_styles():
         .rf-month-number {
             font-size: 12px;
             font-weight: 500;
-            color: #52525B;
+            color: var(--graphite-soft);
         }
 
         .rf-month-cell.active {
-            background: #F5F3FF;
+            background: var(--brand-lighter);
         }
 
         .rf-month-cell.active .rf-month-number {
-            color: #6D28D9;
+            color: var(--brand);
             font-weight: 700;
         }
 
@@ -258,7 +258,7 @@ def _render_styles():
             align-items: center;
             gap: 14px;
             padding-bottom: 20px;
-            border-bottom: 1px solid #E4E1DB;
+            border-bottom: 1px solid var(--stroke);
             margin-bottom: 20px;
         }
 
@@ -266,7 +266,7 @@ def _render_styles():
             width: 52px;
             height: 52px;
             border-radius: 12px;
-            background: #6D28D9;
+            background: var(--brand);
             color: #FFFFFF;
             display: flex;
             flex-direction: column;
@@ -287,13 +287,13 @@ def _render_styles():
         .rf-daily-title {
             font-size: 15px;
             font-weight: 600;
-            color: #1C1C2E;
+            color: var(--graphite);
             margin: 0;
         }
 
         .rf-daily-subtitle {
             font-size: 12px;
-            color: #71717A;
+            color: var(--graphite-muted);
             margin: 3px 0 0 0;
         }
 
@@ -307,14 +307,14 @@ def _render_styles():
             width: 55px;
             text-align: right;
             font-size: 11px;
-            color: #71717A;
+            color: var(--graphite-muted);
             padding-top: 10px;
         }
 
         .rf-daily-event-card {
             flex: 1;
-            background: #F8F7F4;
-            border: 1px solid #E4E1DB;
+            background: var(--surface-alt);
+            border: 1px solid var(--stroke);
             border-radius: 10px;
             padding: 12px;
         }

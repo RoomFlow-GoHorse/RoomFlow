@@ -10,6 +10,20 @@ baseRadius = "0.75rem"
 showWidgetBorder = true
 showSidebarBorder = true
 
+[theme.light]
+primaryColor = "#6D28D9"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F4F4F5"
+textColor = "#18181B"
+borderColor = "#E4E4E7"
+linkColor = "#6D28D9"
+
+[theme.light.sidebar]
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F4F4F5"
+textColor = "#18181B"
+borderColor = "#E4E4E7"
+
 [theme.dark]
 primaryColor = "#8B5CF6"
 backgroundColor = "#09090B"
@@ -17,3 +31,9 @@ secondaryBackgroundColor = "#27272A"
 textColor = "#FAFAFA"
 borderColor = "#3F3F46"
 linkColor = "#A78BFA"
+
+[theme.dark.sidebar]
+backgroundColor = "#18181B"
+secondaryBackgroundColor = "#27272A"
+textColor = "#FAFAFA"
+borderColor = "#3F3F46"

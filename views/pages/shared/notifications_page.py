@@ -80,26 +80,26 @@ def _render_styles():
             }
 
             [class*="st-key-rf_notif_card_"] {
-                background-color: #FFFFFF !important;
-                border: 1px solid #E4E1DB !important;
+                background-color: var(--surface-card) !important;
+                border: 1px solid var(--stroke) !important;
             }
 
             [class*="st-key-rf_notif_unread_"] {
-                background-color: #F5F3FF !important;
+                background-color: var(--brand-lighter) !important;
                 border: 1px solid rgba(109, 40, 217, 0.25) !important;
             }
 
             .rf-notif-title {
                 font-size: 14px;
                 font-weight: 600;
-                color: #1C1C2E;
+                color: var(--graphite);
                 margin-bottom: 2px;
             }
 
             .rf-notif-message {
                 font-size: 13.5px;
                 line-height: 1.5;
-                color: #52525B;
+                color: var(--graphite-soft);
                 margin-bottom: 4px;
             }
 
@@ -107,7 +107,7 @@ def _render_styles():
                 width: 6px;
                 height: 6px;
                 border-radius: 50%;
-                background-color: #6D28D9;
+                background-color: var(--brand);
                 display: inline-block;
                 margin-top: 6px;
             }
@@ -123,7 +123,7 @@ def _render_styles():
             [class*="st-key-rf_notif_card_"] hr,
             [class*="st-key-rf_notif_unread_"] hr {
                 margin: 8px 0 !important;
-                border-color: #E4E1DB !important;
+                border-color: var(--stroke) !important;
             }
 
             [class*="st-key-rf_notif_card_"] button[kind="tertiary"],
@@ -158,8 +158,8 @@ def _render_styles():
 
             /* Card de filtros */
             .st-key-rf_notif_filters {
-                background: #FFFFFF !important;
-                border: 1px solid #E4E1DB !important;
+                background: var(--surface-card) !important;
+                border: 1px solid var(--stroke) !important;
                 border-radius: 12px !important;
                 padding: 16px !important;
                 margin-bottom: 20px !important;
@@ -170,7 +170,7 @@ def _render_styles():
                 font-weight: 600;
                 text-transform: uppercase;
                 letter-spacing: 0.06em;
-                color: #71717A;
+                color: var(--graphite-muted);
                 margin-bottom: 10px;
             }
         </style>

@@ -16,8 +16,8 @@ def _render_styles():
             .st-key-rf_find_map_card,
             .st-key-rf_find_details_card,
             .st-key-rf_find_directions_card {
-                background: #FFFFFF !important;
-                border: 1px solid #E4E1DB !important;
+                background: var(--surface-card) !important;
+                border: 1px solid var(--stroke) !important;
                 border-radius: 14px !important;
                 padding: 0 !important;
                 overflow: hidden !important;
@@ -26,8 +26,8 @@ def _render_styles():
             .rf-map-canvas {
                 position: relative;
                 min-height: 480px;
-                background: #F5F6F8;
-                border-bottom: 1px solid #E4E1DB;
+                background: var(--surface-alt);
+                border-bottom: 1px solid var(--stroke);
                 padding: 24px;
             }
 
@@ -36,7 +36,7 @@ def _render_styles():
                 inset: 0;
                 opacity: 0.4;
                 pointer-events: none;
-                background-image: linear-gradient(#DFE2E7 1px, transparent 1px), linear-gradient(90deg, #DFE2E7 1px, transparent 1px);
+                background-image: linear-gradient(var(--stroke-strong) 1px, transparent 1px), linear-gradient(90deg, var(--stroke-strong) 1px, transparent 1px);
                 background-size: 32px 32px;
             }
 
@@ -46,9 +46,9 @@ def _render_styles():
                 align-items: center;
                 gap: 16px;
                 padding: 12px 20px;
-                background: #FFFFFF;
+                background: var(--surface-card);
                 font-size: 11px;
-                color: #71717A;
+                color: var(--graphite-muted);
             }
 
             .rf-legend-item {
@@ -133,8 +133,8 @@ def localizar(user: dict):
 
         st.html(
             f"""
-            <div style="background:#FFFFFF; border:1px solid #E4E1DB; border-radius:12px; padding:16px; margin-bottom:20px;">
-                <p style="font-size:11px; font-weight:600; text-transform:uppercase; color:#71717A; margin:0 0 12px 0;">
+            <div style="background:var(--surface-card); border:1px solid var(--stroke); border-radius:12px; padding:16px; margin-bottom:20px;">
+                <p style="font-size:11px; font-weight:600; text-transform:uppercase; color:var(--graphite-muted); margin:0 0 12px 0;">
                     Resultados encontrados ({len(filtered)})
                 </p>
             """
@@ -143,7 +143,7 @@ def localizar(user: dict):
         if not filtered:
             st.html(
                 """
-                <div style="text-align:center; padding:16px 0; color:#A1A1AA; font-size:13px;">
+                <div style="text-align:center; padding:16px 0; color:var(--graphite-muted); font-size:13px;">
                     📍 Nenhum espaço encontrado para a busca realizada.
                 </div>
                 """
@@ -155,8 +155,8 @@ def localizar(user: dict):
                     st.html(
                         f"""
                         <div style="margin-bottom:8px;">
-                            <p style="font-size:14px; font-weight:600; color:#1C1C2E; margin:0;">{esc(sp['name'])}</p>
-                            <p style="font-size:12px; color:#71717A; margin:2px 0 0 0;">{esc(sp.get('building', ''))} &middot; {esc(sp.get('floor', ''))} &middot; {esc(sp.get('location', ''))}</p>
+                            <p style="font-size:14px; font-weight:600; color:var(--graphite); margin:0;">{esc(sp['name'])}</p>
+                            <p style="font-size:12px; color:var(--graphite-muted); margin:2px 0 0 0;">{esc(sp.get('building', ''))} &middot; {esc(sp.get('floor', ''))} &middot; {esc(sp.get('location', ''))}</p>
                         </div>
                         """
                     )
@@ -178,8 +178,8 @@ def localizar(user: dict):
         st.html(
             f"""
             <div>
-                <p style="font-size:11px; font-weight:500; color:#71717A; margin:0 0 2px 0;">Localização atual</p>
-                <h3 style="font-size:16px; font-weight:600; color:#1C1C2E; margin:0;">
+                <p style="font-size:11px; font-weight:500; color:var(--graphite-muted); margin:0 0 2px 0;">Localização atual</p>
+                <h3 style="font-size:16px; font-weight:600; color:var(--graphite); margin:0;">
                     🏢 {esc(st.session_state.find_building)} &middot; {esc(st.session_state.find_floor)}
                 </h3>
             </div>

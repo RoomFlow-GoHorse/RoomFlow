@@ -17,8 +17,8 @@ def _render_styles():
         <style>
         [class*="st-key-rf_request_card_"]
         div[data-testid="stVerticalBlockBorderWrapper"] {
-            background: #FFFFFF;
-            border-color: #E4E1DB;
+            background: var(--surface-card);
+            border-color: var(--stroke);
             border-radius: 10px;
         }
         </style>
