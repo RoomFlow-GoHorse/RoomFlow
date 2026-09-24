@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from typing import Any, Dict, List, Optional
 
 import streamlit as st
 
@@ -6,17 +7,15 @@ from controllers import mock_data_service
 from controllers.app_state_service import go, set_toast
 from views.components.ui_components import badge, page_header
 
-
 _PENDING_STATUSES = {"pendente", "em_analise"}
 
 
-def _render_styles():
-    """Aplica estilos somente aos cards de solicitações."""
+def _render_styles() -> None:
+    """Aplica estilos customizados para os cards de solicitação."""
     st.html(
         """
         <style>
-        [class*="st-key-rf_request_card_"]
-        div[data-testid="stVerticalBlockBorderWrapper"] {
+        [class*="st-key-rf_request_card_"] div[data-testid="stVerticalBlockBorderWrapper"] {
             background: var(--surface-card);
             border-color: var(--stroke);
             border-radius: 10px;
@@ -27,262 +26,210 @@ def _render_styles():
 
 
 def _date_label(value: str) -> str:
+    """Formata datas no padrão brasileiro DD/MM/AAAA."""
     try:
         return datetime.fromisoformat(value).strftime("%d/%m/%Y")
     except (TypeError, ValueError):
-        return value
+        return value or "N/A"
 
 
-def _resources_for(reservation: dict) -> list[str]:
+def _resources_for(reservation: Dict[str, Any]) -> List[str]:
+    """Recupera os recursos associados a uma reserva."""
     if reservation.get("resources"):
         return reservation["resources"]
 
+    spaces = st.session_state.get("spaces", [])
     room = next(
-        (
-            space
-            for space in st.session_state.spaces
-            if space["name"] == reservation["space"]
-        ),
+        (space for space in spaces if space.get("name") == reservation.get("space")),
         None,
     )
 
     return room.get("resources", []) if room else []
 
 
-def _remove_reservation(reservation_id: str):
-    st.session_state.reservations = [
-        item
-        for item in st.session_state.reservations
-        if item["id"] != reservation_id
-    ]
-
-    set_toast(
-        "Reserva cancelada. O espaço foi liberado."
-    )
+def _remove_reservation(reservation_id: str) -> None:
+    """Remove a reserva do estado da sessão."""
+    if "reservations" in st.session_state:
+        st.session_state.reservations = [
+            item
+            for item in st.session_state.reservations
+            if item.get("id") != reservation_id
+        ]
+    set_toast("Reserva cancelada. O espaço foi liberado.")
 
 
 def _update_reservation(
     reservation_id: str,
-    room: dict,
+    room: Dict[str, Any],
     day: date,
-    start,
-    end,
-):
-    for item in st.session_state.reservations:
-        if item["id"] == reservation_id:
+    start: datetime.time,
+    end: datetime.time,
+) -> None:
+    """Atualiza as informações de uma reserva e altera o status para análise."""
+    reservations = st.session_state.get("reservations", [])
+    for item in reservations:
+        if item.get("id") == reservation_id:
             item.update(
                 status="em_analise",
-                space=room["name"],
+                space=room.get("name"),
                 date=day.isoformat(),
                 start=start.strftime("%H:%M"),
                 end=end.strftime("%H:%M"),
             )
             break
 
-    set_toast(
-        "Alteração enviada para análise."
-    )
+    set_toast("Alteração enviada para análise.")
 
 
 @st.dialog("Cancelar reserva")
-def _cancel_dialog(reservation: dict):
-    st.markdown(
-        f"### {reservation['type']}"
-    )
+def _cancel_dialog(reservation: Dict[str, Any]) -> None:
+    """Modal de confirmação de cancelamento da reserva."""
+    title = reservation.get("title") or reservation.get("type", "Reserva")
+    space = reservation.get("space", "N/A")
+    res_date = _date_label(reservation.get("date", ""))
+    start = reservation.get("start", "")
+    end = reservation.get("end", "")
 
-    st.caption(
-        f"{reservation['space']} · "
-        f"{_date_label(reservation['date'])} · "
-        f"{reservation['start']}–{reservation['end']}"
-    )
+    st.markdown(f"### {title}")
+    st.caption(f"{space} · {res_date} · {start}–{end}")
 
     st.warning(
-        "Deseja realmente cancelar? "
-        "O espaço será liberado e os participantes "
-        "poderão ser notificados.",
+        "Deseja realmente cancelar? O espaço será liberado e os participantes poderão ser notificados.",
         icon=":material/warning:",
     )
 
     st.text_area(
         "Motivo do cancelamento (opcional)",
         placeholder="Ex.: A atividade foi remarcada.",
+        key=f"cancel_reason_{reservation['id']}",
     )
 
-    keep, cancel = st.columns(2)
+    keep_col, cancel_col = st.columns(2)
 
-    with keep:
-        if st.button(
-            "Manter reserva",
-            width="stretch",
-        ):
+    with keep_col:
+        if st.button("Manter reserva", use_container_width=True):
             st.rerun()
 
-    with cancel:
+    with cancel_col:
         if st.button(
             "Cancelar reserva",
             key=f"confirm_cancel_{reservation['id']}",
             type="primary",
-            width="stretch",
+            use_container_width=True,
         ):
-            _remove_reservation(
-                reservation["id"]
-            )
+            _remove_reservation(reservation["id"])
             st.rerun()
 
 
 @st.dialog("Solicitar alteração", width="large")
-def _alter_dialog(reservation: dict):
-    required_resources = _resources_for(
-        reservation
-    )
+def _alter_dialog(reservation: Dict[str, Any]) -> None:
+    """Modal para edição e solicitação de mudança de data/hora/sala."""
+    required_resources = _resources_for(reservation)
 
     st.info(
-        "Escolha uma nova data, horário e sala. "
-        "Serão exibidos somente espaços compatíveis "
-        "com os recursos da atividade.",
+        "Escolha uma nova data, horário e sala. Serão exibidos somente espaços compatíveis com os recursos da atividade.",
         icon=":material/sync:",
     )
 
-    with st.container(
-        border=True,
-    ):
+    with st.container(border=True):
         st.caption("SOLICITAÇÃO ATUAL")
 
-        activity, room, participants = st.columns(
-            [2, 2, 1]
-        )
+        activity_col, room_col, participants_col = st.columns([2, 2, 1])
 
-        with activity:
+        with activity_col:
             st.markdown("**Atividade**")
-            st.write(reservation["type"])
+            st.write(reservation.get("type", "N/A"))
 
-        with room:
+        with room_col:
             st.markdown("**Sala atual**")
-            st.write(reservation["space"])
+            st.write(reservation.get("space", "N/A"))
 
-        with participants:
+        with participants_col:
             st.markdown("**Participantes**")
-            st.write(
-                reservation.get(
-                    "participants",
-                    "Não informado",
-                )
-            )
+            st.write(reservation.get("participants", "Não informado"))
 
     st.markdown("### Recursos definidos")
 
     if required_resources:
-        st.markdown(
-            " · ".join(
-                f":violet-badge[{resource}]"
-                for resource in required_resources
-            )
-        )
+        badges_str = " · ".join(f":violet-badge[{res}]" for res in required_resources)
+        st.markdown(badges_str)
     else:
-        st.caption(
-            "Nenhum recurso específico foi informado "
-            "para esta solicitação."
-        )
+        st.caption("Nenhum recurso específico foi informado para esta solicitação.")
 
     st.markdown("### Novo período")
+    st.caption("Defina quando deseja realizar a atividade.")
 
-    st.caption(
-        "Defina quando deseja realizar a atividade."
-    )
-
-    with st.form(
-        f"alter_reservation_{reservation['id']}"
-    ):
+    with st.form(f"alter_reservation_{reservation['id']}"):
         new_day, new_start, new_end = st.columns(3)
 
+        curr_date = (
+            date.fromisoformat(reservation["date"])
+            if reservation.get("date")
+            else date.today()
+        )
+        curr_start = (
+            datetime.strptime(reservation["start"], "%H:%M").time()
+            if reservation.get("start")
+            else datetime.now().time()
+        )
+        curr_end = (
+            datetime.strptime(reservation["end"], "%H:%M").time()
+            if reservation.get("end")
+            else datetime.now().time()
+        )
+
         with new_day:
-            selected_day = st.date_input(
-                "Nova data",
-                value=date.fromisoformat(
-                    reservation["date"]
-                ),
-            )
+            selected_day = st.date_input("Nova data", value=curr_date)
 
         with new_start:
-            selected_start = st.time_input(
-                "Horário de início",
-                value=datetime.strptime(
-                    reservation["start"],
-                    "%H:%M",
-                ).time(),
-            )
+            selected_start = st.time_input("Horário de início", value=curr_start)
 
         with new_end:
-            selected_end = st.time_input(
-                "Horário de término",
-                value=datetime.strptime(
-                    reservation["end"],
-                    "%H:%M",
-                ).time(),
-            )
+            selected_end = st.time_input("Horário de término", value=curr_end)
 
+        spaces = st.session_state.get("spaces", [])
         compatible_rooms = [
             space
-            for space in st.session_state.spaces
-            if space["status"] != "bloqueado"
+            for space in spaces
+            if space.get("status") != "bloqueado"
             and all(
-                resource in space.get(
-                    "resources",
-                    [],
-                )
-                for resource in required_resources
+                res in space.get("resources", []) for res in required_resources
             )
         ]
 
         st.markdown("### Salas disponíveis")
-
         st.caption(
-            f"{len(compatible_rooms)} sala(s) "
-            "compatível(is) com os recursos solicitados."
+            f"{len(compatible_rooms)} sala(s) compatível(is) com os recursos solicitados."
         )
 
-        room_names = [
-            space["name"]
-            for space in compatible_rooms
-        ]
+        room_names = [space["name"] for space in compatible_rooms if "name" in space]
 
         selected_name = st.selectbox(
             "Escolha uma sala",
-            room_names,
+            options=room_names,
             index=None,
             placeholder="Selecione uma sala",
         )
 
         st.info(
-            "Ao enviar a alteração, a solicitação "
-            "será novamente analisada pelo gerente.",
+            "Ao enviar a alteração, a solicitação será novamente analisada pelo gerente.",
             icon=":material/info:",
         )
 
         submitted = st.form_submit_button(
             "Enviar alteração",
             type="primary",
-            width="stretch",
+            use_container_width=True,
         )
 
     if submitted:
         if not selected_name:
-            st.error(
-                "Selecione uma sala compatível "
-                "antes de enviar a alteração."
-            )
-
+            st.error("Selecione uma sala compatível antes de enviar a alteração.")
         elif selected_start >= selected_end:
-            st.error(
-                "O horário de término deve ser posterior "
-                "ao horário de início."
-            )
-
+            st.error("O horário de término deve ser posterior ao horário de início.")
         else:
             selected_room = next(
-                space
-                for space in compatible_rooms
-                if space["name"] == selected_name
+                space for space in compatible_rooms if space["name"] == selected_name
             )
 
             _update_reservation(
@@ -292,274 +239,142 @@ def _alter_dialog(reservation: dict):
                 selected_start,
                 selected_end,
             )
-
             st.rerun()
 
 
-def _render_summary(items: list[dict]):
-    """Exibe os indicadores resumidos das solicitações."""
+def _render_summary(items: List[Dict[str, Any]]) -> None:
+    """Exibe os cards de métricas/resumo das solicitações."""
+    total = len(items)
+    pending = sum(1 for item in items if item.get("status") in _PENDING_STATUSES)
+    approved = sum(1 for item in items if item.get("status") == "aprovada")
+    rejected = sum(1 for item in items if item.get("status") == "rejeitada")
 
-    counts = (
-        (
-            "Total",
-            len(items),
-        ),
-        (
-            "Pendentes",
-            sum(
-                item["status"] in _PENDING_STATUSES
-                for item in items
-            ),
-        ),
-        (
-            "Aprovadas",
-            sum(
-                item["status"] == "aprovada"
-                for item in items
-            ),
-        ),
-        (
-            "Reprovadas",
-            sum(
-                item["status"] == "rejeitada"
-                for item in items
-            ),
-        ),
-    )
+    cols = st.columns(4)
+    metrics = [
+        ("Total", total),
+        ("Pendentes", pending),
+        ("Aprovadas", approved),
+        ("Reprovadas", rejected),
+    ]
 
-    columns = st.columns(4)
-
-    for column, (label, count) in zip(
-        columns,
-        counts,
-    ):
-        with column:
-            with st.container(
-                border=True,
-            ):
-                st.caption(label)
-
-                st.markdown(
-                    f"<div style='"
-                    f"font-size:28px;"
-                    f"font-weight:700;"
-                    f"color:#27272a;"
-                    f"margin-top:2px;"
-                    f"'>"
-                    f"{count}"
-                    f"</div>",
-                    unsafe_allow_html=True,
-                )
+    for col, (label, value) in zip(cols, metrics):
+        with col:
+            with st.container(border=True):
+                st.metric(label=label, value=value)
 
 
-def _render_card(reservation: dict):
-    """Renderiza um card individual de solicitação."""
+def _render_card(reservation: Dict[str, Any]) -> None:
+    """Renderiza um card individual de solicitação estilizado."""
+    res_id = reservation.get("id", "unknown")
 
-    with st.container(
-        border=True,
-        key=f"rf_request_card_{reservation['id']}",
-    ):
-        # -----------------------------------------------------
-        # CABEÇALHO
-        # -----------------------------------------------------
+    with st.container(border=True, key=f"rf_request_card_{res_id}"):
+        header_col, status_col = st.columns([5, 1], vertical_alignment="top")
 
-        content, status = st.columns(
-            [5, 1],
-            vertical_alignment="top",
-        )
+        with header_col:
+            st.subheader(reservation.get("title", "Sem título"))
 
-        with content:
-            st.markdown(
-                f"<div style='"
-                f"font-size:17px;"
-                f"font-weight:650;"
-                f"color:#27272a;"
-                f"margin-bottom:6px;"
-                f"'>"
-                f"{reservation['title']}"
-                f"</div>",
-                unsafe_allow_html=True,
-            )
+            space_name = reservation.get("space", "N/A")
+            date_str = _date_label(reservation.get("date", ""))
+            start_time = reservation.get("start", "")
+            end_time = reservation.get("end", "")
 
             st.caption(
-                f":material/meeting_room: "
-                f"{reservation['space']}  ·  "
-                f":material/calendar_today: "
-                f"{_date_label(reservation['date'])}  ·  "
-                f":material/schedule: "
-                f"{reservation['start']}–"
-                f"{reservation['end']}"
+                f":material/meeting_room: {space_name}  ·  "
+                f":material/calendar_today: {date_str}  ·  "
+                f":material/schedule: {start_time}–{end_time}"
             )
 
             if reservation.get("participants"):
                 st.caption(
-                    f":material/groups: "
-                    f"{reservation['participants']} "
-                    f"participantes"
+                    f":material/groups: {reservation['participants']} participantes"
                 )
 
-        with status:
-            st.html(
-                badge(
-                    reservation["status"]
-                )
-            )
+        with status_col:
+            st.html(badge(reservation.get("status", "pendente")))
 
-        # -----------------------------------------------------
-        # JUSTIFICATIVA
-        # -----------------------------------------------------
+        # Exibição de Justificativa (se existir)
+        justification = reservation.get("justification")
+        if justification:
+            with st.container(border=True):
+                st.caption("**Justificativa**")
+                st.write(justification)
 
-        if reservation.get("justification"):
-            st.markdown(
-                "<div style='"
-                "margin-top:14px;"
-                "padding:12px 14px;"
-                "border-radius:10px;"
-                "background:#F5F3FF;"
-                "border:1px solid #EDE9FE;"
-                "'>"
-                "<div style='"
-                "font-size:11px;"
-                "font-weight:600;"
-                "color:#52525B;"
-                "margin-bottom:4px;"
-                "'>"
-                "Justificativa"
-                "</div>"
-                f"<div style='"
-                "font-size:14px;"
-                "line-height:1.5;"
-                "color:#3F3F46;"
-                "'>"
-                f"{reservation['justification']}"
-                "</div>"
-                "</div>",
-                unsafe_allow_html=True,
-            )
+        st.divider()
 
-        # -----------------------------------------------------
-        # AÇÕES
-        # -----------------------------------------------------
+        # Ações do Card
+        _, action_col1, action_col2 = st.columns([2, 1, 1])
 
-        st.markdown(
-            "<div style='margin-top:16px;'>"
-            "</div>",
-            unsafe_allow_html=True,
-        )
-
-        with st.container(
-            horizontal=True,
-            horizontal_alignment="right",
-        ):
+        with action_col1:
             if st.button(
                 "Solicitar alteração",
-                key=f"alter_{reservation['id']}",
+                key=f"alter_{res_id}",
                 icon=":material/edit_calendar:",
+                use_container_width=True,
             ):
-                _alter_dialog(
-                    reservation
-                )
+                _alter_dialog(reservation)
 
+        with action_col2:
             if st.button(
                 "Cancelar",
-                key=f"cancel_{reservation['id']}",
+                key=f"cancel_{res_id}",
                 icon=":material/cancel:",
                 type="primary",
+                use_container_width=True,
             ):
-                _cancel_dialog(
-                    reservation
-                )
+                _cancel_dialog(reservation)
 
 
-def minhas_reservas(user):
-    """Página de acompanhamento das solicitações do solicitante."""
-
+def minhas_reservas(user: Dict[str, Any]) -> None:
+    """Página de acompanhamento de solicitações do solicitante."""
     _render_styles()
 
-    items = mock_data_service.reservations(
-        requester_id=user["id"]
-    )
+    items = mock_data_service.reservations(requester_id=user["id"])
 
-    # ---------------------------------------------------------
-    # CABEÇALHO
-    # ---------------------------------------------------------
+    # Cabeçalho da Página
+    header_col, action_col = st.columns([4, 1], vertical_alignment="center")
 
-    header, action = st.columns(
-        [4, 1],
-        vertical_alignment="center",
-    )
-
-    with header:
+    with header_col:
         page_header(
             "Minhas solicitações",
             "Acompanhe suas reservas e gerencie alterações.",
         )
 
-    with action:
+    with action_col:
         if st.button(
             "Nova solicitação",
             icon=":material/add:",
             type="primary",
-            width="stretch",
+            use_container_width=True,
         ):
             go("nova_reserva")
             st.rerun()
 
-    # ---------------------------------------------------------
-    # RESUMO
-    # ---------------------------------------------------------
-
+    # Resumo / Métricas
     _render_summary(items)
 
-    # ---------------------------------------------------------
-    # FILTROS
-    # ---------------------------------------------------------
-
+    # Filtros
     filters = {
         "Todas": lambda item: True,
-        "Pendentes": lambda item: (
-            item["status"] in _PENDING_STATUSES
-        ),
-        "Aprovadas": lambda item: (
-            item["status"] == "aprovada"
-        ),
-        "Reprovadas": lambda item: (
-            item["status"] == "rejeitada"
-        ),
-        "Conflitos": lambda item: (
-            item["status"] == "conflito"
-        ),
+        "Pendentes": lambda item: item.get("status") in _PENDING_STATUSES,
+        "Aprovadas": lambda item: item.get("status") == "aprovada",
+        "Reprovadas": lambda item: item.get("status") == "rejeitada",
+        "Conflitos": lambda item: item.get("status") == "conflito",
     }
 
     selected_tab = st.segmented_control(
         "Filtrar solicitações",
-        list(filters),
+        options=list(filters.keys()),
         default="Todas",
         label_visibility="collapsed",
     )
 
-    filtered = [
-        item
-        for item in items
-        if filters[selected_tab](item)
-    ]
+    filtered = [item for item in items if filters[selected_tab](item)]
 
-    # ---------------------------------------------------------
-    # ESTADO VAZIO
-    # ---------------------------------------------------------
-
+    # Estado Vazio
     if not filtered:
-        with st.container(
-            border=True,
-        ):
-            st.markdown(
-                "### :material/calendar_month: "
-                "Nenhuma solicitação encontrada"
-            )
-
-            st.caption(
-                "Não existem solicitações nessa categoria."
-            )
+        with st.container(border=True):
+            st.markdown("### :material/calendar_month: Nenhuma solicitação encontrada")
+            st.caption("Não existem solicitações nessa categoria.")
 
             if st.button(
                 "Nova solicitação",
@@ -569,12 +384,8 @@ def minhas_reservas(user):
             ):
                 go("nova_reserva")
                 st.rerun()
-
         return
 
-    # ---------------------------------------------------------
-    # CARDS
-    # ---------------------------------------------------------
-
+    # Lista de Cards
     for reservation in filtered:
         _render_card(reservation)
