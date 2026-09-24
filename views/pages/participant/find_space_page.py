@@ -13,6 +13,7 @@ def _render_styles():
     st.html(
         """
         <style>
+            /* Cards Principais */
             .st-key-rf_find_map_card,
             .st-key-rf_find_details_card,
             .st-key-rf_find_directions_card {
@@ -23,9 +24,28 @@ def _render_styles():
                 overflow: hidden !important;
             }
 
+            /* Correção do Botão em Containers Destaque/Banner Roxo */
+            .st-key-rf_next_activity_card button,
+            .st-key-rf_hero_card button {
+                background-color: rgba(255, 255, 255, 0.18) !important;
+                color: #FFFFFF !important;
+                border: 1px solid rgba(255, 255, 255, 0.3) !important;
+                border-radius: 8px !important;
+                font-weight: 600 !important;
+                transition: all 0.2s ease !important;
+            }
+
+            .st-key-rf_next_activity_card button:hover,
+            .st-key-rf_hero_card button:hover {
+                background-color: rgba(255, 255, 255, 0.3) !important;
+                color: #FFFFFF !important;
+                border-color: rgba(255, 255, 255, 0.5) !important;
+            }
+
+            /* Canvas do Mapa */
             .rf-map-canvas {
                 position: relative;
-                min-height: 480px;
+                min-height: 420px;
                 background: var(--surface-alt);
                 border-bottom: 1px solid var(--stroke);
                 padding: 24px;
@@ -34,12 +54,44 @@ def _render_styles():
             .rf-map-grid-bg {
                 position: absolute;
                 inset: 0;
-                opacity: 0.4;
+                opacity: 0.35;
                 pointer-events: none;
-                background-image: linear-gradient(var(--stroke-strong) 1px, transparent 1px), linear-gradient(90deg, var(--stroke-strong) 1px, transparent 1px);
+                background-image: linear-gradient(var(--stroke-strong) 1px, transparent 1px), 
+                                  linear-gradient(90deg, var(--stroke-strong) 1px, transparent 1px);
                 background-size: 32px 32px;
             }
 
+            /* Marcadores Fixos do Mapa */
+            .rf-map-landmark {
+                position: absolute;
+                bottom: 16px;
+                font-size: 11px;
+                color: var(--graphite-muted);
+                background: var(--surface-card);
+                padding: 6px 12px;
+                border-radius: 8px;
+                border: 1px solid var(--stroke);
+            }
+
+            .rf-map-landmark.left { left: 16px; }
+            .rf-map-landmark.right { right: 16px; }
+
+            /* Corredor Central */
+            .rf-map-corridor {
+                margin: 20px 0;
+                padding: 10px;
+                background: var(--surface-card);
+                border: 1px solid var(--stroke);
+                border-radius: 8px;
+                text-align: center;
+                font-size: 10px;
+                font-weight: 700;
+                text-transform: uppercase;
+                letter-spacing: 0.15em;
+                color: var(--graphite-muted);
+            }
+
+            /* Legenda */
             .rf-legend-bar {
                 display: flex;
                 flex-wrap: wrap;
@@ -63,8 +115,49 @@ def _render_styles():
                 border-radius: 3px;
                 border: 1px solid;
             }
+
+            /* Painel de Busca e Resultados */
+            .rf-search-results-box {
+                background: var(--surface-card);
+                border: 1px solid var(--stroke);
+                border-radius: 12px;
+                padding: 16px;
+                margin-bottom: 20px;
+            }
+
+            .rf-section-title {
+                font-size: 11px;
+                font-weight: 600;
+                text-transform: uppercase;
+                color: var(--graphite-muted);
+                margin-bottom: 12px;
+            }
+
+            /* Passos de Rota */
+            .rf-route-timeline {
+                border-left: 2px dashed var(--brand);
+                padding-left: 16px;
+                margin-bottom: 16px;
+            }
+
+            .rf-route-step {
+                margin-bottom: 12px;
+            }
+
+            .rf-route-step-title {
+                font-size: 12px;
+                font-weight: 600;
+                color: var(--graphite);
+                margin: 0;
+            }
+
+            .rf-route-step-desc {
+                font-size: 11px;
+                color: var(--graphite-muted);
+                margin: 2px 0 0 0;
+            }
         </style>
-        """
+        """,
     )
 
 
@@ -115,13 +208,13 @@ def localizar(user: dict):
         st.session_state.find_search = search_val
 
     with col_action:
-        if st.button("📍 Minha localização", key="btn_my_location", type="secondary"):
+        if st.button("📍 Minha localização", key="btn_my_location", type="secondary", use_container_width=True):
             st.session_state.find_building = buildings[0]
             st.session_state.find_floor = floors_list[0]
             st.session_state.find_search = ""
             st.rerun()
 
-    # 3. Resultados da Busca (se houver busca digitada)
+    # 3. Resultados da Busca
     search_query = st.session_state.find_search.strip().lower()
     if search_query:
         filtered = [
@@ -131,59 +224,39 @@ def localizar(user: dict):
             or search_query in sp.get("location", "").lower()
         ]
 
-        st.html(
-            f"""
-            <div style="background:var(--surface-card); border:1px solid var(--stroke); border-radius:12px; padding:16px; margin-bottom:20px;">
-                <p style="font-size:11px; font-weight:600; text-transform:uppercase; color:var(--graphite-muted); margin:0 0 12px 0;">
-                    Resultados encontrados ({len(filtered)})
-                </p>
-            """
-        )
+        with st.container():
+            st.html(f'<div class="rf-search-results-box"><p class="rf-section-title">Resultados encontrados ({len(filtered)})</p>')
 
-        if not filtered:
-            st.html(
-                """
-                <div style="text-align:center; padding:16px 0; color:var(--graphite-muted); font-size:13px;">
-                    📍 Nenhum espaço encontrado para a busca realizada.
-                </div>
-                """
-            )
-        else:
-            for sp in filtered:
-                col_sp_info, col_sp_btn = st.columns([4, 1], vertical_alignment="center")
-                with col_sp_info:
-                    st.html(
-                        f"""
-                        <div style="margin-bottom:8px;">
-                            <p style="font-size:14px; font-weight:600; color:var(--graphite); margin:0;">{esc(sp['name'])}</p>
-                            <p style="font-size:12px; color:var(--graphite-muted); margin:2px 0 0 0;">{esc(sp.get('building', ''))} &middot; {esc(sp.get('floor', ''))} &middot; {esc(sp.get('location', ''))}</p>
-                        </div>
-                        """
-                    )
-                with col_sp_btn:
-                    if st.button(f"Selecionar {sp['name']}", key=f"btn_select_search_{sp['id']}"):
-                        st.session_state.find_building = sp.get("building", buildings[0])
-                        st.session_state.find_floor = sp.get("floor", floors_list[0])
-                        st.session_state.find_selected_space_id = sp["id"]
-                        st.session_state.find_show_directions = False
-                        st.session_state.find_search = ""
-                        st.rerun()
+            if not filtered:
+                st.caption("📍 Nenhum espaço encontrado para a busca realizada.")
+            else:
+                for sp in filtered:
+                    col_sp_info, col_sp_btn = st.columns([4, 1], vertical_alignment="center")
+                    with col_sp_info:
+                        st.markdown(
+                            f"**{esc(sp['name'])}**\n\n"
+                            f"<small style='color: var(--graphite-muted);'>{esc(sp.get('building', ''))} &middot; {esc(sp.get('floor', ''))} &middot; {esc(sp.get('location', ''))}</small>",
+                            unsafe_allow_html=True,
+                        )
+                    with col_sp_btn:
+                        if st.button(f"Selecionar", key=f"btn_select_search_{sp['id']}", use_container_width=True):
+                            st.session_state.find_building = sp.get("building", buildings[0])
+                            st.session_state.find_floor = sp.get("floor", floors_list[0])
+                            st.session_state.find_selected_space_id = sp["id"]
+                            st.session_state.find_show_directions = False
+                            st.session_state.find_search = ""
+                            st.rerun()
 
-        st.html("</div>")
+            st.html("</div>")
 
-    # 4. Controles do Mapa (Prédio + Andar)
+    # 4. Controles do Mapa
     col_ctrl_left, col_ctrl_right = st.columns([2, 3], vertical_alignment="center")
 
     with col_ctrl_left:
-        st.html(
-            f"""
-            <div>
-                <p style="font-size:11px; font-weight:500; color:var(--graphite-muted); margin:0 0 2px 0;">Localização atual</p>
-                <h3 style="font-size:16px; font-weight:600; color:var(--graphite); margin:0;">
-                    🏢 {esc(st.session_state.find_building)} &middot; {esc(st.session_state.find_floor)}
-                </h3>
-            </div>
-            """
+        st.markdown(
+            f"<small style='color:var(--graphite-muted);'>Localização atual</small>"
+            f"<h3 style='margin:0; font-size:16px;'>🏢 {esc(st.session_state.find_building)} &middot; {esc(st.session_state.find_floor)}</h3>",
+            unsafe_allow_html=True,
         )
 
     with col_ctrl_right:
@@ -220,109 +293,71 @@ def localizar(user: dict):
                 st.session_state.find_show_directions = False
                 st.rerun()
 
-    st.markdown('<div style="height:16px;"></div>', unsafe_allow_html=True)
+    st.space()
 
-    # Obter salas do andar selecionado
+    # Dados do andar atual
     curr_bld = st.session_state.find_building
     curr_flr = st.session_state.find_floor
     floor_spaces = mock_data_service.spaces(building=curr_bld, floor=curr_flr)
 
-    # Obter sala selecionada no estado
     selected_space = next(
         (sp for sp in all_spaces if sp["id"] == st.session_state.find_selected_space_id),
         None,
     )
 
-    # 5. Grid Principal (Mapa do Andar + Painel Lateral)
+    # 5. Grid Principal
     col_map, col_side = st.columns([3, 2], gap="medium")
 
     # =====================================================
-    # MAPA DO ANDAR (COLUNA ESQUERDA)
+    # MAPA DO ANDAR
     # =====================================================
     with col_map:
         with st.container(key="rf_find_map_card"):
-            # Header do mapa
             st.html(
                 f"""
-                <div style="padding:14px 20px; border-bottom:1px solid #E4E1DB; display:flex; justify-content:space-between; align-items:center;">
+                <div style="padding:14px 20px; border-bottom:1px solid var(--stroke); display:flex; justify-content:space-between; align-items:center;">
                     <div>
-                        <p style="font-size:14px; font-weight:600; color:#1C1C2E; margin:0;">Mapa do andar</p>
-                        <p style="font-size:12px; color:#71717A; margin:2px 0 0 0;">Clique em uma sala para visualizar os detalhes</p>
+                        <p style="font-size:14px; font-weight:600; color:var(--graphite); margin:0;">Mapa do andar</p>
+                        <p style="font-size:12px; color:var(--graphite-muted); margin:2px 0 0 0;">Clique em uma sala para visualizar os detalhes</p>
                     </div>
-                    <span style="padding:3px 10px; border-radius:999px; background:#F0EEE9; color:#52525B; font-size:11px; font-weight:600;">
+                    <span style="padding:3px 10px; border-radius:999px; background:var(--surface-alt); color:var(--graphite-muted); font-size:11px; font-weight:600;">
                         {len(floor_spaces)} espaços
                     </span>
                 </div>
                 """
             )
 
-            # Área interativa do Mapa
             st.html(
                 """
                 <div class="rf-map-canvas">
                     <div class="rf-map-grid-bg"></div>
-                    <div style="position:absolute; bottom:16px; left:16px; font-size:11px; color:#71717A; background:#FFFFFF; padding:6px 12px; border-radius:8px; border:1px solid #E4E1DB;">
-                        🚪 Acesso Principal (Entrada)
-                    </div>
-                    <div style="position:absolute; bottom:16px; right:16px; font-size:11px; color:#71717A; background:#FFFFFF; padding:6px 12px; border-radius:8px; border:1px solid #E4E1DB;">
-                        🛗 Elevador / Escadas
-                    </div>
+                    <div class="rf-map-landmark left">🚪 Acesso Principal (Entrada)</div>
+                    <div class="rf-map-landmark right">🛗 Elevador / Escadas</div>
                 """
             )
 
-            # Se existirem salas no andar
             if not floor_spaces:
                 st.html(
                     """
                     <div style="min-height:280px; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:40px;">
                         <span style="font-size:28px;">📍</span>
-                        <p style="font-size:14px; font-weight:600; color:#1C1C2E; margin:8px 0 2px 0;">Nenhum espaço neste andar</p>
-                        <p style="font-size:12px; color:#71717A; margin:0;">Selecione outro andar para visualizar as salas.</p>
+                        <p style="font-size:14px; font-weight:600; color:var(--graphite); margin:8px 0 2px 0;">Nenhum espaço neste andar</p>
+                        <p style="font-size:12px; color:var(--graphite-muted); margin:0;">Selecione outro andar para visualizar as salas.</p>
                     </div>
                     """
                 )
             else:
-                # Fileira Superior de Salas (até 3 salas)
                 top_spaces = floor_spaces[:3]
                 bottom_spaces = floor_spaces[3:6]
 
-                cols_top = st.columns(3)
-                for idx, sp in enumerate(top_spaces):
-                    is_sel = selected_space and selected_space["id"] == sp["id"]
-                    status_label = "Disponível" if sp["status"] == "disponivel" else ("Ocupado" if sp["status"] == "ocupado" else "Bloqueado")
-
-                    with cols_top[idx]:
-                        btn_type = "primary" if is_sel else "secondary"
-                        if st.button(
-                            f"📍 {sp['name']}\n{sp['capacity']} lugares ({status_label})",
-                            key=f"map_btn_{sp['id']}",
-                            use_container_width=True,
-                            type=btn_type,
-                        ):
-                            st.session_state.find_selected_space_id = sp["id"]
-                            st.session_state.find_show_directions = False
-                            st.rerun()
-
-                # Corredor Principal Central
-                st.html(
-                    """
-                    <div style="margin:20px 0; padding:10px; background:#FFFFFF; border:1px solid #E4E1DB; border-radius:8px; text-align:center;">
-                        <span style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.15em; color:#A1A1AA;">
-                            Corredor Principal
-                        </span>
-                    </div>
-                    """
-                )
-
-                # Fileira Inferior de Salas (até 3 salas)
-                if bottom_spaces:
-                    cols_bottom = st.columns(3)
-                    for idx, sp in enumerate(bottom_spaces):
+                def _render_space_grid(spaces_list):
+                    cols = st.columns(3)
+                    for idx, sp in enumerate(spaces_list):
                         is_sel = selected_space and selected_space["id"] == sp["id"]
                         status_label = "Disponível" if sp["status"] == "disponivel" else ("Ocupado" if sp["status"] == "ocupado" else "Bloqueado")
+                        btn_type = "primary" if is_sel else "secondary"
 
-                        with cols_bottom[idx]:
-                            btn_type = "primary" if is_sel else "secondary"
+                        with cols[idx]:
                             if st.button(
                                 f"📍 {sp['name']}\n{sp['capacity']} lugares ({status_label})",
                                 key=f"map_btn_{sp['id']}",
@@ -333,9 +368,16 @@ def localizar(user: dict):
                                 st.session_state.find_show_directions = False
                                 st.rerun()
 
+                _render_space_grid(top_spaces)
+
+                st.html('<div class="rf-map-corridor">Corredor Principal</div>')
+
+                if bottom_spaces:
+                    _render_space_grid(bottom_spaces)
+
             st.html("</div>")
 
-            # Barra de Legenda do Mapa
+            # Legenda do Mapa
             st.html(
                 """
                 <div class="rf-legend-bar">
@@ -360,7 +402,7 @@ def localizar(user: dict):
             )
 
     # =====================================================
-    # PAINEL LATERAL (DETALHES / ROTA) (COLUNA DIREITA)
+    # PAINEL LATERAL (DETALHES / ROTA)
     # =====================================================
     with col_side:
         if not selected_space:
@@ -368,11 +410,11 @@ def localizar(user: dict):
                 st.html(
                     """
                     <div style="padding:48px 24px; text-align:center;">
-                        <div style="width:52px; height:52px; border-radius:14px; background:#F5F3FF; color:#6D28D9; display:inline-flex; align-items:center; justify-content:center; font-size:24px; margin-bottom:12px;">
+                        <div style="width:52px; height:52px; border-radius:14px; background:var(--surface-alt); color:var(--brand); display:inline-flex; align-items:center; justify-content:center; font-size:24px; margin-bottom:12px;">
                             📍
                         </div>
-                        <h3 style="font-size:15px; font-weight:600; color:#1C1C2E; margin:0 0 6px 0;">Selecione um espaço</h3>
-                        <p style="font-size:12px; color:#71717A; margin:0; line-height:1.5;">
+                        <h3 style="font-size:15px; font-weight:600; color:var(--graphite); margin:0 0 6px 0;">Selecione um espaço</h3>
+                        <p style="font-size:12px; color:var(--graphite-muted); margin:0; line-height:1.5;">
                             Clique em uma sala no mapa para visualizar informações e descobrir como chegar até ela.
                         </p>
                     </div>
@@ -380,15 +422,14 @@ def localizar(user: dict):
                 )
         else:
             with st.container(key="rf_find_details_card"):
-                # Header dos Detalhes com botão Fechar
                 col_det_title, col_det_close = st.columns([4, 1])
 
                 with col_det_title:
                     st.html(
                         f"""
                         <div style="padding:16px 20px 0 20px;">
-                            <h2 style="font-size:16px; font-weight:700; color:#1C1C2E; margin:0 0 4px 0;">{esc(selected_space['name'])}</h2>
-                            <p style="font-size:12px; color:#71717A; margin:0;">🏢 {esc(selected_space['building'])} &middot; {esc(selected_space['floor'])}</p>
+                            <h2 style="font-size:16px; font-weight:700; color:var(--graphite); margin:0 0 4px 0;">{esc(selected_space['name'])}</h2>
+                            <p style="font-size:12px; color:var(--graphite-muted); margin:0;">🏢 {esc(selected_space['building'])} &middot; {esc(selected_space['floor'])}</p>
                         </div>
                         """
                     )
@@ -399,48 +440,44 @@ def localizar(user: dict):
                         st.session_state.find_show_directions = False
                         st.rerun()
 
-                # Badges de Informação
                 st.html(
                     f"""
                     <div style="padding:12px 20px; display:flex; flex-wrap:wrap; gap:8px;">
                         {badge(selected_space['status'])}
-                        <span style="padding:3px 10px; border-radius:999px; background:#F0EEE9; color:#52525B; font-size:11px; font-weight:600;">
+                        <span style="padding:3px 10px; border-radius:999px; background:var(--surface-alt); color:var(--graphite-muted); font-size:11px; font-weight:600;">
                             👥 {selected_space['capacity']} pessoas
                         </span>
-                        <span style="padding:3px 10px; border-radius:999px; background:#F0EEE9; color:#52525B; font-size:11px; font-weight:600;">
+                        <span style="padding:3px 10px; border-radius:999px; background:var(--surface-alt); color:var(--graphite-muted); font-size:11px; font-weight:600;">
                             {esc(selected_space['type'])}
                         </span>
                     </div>
                     <div style="padding:0 20px 16px 20px;">
-                        <div style="background:#F8F7F4; border-radius:10px; padding:12px; margin-bottom:16px;">
-                            <p style="font-size:11px; font-weight:600; text-transform:uppercase; color:#71717A; margin:0 0 4px 0;">Localização</p>
-                            <p style="font-size:13px; color:#1C1C2E; margin:0 0 10px 0;">{esc(selected_space['location'])}</p>
-                            <p style="font-size:11px; font-weight:600; text-transform:uppercase; color:#71717A; margin:0 0 4px 0;">Funcionamento</p>
-                            <p style="font-size:13px; color:#1C1C2E; margin:0;">08:00 – 22:00</p>
+                        <div style="background:var(--surface-alt); border-radius:10px; padding:12px; margin-bottom:16px;">
+                            <p style="font-size:11px; font-weight:600; text-transform:uppercase; color:var(--graphite-muted); margin:0 0 4px 0;">Localização</p>
+                            <p style="font-size:13px; color:var(--graphite); margin:0 0 10px 0;">{esc(selected_space['location'])}</p>
+                            <p style="font-size:11px; font-weight:600; text-transform:uppercase; color:var(--graphite-muted); margin:0 0 4px 0;">Funcionamento</p>
+                            <p style="font-size:13px; color:var(--graphite); margin:0;">08:00 – 22:00</p>
                         </div>
                     </div>
                     """
                 )
 
-                # Botão Como Chegar
-                col_btn_wrap = st.container()
-                with col_btn_wrap:
-                    if st.button("🗺️ Como chegar", key="btn_show_directions", type="primary", use_container_width=True):
-                        st.session_state.find_show_directions = True
-                        st.rerun()
+                if st.button("🗺️ Como chegar", key="btn_show_directions", type="primary", use_container_width=True):
+                    st.session_state.find_show_directions = True
+                    st.rerun()
 
-            # Painel de Rota ("Como chegar")
+            # Painel de Rota
             if st.session_state.find_show_directions:
-                st.markdown('<div style="height:16px;"></div>', unsafe_allow_html=True)
+                st.space()
                 with st.container(key="rf_find_directions_card"):
                     col_dir_hdr, col_dir_cls = st.columns([4, 1])
 
                     with col_dir_hdr:
                         st.html(
                             f"""
-                            <div style="background:#F5F3FF; padding:14px 16px; border-bottom:1px solid #EDE9FE;">
-                                <h3 style="font-size:14px; font-weight:700; color:#6D28D9; margin:0;">Como chegar</h3>
-                                <p style="font-size:11px; color:#71717A; margin:2px 0 0 0;">Rota até {esc(selected_space['name'])}</p>
+                            <div style="background:var(--surface-alt); padding:14px 16px; border-bottom:1px solid var(--stroke);">
+                                <h3 style="font-size:14px; font-weight:700; color:var(--brand); margin:0;">Como chegar</h3>
+                                <p style="font-size:11px; color:var(--graphite-muted); margin:2px 0 0 0;">Rota até {esc(selected_space['name'])}</p>
                             </div>
                             """
                         )
@@ -450,42 +487,39 @@ def localizar(user: dict):
                             st.session_state.find_show_directions = False
                             st.rerun()
 
-                    # Etapas do passo a passo
                     is_ground = selected_space["floor"] == "Térreo"
                     st.html(
                         f"""
                         <div style="padding:16px;">
-                            <div style="border-left:2px dashed #6D28D9; padding-left:16px; margin-bottom:16px; position:relative;">
+                            <div class="rf-route-timeline">
                                 <div style="margin-bottom:12px;">
-                                    <p style="font-size:10px; font-weight:700; text-transform:uppercase; color:#71717A; margin:0;">Você está aqui</p>
-                                    <p style="font-size:12px; font-weight:600; color:#1C1C2E; margin:2px 0 0 0;">Entrada Principal</p>
+                                    <p style="font-size:10px; font-weight:700; text-transform:uppercase; color:var(--graphite-muted); margin:0;">Você está aqui</p>
+                                    <p style="font-size:12px; font-weight:600; color:var(--graphite); margin:2px 0 0 0;">Entrada Principal</p>
                                 </div>
                                 <div>
-                                    <p style="font-size:10px; font-weight:700; text-transform:uppercase; color:#6D28D9; margin:0;">Destino</p>
-                                    <p style="font-size:13px; font-weight:700; color:#1C1C2E; margin:2px 0 0 0;">{esc(selected_space['name'])}</p>
-                                    <p style="font-size:11px; color:#71717A; margin:2px 0 0 0;">{esc(selected_space['building'])} &middot; {esc(selected_space['floor'])}</p>
+                                    <p style="font-size:10px; font-weight:700; text-transform:uppercase; color:var(--brand); margin:0;">Destino</p>
+                                    <p style="font-size:13px; font-weight:700; color:var(--graphite); margin:2px 0 0 0;">{esc(selected_space['name'])}</p>
+                                    <p style="font-size:11px; color:var(--graphite-muted); margin:2px 0 0 0;">{esc(selected_space['building'])} &middot; {esc(selected_space['floor'])}</p>
                                 </div>
                             </div>
 
-                            <p style="font-size:11px; font-weight:600; text-transform:uppercase; color:#71717A; margin:0 0 10px 0;">Passo a passo</p>
+                            <p class="rf-section-title">Passo a passo</p>
 
-                            <div style="display:flex; flex-direction:column; gap:12px;">
-                                <div>
-                                    <p style="font-size:12px; font-weight:600; color:#1C1C2E; margin:0;">1. Entre pelo acesso principal</p>
-                                    <p style="font-size:11px; color:#71717A; margin:2px 0 0 0;">Acesse o {esc(selected_space['building'])} pela entrada principal.</p>
-                                </div>
-                                <div>
-                                    <p style="font-size:12px; font-weight:600; color:#1C1C2E; margin:0;">2. Siga pelo corredor principal</p>
-                                    <p style="font-size:11px; color:#71717A; margin:2px 0 0 0;">Continue reto pelo corredor seguindo a sinalização.</p>
-                                </div>
-                                <div>
-                                    <p style="font-size:12px; font-weight:600; color:#1C1C2E; margin:0;">3. {'Permaneça no térreo' if is_ground else f'Suba até o {esc(selected_space["floor"])}'}</p>
-                                    <p style="font-size:11px; color:#71717A; margin:2px 0 0 0;">{'Não é necessário utilizar escadas ou elevador.' if is_ground else 'Utilize o elevador ou escadas para acessar o andar.'}</p>
-                                </div>
-                                <div>
-                                    <p style="font-size:12px; font-weight:600; color:#1C1C2E; margin:0;">4. Procure pela {esc(selected_space['name'])}</p>
-                                    <p style="font-size:11px; color:#71717A; margin:2px 0 0 0;">A sala está localizada no {esc(selected_space['floor'])}, em {esc(selected_space['location'])}.</p>
-                                </div>
+                            <div class="rf-route-step">
+                                <p class="rf-route-step-title">1. Entre pelo acesso principal</p>
+                                <p class="rf-route-step-desc">Acesse o {esc(selected_space['building'])} pela entrada principal.</p>
+                            </div>
+                            <div class="rf-route-step">
+                                <p class="rf-route-step-title">2. Siga pelo corredor principal</p>
+                                <p class="rf-route-step-desc">Continue reto pelo corredor seguindo a sinalização.</p>
+                            </div>
+                            <div class="rf-route-step">
+                                <p class="rf-route-step-title">3. {'Permaneça no térreo' if is_ground else f'Suba até o {esc(selected_space["floor"])}'}</p>
+                                <p class="rf-route-step-desc">{'Não é necessário utilizar escadas ou elevador.' if is_ground else 'Utilize o elevador ou escadas para acessar o andar.'}</p>
+                            </div>
+                            <div class="rf-route-step">
+                                <p class="rf-route-step-title">4. Procure pela {esc(selected_space['name'])}</p>
+                                <p class="rf-route-step-desc">A sala está localizada no {esc(selected_space['floor'])}, em {esc(selected_space['location'])}.</p>
                             </div>
                         </div>
                         """
