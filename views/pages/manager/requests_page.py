@@ -1,9 +1,10 @@
+import pandas as pd
 import streamlit as st
 
 from controllers import mock_data_service
 from controllers.app_state_service import go, set_toast
 from views.components.reservation_cards import reservation_cards
-from views.components.ui_components import badge, page_header
+from views.components.ui_components import badge, page_header, table
 
 
 STATUS_OPTIONS = [
@@ -15,118 +16,15 @@ STATUS_OPTIONS = [
     ("Conflito", "conflito"),
 ]
 
+STATUS_LABELS = {
+    "pendente": "Pendente",
+    "em_analise": "Em análise",
+    "aprovada": "Aprovada",
+    "rejeitada": "Rejeitada",
+    "conflito": "Conflito",
+}
+
 ACTION_STATUSES = {"pendente", "em_analise"}
-
-
-# ============================================================
-# ESTILO DA TABELA
-# ============================================================
-
-def _load_reservations_table_style():
-    st.markdown(
-        """
-        <style>
-            /* Área geral da tabela */
-            .st-key-manager_reservations_table {
-                border: 1px solid var(--stroke);
-                border-radius: 12px;
-                overflow: hidden;
-                background: var(--surface-card);
-            }
-
-            /* Cabeçalho */
-            .st-key-manager_reservation_header {
-                background: var(--surface-alt);
-                border-bottom: 1px solid var(--stroke);
-                min-height: 42px;
-            }
-
-            .st-key-manager_reservation_header [data-testid="stMarkdownContainer"] p {
-                color: var(--graphite-muted);
-                font-size: 11px;
-                font-weight: 600;
-                letter-spacing: 0.04em;
-                margin: 0;
-            }
-
-            /* Linhas */
-            [class*="manager_reservation_row_"] {
-                min-height: 68px;
-                border-bottom: 1px solid var(--stroke);
-                background: var(--surface-card);
-                transition: background-color 0.15s ease;
-            }
-
-            [class*="manager_reservation_row_"]:hover {
-                background: var(--surface-alt);
-            }
-
-            [class*="manager_reservation_row_"]:last-child {
-                border-bottom: none;
-            }
-
-            /* Textos principais */
-            [class*="manager_reservation_row_"] [data-testid="stMarkdownContainer"] p {
-                margin: 0;
-            }
-
-            /* Nome do solicitante */
-            .reservation-requester {
-                color: var(--graphite);
-                font-size: 13px;
-                font-weight: 600;
-                line-height: 1.35;
-            }
-
-            /* Textos secundários */
-            .reservation-secondary {
-                color: var(--graphite-muted);
-                font-size: 12px;
-                line-height: 1.4;
-            }
-
-            .reservation-date {
-                color: var(--graphite-soft);
-                font-size: 12px;
-                line-height: 1.4;
-            }
-
-            /* Botão Ver */
-            [class*="manager_reservation_row_"] [data-testid="stButton"] button {
-                height: 32px;
-                min-height: 32px;
-                padding: 0 13px;
-                border: 1px solid var(--stroke-strong);
-                border-radius: 7px;
-                background: var(--surface-card);
-                color: var(--graphite-soft);
-                font-size: 12px;
-                font-weight: 600;
-                box-shadow: none;
-            }
-
-            [class*="manager_reservation_row_"] [data-testid="stButton"] button:hover {
-                border-color: var(--brand);
-                color: var(--brand);
-                background: var(--brand-lighter);
-            }
-
-            /* Espaçamento interno das células */
-            .reservation-cell {
-                padding-top: 4px;
-            }
-
-            /* Estado vazio */
-            .reservation-empty {
-                padding: 42px 20px;
-                text-align: center;
-                color: var(--graphite-muted);
-                font-size: 13px;
-            }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
 
 
 # ============================================================
@@ -172,8 +70,25 @@ def _can_act(status):
     return status in ACTION_STATUSES
 
 
+def _reservations_dataframe(items_list: list) -> pd.DataFrame:
+    """Converte a lista de reservas no DataFrame padronizado para exibição no st.dataframe."""
+    return pd.DataFrame(
+        [
+            {
+                "Solicitante": item["requester"],
+                "Espaço": item["space"],
+                "Tipo": item["type"],
+                "Data": item["date"],
+                "Horário": f"{item['start']} – {item['end']}",
+                "Status": STATUS_LABELS.get(item["status"], item["status"].capitalize()),
+            }
+            for item in items_list
+        ]
+    )
+
+
 # ============================================================
-# DETALHES
+# DETALHES DIALOG
 # ============================================================
 
 @st.dialog("Detalhes da reserva", width="medium")
@@ -189,81 +104,33 @@ def reservation_details_dialog(reservation):
             margin: 18px 0;
         ">
             <div>
-                <div style="
-                    color: #73706A;
-                    font-size: 11px;
-                    margin-bottom: 4px;
-                ">SOLICITANTE</div>
-                <div style="
-                    color: #231F20;
-                    font-size: 14px;
-                    font-weight: 600;
-                ">{reservation["requester"]}</div>
+                <div style="color: #73706A; font-size: 11px; margin-bottom: 4px;">SOLICITANTE</div>
+                <div style="color: #231F20; font-size: 14px; font-weight: 600;">{reservation["requester"]}</div>
             </div>
 
             <div>
-                <div style="
-                    color: #73706A;
-                    font-size: 11px;
-                    margin-bottom: 4px;
-                ">ESPAÇO</div>
-                <div style="
-                    color: #231F20;
-                    font-size: 14px;
-                    font-weight: 600;
-                ">{reservation["space"]}</div>
+                <div style="color: #73706A; font-size: 11px; margin-bottom: 4px;">ESPAÇO</div>
+                <div style="color: #231F20; font-size: 14px; font-weight: 600;">{reservation["space"]}</div>
             </div>
 
             <div>
-                <div style="
-                    color: #73706A;
-                    font-size: 11px;
-                    margin-bottom: 4px;
-                ">TIPO</div>
-                <div style="
-                    color: #231F20;
-                    font-size: 14px;
-                    font-weight: 600;
-                ">{reservation["type"]}</div>
+                <div style="color: #73706A; font-size: 11px; margin-bottom: 4px;">TIPO</div>
+                <div style="color: #231F20; font-size: 14px; font-weight: 600;">{reservation["type"]}</div>
             </div>
 
             <div>
-                <div style="
-                    color: #73706A;
-                    font-size: 11px;
-                    margin-bottom: 4px;
-                ">PARTICIPANTES</div>
-                <div style="
-                    color: #231F20;
-                    font-size: 14px;
-                    font-weight: 600;
-                ">{reservation.get("participants", 0)}</div>
+                <div style="color: #73706A; font-size: 11px; margin-bottom: 4px;">PARTICIPANTES</div>
+                <div style="color: #231F20; font-size: 14px; font-weight: 600;">{reservation.get("participants", 0)}</div>
             </div>
 
             <div>
-                <div style="
-                    color: #73706A;
-                    font-size: 11px;
-                    margin-bottom: 4px;
-                ">DATA</div>
-                <div style="
-                    color: #231F20;
-                    font-size: 14px;
-                    font-weight: 600;
-                ">{reservation["date"]}</div>
+                <div style="color: #73706A; font-size: 11px; margin-bottom: 4px;">DATA</div>
+                <div style="color: #231F20; font-size: 14px; font-weight: 600;">{reservation["date"]}</div>
             </div>
 
             <div>
-                <div style="
-                    color: #73706A;
-                    font-size: 11px;
-                    margin-bottom: 4px;
-                ">HORÁRIO</div>
-                <div style="
-                    color: #231F20;
-                    font-size: 14px;
-                    font-weight: 600;
-                ">{reservation["start"]} – {reservation["end"]}</div>
+                <div style="color: #73706A; font-size: 11px; margin-bottom: 4px;">HORÁRIO</div>
+                <div style="color: #231F20; font-size: 14px; font-weight: 600;">{reservation["start"]} – {reservation["end"]}</div>
             </div>
         </div>
         """
@@ -283,10 +150,7 @@ def reservation_details_dialog(reservation):
             line-height: 1.5;
             margin-bottom: 18px;
         ">
-            {reservation.get(
-                "justification",
-                "Sem justificativa informada."
-            )}
+            {reservation.get("justification", "Sem justificativa informada.")}
         </div>
         """,
         unsafe_allow_html=True,
@@ -299,10 +163,7 @@ def reservation_details_dialog(reservation):
     can_act = _can_act(reservation["status"])
 
     if can_act:
-        edit_column, reject_column, approve_column = st.columns(
-            3,
-            gap="small",
-        )
+        edit_column, reject_column, approve_column = st.columns(3, gap="small")
 
         with edit_column:
             if st.button(
@@ -355,7 +216,7 @@ def reservation_details_dialog(reservation):
 
 
 # ============================================================
-# EDITAR
+# EDITAR DIALOG (COM SELEÇÃO DE STATUS / DECISÃO)
 # ============================================================
 
 @st.dialog("Editar reserva", width="medium")
@@ -367,6 +228,29 @@ def edit_reservation_dialog(reservation):
     )
 
     with st.form(f"edit_reservation_{reservation['id']}"):
+        # Opções de status editáveis pelo gestor
+        status_options = [
+            ("Pendente", "pendente"),
+            ("Em análise", "em_analise"),
+            ("Aprovada", "aprovada"),
+            ("Rejeitada", "rejeitada"),
+            ("Conflito", "conflito"),
+        ]
+
+        # Encontra o índice do status atual para deixar selecionado por padrão
+        current_status = reservation.get("status", "pendente")
+        status_keys = [opt[1] for opt in status_options]
+        default_index = status_keys.index(current_status) if current_status in status_keys else 0
+
+        new_status_tuple = st.selectbox(
+            "Decisão / Status",
+            options=status_options,
+            format_func=lambda opt: opt[0],
+            index=default_index,
+            help="Altere a decisão ou o estado atual da solicitação",
+        )
+        new_status = new_status_tuple[1]
+
         space_options = [
             space["name"]
             for space in st.session_state.spaces
@@ -458,6 +342,7 @@ def edit_reservation_dialog(reservation):
         mock_data_service.update_reservation(
             reservation["id"],
             {
+                "status": new_status,
                 "space": space,
                 "type": kind,
                 "date": date_value.isoformat(),
@@ -469,12 +354,12 @@ def edit_reservation_dialog(reservation):
         )
 
         st.session_state["edit_reservation_id"] = None
-        set_toast("Reserva atualizada.")
+        set_toast("Reserva atualizada com sucesso.")
         st.rerun()
 
 
 # ============================================================
-# REJEITAR
+# REJEITAR DIALOG
 # ============================================================
 
 @st.dialog("Rejeitar reserva", width="small")
@@ -508,124 +393,10 @@ def reject_reservation_dialog(reservation):
 
 
 # ============================================================
-# TABELA
-# ============================================================
-
-def _reservation_table(items):
-    _load_reservations_table_style()
-
-    with st.container(
-        key="manager_reservations_table",
-        border=False,
-    ):
-        # Cabeçalho
-        with st.container(key="manager_reservation_header"):
-            columns = st.columns(
-                [2.1, 1.7, 1.25, 1.7, 1.3, 0.8],
-                vertical_alignment="center",
-            )
-
-            headers = [
-                "Solicitante",
-                "Espaço",
-                "Tipo",
-                "Data / Horário",
-                "Status",
-                "Ações",
-            ]
-
-            for column, header in zip(columns, headers):
-                with column:
-                    st.markdown(header)
-
-        # Linhas
-        for item in items:
-            row_key = f"manager_reservation_row_{item['id']}"
-
-            with st.container(key=row_key):
-                columns = st.columns(
-                    [2.1, 1.7, 1.25, 1.7, 1.3, 0.8],
-                    vertical_alignment="center",
-                )
-
-                with columns[0]:
-                    st.markdown(
-                        f"""
-                        <div class="reservation-cell">
-                            <div class="reservation-requester">
-                                {item["requester"]}
-                            </div>
-                        </div>
-                        """,
-                        unsafe_allow_html=True,
-                    )
-
-                with columns[1]:
-                    st.markdown(
-                        f"""
-                        <div class="reservation-cell">
-                            <div class="reservation-secondary">
-                                {item["space"]}
-                            </div>
-                        </div>
-                        """,
-                        unsafe_allow_html=True,
-                    )
-
-                with columns[2]:
-                    st.markdown(
-                        f"""
-                        <div class="reservation-cell">
-                            <div class="reservation-secondary">
-                                {item["type"]}
-                            </div>
-                        </div>
-                        """,
-                        unsafe_allow_html=True,
-                    )
-
-                with columns[3]:
-                    st.markdown(
-                        f"""
-                        <div class="reservation-cell">
-                            <div class="reservation-date">
-                                {item["date"]}
-                            </div>
-                            <div class="reservation-secondary">
-                                {item["start"]} – {item["end"]}
-                            </div>
-                        </div>
-                        """,
-                        unsafe_allow_html=True,
-                    )
-
-                with columns[4]:
-                    st.html(badge(item["status"]))
-
-                with columns[5]:
-                    if st.button(
-                        "Ver",
-                        key=f"view_reservation_{item['id']}",
-                    ):
-                        st.session_state["detail_reservation_id"] = item["id"]
-                        st.rerun()
-
-    if not items:
-        st.markdown(
-            """
-            <div class="reservation-empty">
-                Nenhuma reserva encontrada.
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-
-# ============================================================
 # RESERVAS DO GERENTE
 # ============================================================
 
-def manager_reservations(user):
+def manager_reservations(user=None):
     page_header(
         "Reservas",
         "Analise e decida sobre as solicitações de reserva.",
@@ -634,7 +405,6 @@ def manager_reservations(user):
     # --------------------------------------------------------
     # Filtros
     # --------------------------------------------------------
-
     search_column, status_column = st.columns(
         [3, 1],
         vertical_alignment="bottom",
@@ -646,6 +416,7 @@ def manager_reservations(user):
             placeholder="Buscar por solicitante ou espaço...",
             label_visibility="collapsed",
             icon=":material/search:",
+            key="manager_search",
         )
 
     with status_column:
@@ -653,6 +424,8 @@ def manager_reservations(user):
             "Status",
             STATUS_OPTIONS,
             format_func=lambda option: option[0],
+            label_visibility="collapsed",
+            key="manager_status_filter",
         )
 
     status_value = status[1]
@@ -671,225 +444,115 @@ def manager_reservations(user):
 
     st.write("")
 
-    _reservation_table(filtered_items)
+    if not filtered_items:
+        st.info("Nenhuma reserva encontrada.")
+        return
 
     # --------------------------------------------------------
-    # Dialog de detalhes
+    # Container Informativo
     # --------------------------------------------------------
-
-    detail_id = st.session_state.get("detail_reservation_id")
-
-    if detail_id:
-        detail = next(
-            (
-                item
-                for item in items
-                if item["id"] == detail_id
-            ),
-            None,
+    with st.container(border=True):
+        st.caption(
+            ":material/info: Selecione uma solicitação abaixo no menu de ações para analisar detalhes, editar dados ou alterar o status."
         )
 
+    # --------------------------------------------------------
+    # Tabela (Estilo padronizado com st.dataframe)
+    # --------------------------------------------------------
+    df_reservations = _reservations_dataframe(filtered_items)
+    st.dataframe(
+        df_reservations,
+        column_config={
+            "Solicitante": st.column_config.TextColumn("Solicitante", width="medium", pinned=True),
+            "Espaço": st.column_config.TextColumn("Espaço", width="medium"),
+            "Tipo": st.column_config.TextColumn("Tipo", width="small"),
+            "Data": st.column_config.TextColumn("Data", width="small"),
+            "Horário": st.column_config.TextColumn("Horário", width="medium"),
+            "Status": st.column_config.TextColumn("Status", width="small"),
+        },
+        hide_index=True,
+        use_container_width=True,
+    )
+
+    # --------------------------------------------------------
+    # Painel de Ações Operacionais sobre a Seleção
+    # --------------------------------------------------------
+    res_map = {
+        f"{item['requester']} - {item['space']} ({item['date']} às {item['start']})": item
+        for item in filtered_items
+    }
+
+    col_select, col_details, col_edit, col_reject, col_approve = st.columns(
+        [3, 1, 1, 1, 1],
+        vertical_alignment="bottom",
+    )
+
+    with col_select:
+        selected_label = st.selectbox(
+            "Ações da reserva",
+            options=list(res_map.keys()),
+            help="Selecione uma reserva para ver detalhes ou tomar ações",
+        )
+        selected_res = res_map[selected_label]
+
+    can_act = _can_act(selected_res["status"])
+
+    with col_details:
+        if st.button("Ver", icon=":material/visibility:", use_container_width=True):
+            st.session_state["detail_reservation_id"] = selected_res["id"]
+            st.rerun()
+
+    with col_edit:
+        if st.button("Editar", icon=":material/edit:", use_container_width=True):
+            st.session_state["edit_reservation_id"] = selected_res["id"]
+            st.rerun()
+
+    with col_reject:
+        if st.button(
+            "Rejeitar",
+            icon=":material/close:",
+            use_container_width=True,
+            disabled=not can_act,
+        ):
+            st.session_state["reject_reservation_id"] = selected_res["id"]
+            st.rerun()
+
+    with col_approve:
+        if st.button(
+            "Aprovar",
+            type="primary",
+            icon=":material/check:",
+            use_container_width=True,
+            disabled=not can_act,
+        ):
+            mock_data_service.update_reservation_status(selected_res["id"], "aprovada")
+            set_toast(f"Reserva de {selected_res['requester']} aprovada com sucesso.")
+            st.rerun()
+
+    # --------------------------------------------------------
+    # Dialogs (Renderização condicional baseada no Session State)
+    # --------------------------------------------------------
+    detail_id = st.session_state.get("detail_reservation_id")
+    if detail_id:
+        detail = next((item for item in items if item["id"] == detail_id), None)
         if detail:
             reservation_details_dialog(detail)
 
-    # --------------------------------------------------------
-    # Dialog de edição
-    # --------------------------------------------------------
-
     edit_id = st.session_state.get("edit_reservation_id")
-
     if edit_id:
-        edit_target = next(
-            (
-                item
-                for item in items
-                if item["id"] == edit_id
-            ),
-            None,
-        )
-
+        edit_target = next((item for item in items if item["id"] == edit_id), None)
         if edit_target:
             edit_reservation_dialog(edit_target)
 
-    # --------------------------------------------------------
-    # Dialog de rejeição
-    # --------------------------------------------------------
-
     reject_id = st.session_state.get("reject_reservation_id")
-
     if reject_id:
-        reject_target = next(
-            (
-                item
-                for item in items
-                if item["id"] == reject_id
-            ),
-            None,
-        )
-
+        reject_target = next((item for item in items if item["id"] == reject_id), None)
         if reject_target:
             reject_reservation_dialog(reject_target)
 
 
 # ============================================================
-# ADMIN
+# ALIASES DE COMPATIBILIDADE
 # ============================================================
 
-def reservations_admin(user):
-    page_header(
-        "Reservas e solicitações",
-        "Consulte as solicitações e acompanhe seus status.",
-    )
-
-    status = st.selectbox(
-        "Status",
-        [
-            "Todas",
-            "pendente",
-            "em_analise",
-            "aprovada",
-            "rejeitada",
-            "conflito",
-        ],
-    )
-
-    items = mock_data_service.reservations(status=status)
-
-    if not items:
-        st.info("Nenhuma reserva encontrada.")
-        return
-
-    rows = [
-        [
-            item["requester"],
-            item["type"],
-            item["space"],
-            item["date"],
-            f"{item['start']}-{item['end']}",
-            badge(item["status"]),
-        ]
-        for item in items
-    ]
-
-    from views.components.ui_components import table
-
-    table(
-        [
-            "Solicitante",
-            "Tipo",
-            "Espaço",
-            "Data",
-            "Horário",
-            "Status",
-        ],
-        rows,
-    )
-
-
-# ============================================================
-# NOVA RESERVA
-# ============================================================
-
-def new_reservation(user):
-    page_header(
-        "Nova reserva",
-        "Solicite um espaço disponível.",
-    )
-
-    with st.form("new_reservation"):
-        title = st.text_input("Título")
-
-        space = st.selectbox(
-            "Espaço",
-            [
-                space["name"]
-                for space in st.session_state.spaces
-                if space["status"] != "bloqueado"
-            ],
-        )
-
-        day = st.date_input("Data")
-
-        start_column, end_column = st.columns(2)
-
-        with start_column:
-            start = st.time_input("Início")
-
-        with end_column:
-            end = st.time_input("Fim")
-
-        kind = st.selectbox(
-            "Tipo",
-            [
-                "Aula",
-                "Banca",
-                "Workshop",
-                "Reunião",
-                "Monitoria",
-            ],
-        )
-
-        participants = st.number_input(
-            "Participantes",
-            min_value=1,
-            value=12,
-        )
-
-        justification = st.text_area(
-            "Justificativa",
-        )
-
-        submitted = st.form_submit_button(
-            "Solicitar reserva",
-            type="primary",
-        )
-
-    if submitted:
-        mock_data_service.create_reservation(
-            {
-                "requester": user["name"],
-                "requester_id": user["id"],
-                "title": title,
-                "space": space,
-                "date": day.isoformat(),
-                "start": start.strftime("%H:%M"),
-                "end": end.strftime("%H:%M"),
-                "type": kind,
-                "participants": participants,
-                "justification": justification,
-            }
-        )
-
-        set_toast("Reserva enviada para análise.")
-        go("minhas_reservas")
-
-
-# ============================================================
-# MINHAS RESERVAS
-# ============================================================
-
-def minhas_reservas(user):
-    page_header(
-        "Minhas reservas",
-        "Acompanhe suas solicitações.",
-    )
-
-    items = mock_data_service.reservations(
-        requester_id=user["id"],
-    )
-
-    reservation_cards(items)
-
-    for item in items:
-        if item["status"] in {"pendente", "aprovada"}:
-            if st.button(
-                f"Cancelar {item['title']}",
-                key=f"cancel_{item['id']}",
-            ):
-                mock_data_service.update_reservation_status(
-                    item["id"],
-                    "rejeitada",
-                )
-
-                set_toast("Reserva cancelada no mock.")
-                st.rerun()
+reservations_admin = manager_reservations
