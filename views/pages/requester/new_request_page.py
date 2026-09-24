@@ -534,7 +534,6 @@ def _render_step_content(step: int) -> None:
             icon=":material/info:",
         )
 
-
 # -----------------------------------------------------------------------------
 # VIEW PRINCIPAL
 # -----------------------------------------------------------------------------
@@ -608,32 +607,36 @@ def new_reservation(user: Dict[str, Any]) -> None:
 
             st.divider()
 
-            # Botões de Navegação Inferiores
-            btn_col_left, btn_col_right = st.columns([1, 1])
+            # Botões de Navegação Inferiores (Alinhado à extrema direita)
+            btn_left, btn_spacer, btn_right = st.columns([1, 2, 1])
 
-            with btn_col_left:
+            with btn_left:
                 if step > 0:
-                    if st.button("Voltar", icon=":material/arrow_back:", on_click=_go_back):
-                        st.rerun()
+                    st.button(
+                        "Voltar",
+                        icon=":material/arrow_back:",
+                        on_click=_go_back,
+                        use_container_width=True,
+                    )
 
-            with btn_col_right:
+            with btn_right:
                 if step < len(_STEPS) - 1:
-                    if st.button(
+                    st.button(
                         "Continuar",
                         icon=":material/arrow_forward:",
                         type="primary",
                         on_click=_go_next,
-                    ):
-                        st.rerun()
+                        use_container_width=True,
+                    )
                 else:
-                    if st.button(
+                    st.button(
                         "Solicitar reserva",
                         icon=":material/check_circle:",
                         type="primary",
                         on_click=_submit_request,
                         args=(user,),
-                    ):
-                        st.rerun()
+                        use_container_width=True,
+                    )
 
     with summary_col:
         _render_summary_card(step)
