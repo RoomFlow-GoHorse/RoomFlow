@@ -51,7 +51,6 @@ def _render_quick_actions() -> None:
     st.subheader("Ações rápidas")
     for label, description, page, icon in QUICK_ACTIONS:
         with st.container(border=True):
-            # Cabeçalho do card com o botão "Abrir" no canto superior direito
             col_info, col_btn = st.columns([3, 1], vertical_alignment="center")
             with col_info:
                 st.markdown(f"{icon} **{label}**")
@@ -61,8 +60,30 @@ def _render_quick_actions() -> None:
             st.caption(description)
 
 
+def _role_bar(label: str, count: int, total: int) -> None:
+    """Renderiza uma linha de distribuição por perfil no mesmo formato de ocupação dos espaços."""
+    percentage = count / total if total else 0.0
+
+    columns = st.columns(
+        [1.5, 3.5, 0.4],
+        vertical_alignment="center",
+    )
+
+    with columns[0]:
+        st.caption(label)
+
+    with columns[1]:
+        st.progress(
+            percentage,
+            text=None,
+        )
+
+    with columns[2]:
+        st.write(f"**{count}**")
+
+
 def _render_role_distribution(users: list[dict]) -> None:
-    # CSS para forçar a cor roxa especificamente no botão "Gerenciar usuários" desta seção
+    # CSS para o botão "Gerenciar" no canto superior direito
     st.html("""
         <style>
         div[data-testid="stButton"] button[key="distribution_manage"] {
@@ -77,28 +98,38 @@ def _render_role_distribution(users: list[dict]) -> None:
         </style>
     """)
 
-    col_title, col_btn = st.columns([3, 1], vertical_alignment="center")
-    with col_title:
+    # --- FORA DO CONTAINER (Lado a lado no topo) ---
+    header_columns = st.columns([1, 0.3], vertical_alignment="center")
+
+    with header_columns[0]:
         st.subheader("Distribuição por perfil")
-    with col_btn:
+
+    with header_columns[1]:
         if st.button("Gerenciar", key="distribution_manage", icon=":material/group:", type="primary", use_container_width=True):
             _navigate("usuarios")
 
-    counts = {role: sum(user["role"] == role for user in users) for role, _ in ROLE_CONFIG}
-    total = len(users)
+    # --- DENTRO DO CONTAINER (Métricas e barras) ---
     with st.container(border=True):
-        for role, description in ROLE_CONFIG:
-            count = counts[role]
-            percentage = count / total if total else 0
-            label_column, count_column = st.columns([5, 1], vertical_alignment="center")
-            with label_column:
-                st.markdown(f"**{ROLE_LABELS[role]}**")
-                st.caption(description)
-            with count_column:
-                st.markdown(f"**{count}**")
-                st.caption(f"{percentage:.0%}")
-            st.progress(percentage, text=f"{percentage:.0%} dos usuários")
+        counts = {role: sum(user["role"] == role for user in users) for role, _ in ROLE_CONFIG}
+        total = len(users)
 
+        # Renderiza cada linha de perfil no modelo de barras limpas
+        for role, _ in ROLE_CONFIG:
+            _role_bar(
+                ROLE_LABELS[role],
+                counts[role],
+                total,
+            )
+
+        # Cálculo do perfil com maior representatividade para o rodapé explicativo
+        max_role = max(counts, key=counts.get) if counts else "solicitante"
+        max_percentage = (counts[max_role] / total * 100) if total else 0
+
+        st.divider()
+
+        st.caption(
+            f"Perfil com maior presença: **{ROLE_LABELS.get(max_role, max_role)}** ({max_percentage:.0f}% do total)"
+        )
 
 def _render_recent_users(users: list[dict]) -> None:
     header, action = st.columns([5, 1], vertical_alignment="center")
