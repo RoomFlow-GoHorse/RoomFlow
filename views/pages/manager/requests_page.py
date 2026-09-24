@@ -93,7 +93,20 @@ def _reservations_dataframe(items_list: list) -> pd.DataFrame:
 
 @st.dialog("Detalhes da reserva", width="medium")
 def reservation_details_dialog(reservation):
-    st.subheader(reservation["title"])
+    # Cabeçalho: Título e Status lado a lado
+    col_title, col_badge = st.columns([3, 1], vertical_alignment="center")
+
+    with col_title:
+        st.subheader(reservation["title"], anchor=False)
+
+    with col_badge:
+        st.html(
+            f"""
+            <div style="display: flex; justify-content: flex-end; width: 100%;">
+                {badge(reservation["status"])}
+            </div>
+            """
+        )
 
     st.html(
         f"""
@@ -155,8 +168,6 @@ def reservation_details_dialog(reservation):
         """,
         unsafe_allow_html=True,
     )
-
-    st.html(badge(reservation["status"]))
 
     st.divider()
 
@@ -228,7 +239,6 @@ def edit_reservation_dialog(reservation):
     )
 
     with st.form(f"edit_reservation_{reservation['id']}"):
-        # Opções de status editáveis pelo gestor
         status_options = [
             ("Pendente", "pendente"),
             ("Em análise", "em_analise"),
@@ -237,7 +247,6 @@ def edit_reservation_dialog(reservation):
             ("Conflito", "conflito"),
         ]
 
-        # Encontra o índice do status atual para deixar selecionado por padrão
         current_status = reservation.get("status", "pendente")
         status_keys = [opt[1] for opt in status_options]
         default_index = status_keys.index(current_status) if current_status in status_keys else 0
@@ -251,10 +260,11 @@ def edit_reservation_dialog(reservation):
         )
         new_status = new_status_tuple[1]
 
+        spaces = st.session_state.get("spaces", [])
         space_options = [
             space["name"]
-            for space in st.session_state.spaces
-            if space["status"] != "bloqueado"
+            for space in spaces
+            if space.get("status") != "bloqueado"
         ]
 
         current_space = reservation["space"]
@@ -499,11 +509,15 @@ def manager_reservations(user=None):
 
     with col_details:
         if st.button("Ver", icon=":material/visibility:", use_container_width=True):
+            st.session_state["edit_reservation_id"] = None
+            st.session_state["reject_reservation_id"] = None
             st.session_state["detail_reservation_id"] = selected_res["id"]
             st.rerun()
 
     with col_edit:
         if st.button("Editar", icon=":material/edit:", use_container_width=True):
+            st.session_state["detail_reservation_id"] = None
+            st.session_state["reject_reservation_id"] = None
             st.session_state["edit_reservation_id"] = selected_res["id"]
             st.rerun()
 
@@ -514,6 +528,8 @@ def manager_reservations(user=None):
             use_container_width=True,
             disabled=not can_act,
         ):
+            st.session_state["detail_reservation_id"] = None
+            st.session_state["edit_reservation_id"] = None
             st.session_state["reject_reservation_id"] = selected_res["id"]
             st.rerun()
 
@@ -530,22 +546,23 @@ def manager_reservations(user=None):
             st.rerun()
 
     # --------------------------------------------------------
-    # Dialogs (Renderização condicional baseada no Session State)
+    # Renderização exclusiva de Dialog (Garante 1 por run)
     # --------------------------------------------------------
     detail_id = st.session_state.get("detail_reservation_id")
+    edit_id = st.session_state.get("edit_reservation_id")
+    reject_id = st.session_state.get("reject_reservation_id")
+
     if detail_id:
         detail = next((item for item in items if item["id"] == detail_id), None)
         if detail:
             reservation_details_dialog(detail)
 
-    edit_id = st.session_state.get("edit_reservation_id")
-    if edit_id:
+    elif edit_id:
         edit_target = next((item for item in items if item["id"] == edit_id), None)
         if edit_target:
             edit_reservation_dialog(edit_target)
 
-    reject_id = st.session_state.get("reject_reservation_id")
-    if reject_id:
+    elif reject_id:
         reject_target = next((item for item in items if item["id"] == reject_id), None)
         if reject_target:
             reject_reservation_dialog(reject_target)
