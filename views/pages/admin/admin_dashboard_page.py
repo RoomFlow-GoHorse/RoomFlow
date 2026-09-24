@@ -51,16 +51,38 @@ def _render_quick_actions() -> None:
     st.subheader("Ações rápidas")
     for label, description, page, icon in QUICK_ACTIONS:
         with st.container(border=True):
-            st.markdown(f"{icon} **{label}**")
+            # Cabeçalho do card com o botão "Abrir" no canto superior direito
+            col_info, col_btn = st.columns([3, 1], vertical_alignment="center")
+            with col_info:
+                st.markdown(f"{icon} **{label}**")
+            with col_btn:
+                if st.button("Abrir", key=f"quick_action_{page}", icon=":material/arrow_forward:", use_container_width=True):
+                    _navigate(page)
             st.caption(description)
-            if st.button("Abrir", key=f"quick_action_{page}", icon=":material/arrow_forward:"):
-                _navigate(page)
 
 
 def _render_role_distribution(users: list[dict]) -> None:
-    st.subheader("Distribuição por perfil")
-    if st.button("Gerenciar usuários", key="distribution_manage", icon=":material/group:"):
-        _navigate("usuarios")
+    # CSS para forçar a cor roxa especificamente no botão "Gerenciar usuários" desta seção
+    st.html("""
+        <style>
+        div[data-testid="stButton"] button[key="distribution_manage"] {
+            background-color: #7C3AED !important;
+            color: #FFFFFF !important;
+            border: none !important;
+        }
+        div[data-testid="stButton"] button[key="distribution_manage"]:hover {
+            background-color: #6D28D9 !important;
+            color: #FFFFFF !important;
+        }
+        </style>
+    """)
+
+    col_title, col_btn = st.columns([3, 1], vertical_alignment="center")
+    with col_title:
+        st.subheader("Distribuição por perfil")
+    with col_btn:
+        if st.button("Gerenciar", key="distribution_manage", icon=":material/group:", type="primary", use_container_width=True):
+            _navigate("usuarios")
 
     counts = {role: sum(user["role"] == role for user in users) for role, _ in ROLE_CONFIG}
     total = len(users)
@@ -83,7 +105,7 @@ def _render_recent_users(users: list[dict]) -> None:
     with header:
         st.subheader("Usuários recentes")
     with action:
-        if st.button("Ver todos", key="recent_users_all", icon=":material/arrow_forward:"):
+        if st.button("Ver todos", key="recent_users_all", icon=":material/arrow_forward:", use_container_width=True):
             _navigate("usuarios")
 
     rows = [
