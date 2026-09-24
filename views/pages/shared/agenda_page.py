@@ -1,24 +1,20 @@
+import calendar
+from datetime import date, datetime, timedelta
 import streamlit as st
 
 from controllers.app_state_service import go
 from views.components.ui_components import esc, page_header
 
-
 # =========================================================
-# DADOS DA AGENDA
+# CONSTANTES E CONFIGURAÇÕES
 # =========================================================
 
-WEEK_DAYS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"]
-
-WEEK_DATES = [
-    {"day": "Dom", "date": 18, "month": "ago"},
-    {"day": "Seg", "date": 19, "month": "ago"},
-    {"day": "Ter", "date": 20, "month": "ago"},
-    {"day": "Qua", "date": 21, "month": "ago"},
-    {"day": "Qui", "date": 22, "month": "ago"},
-    {"day": "Sex", "date": 23, "month": "ago"},
-    {"day": "Sáb", "date": 24, "month": "ago"},
+PT_MONTHS = [
+    "", "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+    "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
 ]
+
+PT_WEEKDAYS = ["Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado", "Domingo"]
 
 AGENDA_EVENTS = [
     {
@@ -30,7 +26,7 @@ AGENDA_EVENTS = [
         "location": "Bloco A - 1º andar",
         "type": "Aula",
         "color": "#6D28D9",
-        "dayNumber": 21,
+        "date": date(2026, 8, 21),
     },
     {
         "id": "e2",
@@ -41,7 +37,7 @@ AGENDA_EVENTS = [
         "location": "Bloco B - 2º andar",
         "type": "Banca",
         "color": "#B45309",
-        "dayNumber": 21,
+        "date": date(2026, 8, 21),
     },
     {
         "id": "e3",
@@ -52,7 +48,7 @@ AGENDA_EVENTS = [
         "location": "Bloco Central",
         "type": "Workshop",
         "color": "#16A34A",
-        "dayNumber": 22,
+        "date": date(2026, 8, 22),
     },
     {
         "id": "e4",
@@ -63,663 +59,313 @@ AGENDA_EVENTS = [
         "location": "Administrativo",
         "type": "Reunião",
         "color": "#2563EB",
-        "dayNumber": 24,
+        "date": date(2026, 8, 24),
     },
 ]
 
 
 # =========================================================
-# ESTILOS
+# ESTILOS CSS
 # =========================================================
 
 def _render_styles():
-    st.html(
+    st.markdown(
         """
         <style>
-
-        /* =================================================
-           CONTAINER PRINCIPAL DO CALENDÁRIO
-           ================================================= */
-
         .rf-calendar-card {
-            background: var(--surface-card);
-            border: 1px solid var(--stroke);
-            border-radius: 14px;
-            overflow: hidden;
+            background: #FFFFFF;
+            border: 1px solid #E4E4E7;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 12px;
+        }
+        
+        .rf-event-card {
+            background: #F8FAFC;
+            border-left: 4px solid #6D28D9;
+            border-radius: 8px;
+            padding: 10px 14px;
+            margin-bottom: 10px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
         }
 
-        /* =================================================
-           CABEÇALHO DOS DIAS
-           ================================================= */
-
-        .rf-week-header {
-            display: grid;
-            grid-template-columns: repeat(7, 1fr);
-            border-bottom: 1px solid var(--stroke);
-        }
-
-        .rf-week-day {
-            min-height: 96px;
-            padding: 18px 12px;
-            text-align: center;
-            border-right: 1px solid var(--stroke);
-        }
-
-        .rf-week-day:last-child {
-            border-right: none;
-        }
-
-        .rf-week-day-name {
+        .rf-badge {
+            display: inline-block;
             font-size: 11px;
-            color: var(--graphite-muted);
+            font-weight: 600;
+            padding: 3px 8px;
+            border-radius: 6px;
+        }
+
+        /* Estilos da Visão Mensal */
+        .month-header-cell {
+            text-align: center;
+            font-weight: 600;
+            font-size: 13px;
+            color: #64748B;
+            padding: 6px 0;
+            background: #F1F5F9;
+            border-radius: 6px;
             margin-bottom: 8px;
         }
 
-        .rf-week-day-number {
-            font-size: 16px;
-            font-weight: 600;
-            color: var(--graphite);
-        }
-
-        .rf-week-day-month {
-            font-size: 10px;
-            color: var(--graphite-muted);
-            margin-top: 3px;
-        }
-
-        .rf-week-day.active {
-            background: var(--brand);
-        }
-
-        .rf-week-day.active .rf-week-day-name,
-        .rf-week-day.active .rf-week-day-number,
-        .rf-week-day.active .rf-week-day-month {
-            color: #FFFFFF;
-        }
-
-        /* =================================================
-           CORPO DA SEMANA
-           ================================================= */
-
-        .rf-week-body {
-            display: grid;
-            grid-template-columns: repeat(7, 1fr);
-        }
-
-        .rf-week-column {
-            min-height: 210px;
-            padding: 12px;
-            border-right: 1px solid var(--stroke);
-        }
-
-        .rf-week-column:last-child {
-            border-right: none;
-        }
-
-        .rf-empty-day {
-            height: 130px;
-            border: 1px solid var(--stroke);
-            border-radius: 10px;
+        .month-day-cell {
+            min-height: 95px;
+            background: #FFFFFF;
+            border: 1px solid #E2E8F0;
+            border-radius: 8px;
+            padding: 6px;
             display: flex;
-            align-items: center;
-            justify-content: center;
-            color: var(--graphite-muted);
-            font-size: 11px;
-        }
-
-        .rf-week-column.active {
-            background: var(--brand-lighter);
-        }
-
-        .rf-event {
-            border-radius: 7px;
-            padding: 8px;
+            flex-direction: column;
+            gap: 4px;
+            box-sizing: border-box;
             margin-bottom: 8px;
-            border-left: 3px solid;
         }
 
-        .rf-event-title {
-            font-size: 11px;
-            font-weight: 600;
-            color: var(--graphite);
-            margin: 0 0 3px 0;
+        .month-day-cell.other-month {
+            background: #F8FAFC;
+            opacity: 0.4;
         }
 
-        .rf-event-time {
-            font-size: 10px;
-            color: var(--graphite-muted);
-            margin: 0;
+        .month-day-cell.selected-day {
+            border: 2px solid #6D28D9;
+            background-color: #F3E8FF;
         }
 
-        /* =================================================
-           CALENDÁRIO MENSAL
-           ================================================= */
-
-        .rf-month-grid {
-            display: grid;
-            grid-template-columns: repeat(7, 1fr);
-        }
-
-        .rf-month-weekday {
-            padding: 14px 8px;
-            text-align: center;
-            font-size: 11px;
-            font-weight: 600;
-            color: var(--graphite-muted);
-            border-bottom: 1px solid var(--stroke);
-        }
-
-        .rf-month-cell {
-            min-height: 90px;
-            padding: 10px;
-            border-right: 1px solid var(--stroke);
-            border-bottom: 1px solid var(--stroke);
-        }
-
-        .rf-month-cell:nth-child(7n) {
-            border-right: none;
-        }
-
-        .rf-month-number {
+        .month-day-num {
             font-size: 12px;
-            font-weight: 500;
-            color: var(--graphite-soft);
-        }
-
-        .rf-month-cell.active {
-            background: var(--brand-lighter);
-        }
-
-        .rf-month-cell.active .rf-month-number {
-            color: var(--brand);
             font-weight: 700;
+            color: #334155;
+            margin-bottom: 2px;
         }
 
-        .rf-month-event {
-            margin-top: 8px;
-            padding: 5px 6px;
-            border-radius: 5px;
-            font-size: 9px;
+        .month-event-pill {
+            font-size: 10px;
+            padding: 2px 5px;
+            border-radius: 4px;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
-        }
-
-        /* =================================================
-           CALENDÁRIO DIÁRIO
-           ================================================= */
-
-        .rf-daily-calendar {
-            padding: 24px;
-        }
-
-        .rf-daily-date {
-            display: flex;
-            align-items: center;
-            gap: 14px;
-            padding-bottom: 20px;
-            border-bottom: 1px solid var(--stroke);
-            margin-bottom: 20px;
-        }
-
-        .rf-daily-number {
-            width: 52px;
-            height: 52px;
-            border-radius: 12px;
-            background: var(--brand);
             color: #FFFFFF;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
+            font-weight: 500;
+            margin-bottom: 2px;
         }
-
-        .rf-daily-number strong {
-            font-size: 18px;
-            line-height: 1;
-        }
-
-        .rf-daily-number span {
-            font-size: 9px;
-            margin-top: 3px;
-        }
-
-        .rf-daily-title {
-            font-size: 15px;
-            font-weight: 600;
-            color: var(--graphite);
-            margin: 0;
-        }
-
-        .rf-daily-subtitle {
-            font-size: 12px;
-            color: var(--graphite-muted);
-            margin: 3px 0 0 0;
-        }
-
-        .rf-daily-event {
-            display: flex;
-            gap: 18px;
-            margin-bottom: 12px;
-        }
-
-        .rf-daily-time {
-            width: 55px;
-            text-align: right;
-            font-size: 11px;
-            color: var(--graphite-muted);
-            padding-top: 10px;
-        }
-
-        .rf-daily-event-card {
-            flex: 1;
-            background: var(--surface-alt);
-            border: 1px solid var(--stroke);
-            border-radius: 10px;
-            padding: 12px;
-        }
-
         </style>
-        """
+        """,
+        unsafe_allow_html=True,
     )
 
 
 # =========================================================
-# HELPERS
+# HELPERS DE DATA & NAVEGAÇÃO
 # =========================================================
 
-def _navigate(page: str) -> None:
-    go(page)
-    st.rerun()
+def _get_current_selected_date() -> date:
+    selected = st.session_state.get("agenda_selected_date")
+    if not isinstance(selected, date):
+        selected = date(2026, 8, 21)
+        st.session_state.agenda_selected_date = selected
+    return selected
 
 
-def _render_event(event: dict):
-    color = event["color"]
+def _change_date(direction: int):
+    current_date = _get_current_selected_date()
+    view = st.session_state.get("agenda_view_tab", "Semanal")
 
-    st.html(
-        f"""
-        <div
-            class="rf-event"
-            style="
-                background: {color}12;
-                border-left-color: {color};
-            "
-        >
-            <p class="rf-event-title">
-                {esc(event["title"])}
-            </p>
+    if view == "Diário":
+        st.session_state.agenda_selected_date = current_date + timedelta(days=direction)
+    elif view == "Semanal":
+        st.session_state.agenda_selected_date = current_date + timedelta(weeks=direction)
+    elif view == "Mensal":
+        month = current_date.month + direction
+        year = current_date.year
+        if month > 12:
+            month = 1
+            year += 1
+        elif month < 1:
+            month = 12
+            year -= 1
+        st.session_state.agenda_selected_date = date(year, month, min(current_date.day, 28))
 
-            <p class="rf-event-time">
-                🕒 {esc(event["startTime"])}
-            </p>
-        </div>
-        """
-    )
+
+def _set_today():
+    st.session_state.agenda_selected_date = date(2026, 8, 21)
+
+
+def _render_calendar_navigation(title: str):
+    col_prev, col_title, col_next, col_today = st.columns([0.5, 4, 0.5, 1], vertical_alignment="center")
+
+    with col_prev:
+        st.button("‹", key="btn_prev", on_click=_change_date, args=(-1,), use_container_width=True)
+
+    with col_title:
+        st.markdown(
+            f"<h4 style='text-align: center; margin: 0; color: #1E293B;'>{title}</h4>",
+            unsafe_allow_html=True,
+        )
+
+    with col_next:
+        st.button("›", key="btn_next", on_click=_change_date, args=(1,), use_container_width=True)
+
+    with col_today:
+        st.button("Hoje", key="btn_today", on_click=_set_today, type="secondary", use_container_width=True)
 
 
 # =========================================================
-# NAVEGAÇÃO DO CALENDÁRIO
+# VISÕES (DIÁRIO, SEMANAL, MENSAL)
 # =========================================================
 
-def _render_calendar_navigation(
-    title: str,
-    today_label: str = "Hoje",
-):
-    col_left, col_center, col_right = st.columns(
-        [0.5, 5, 0.8],
-        vertical_alignment="center",
-    )
+def _render_daily_view(events: list, selected_date: date):
+    weekday_str = PT_WEEKDAYS[selected_date.weekday()]
+    month_str = PT_MONTHS[selected_date.month]
+    formatted_header = f"{weekday_str}, {selected_date.day} de {month_str} de {selected_date.year}"
 
-    with col_left:
-        if st.button(
-            "‹",
-            key=f"calendar_prev_{title}",
-        ):
-            st.session_state.agenda_selected_date = max(
-                1,
-                st.session_state.agenda_selected_date - 1,
-            )
-            st.rerun()
+    _render_calendar_navigation(formatted_header)
+    st.divider()
 
-    with col_center:
+    day_events = [e for e in events if e["date"] == selected_date]
+    day_events = sorted(day_events, key=lambda x: x["startTime"])
+
+    col_stat1, col_stat2 = st.columns(2)
+    with col_stat1:
+        st.metric("Total de Compromissos", len(day_events))
+    with col_stat2:
+        next_event = day_events[0]["startTime"] if day_events else "Nenhum"
+        st.metric("Primeiro Compromisso", next_event)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    if not day_events:
+        st.info("Nenhuma atividade agendada para este dia.")
+        return
+
+    for event in day_events:
+        color = event["color"]
         st.markdown(
             f"""
-            <div
-                style="
-                    font-size:14px;
-                    font-weight:600;
-                    color:#1C1C2E;
-                    text-align:center;
-                "
-            >
-                {title}
+            <div class="rf-event-card" style="border-left-color: {color};">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                    <strong style="font-size: 15px; color: #0F172A;">{esc(event["title"])}</strong>
+                    <span class="rf-badge" style="background-color: {color}1F; color: {color};">
+                        {esc(event["type"])}
+                    </span>
+                </div>
+                <div style="font-size: 13px; color: #475569;">
+                    🕒 <strong>{esc(event["startTime"])} – {esc(event["endTime"])}</strong> &nbsp;|&nbsp; 📍 {esc(event["space"])} ({esc(event["location"])})
+                </div>
             </div>
             """,
             unsafe_allow_html=True,
         )
 
-    with col_right:
-        if st.button(
-            today_label,
-            key=f"calendar_today_{title}",
-            type="tertiary",
-        ):
-            st.session_state.agenda_selected_date = 21
-            st.rerun()
 
+def _render_weekly_view(events: list, selected_date: date):
+    start_of_week = selected_date - timedelta(days=selected_date.weekday())
+    end_of_week = start_of_week + timedelta(days=6)
 
-# =========================================================
-# VISÃO SEMANAL
-# =========================================================
+    title = f"{start_of_week.day}/{start_of_week.month:02d} a {end_of_week.day}/{end_of_week.month:02d} de {end_of_week.year}"
+    _render_calendar_navigation(title)
+    st.divider()
 
-def _render_weekly_view(events: list):
-    selected_date = st.session_state.agenda_selected_date
+    cols = st.columns(7)
+    week_day_labels = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"]
 
-    _render_calendar_navigation(
-        "18–24 de agosto de 2026"
-    )
+    for i, col in enumerate(cols):
+        current_day = start_of_week + timedelta(days=i)
+        is_selected = current_day == selected_date
 
-    st.markdown(
-        '<div style="height:16px;"></div>',
-        unsafe_allow_html=True,
-    )
+        with col:
+            header_bg = "#6D28D9" if is_selected else "#F1F5F9"
+            header_color = "#FFFFFF" if is_selected else "#334155"
 
-    html = """
-    <div class="rf-calendar-card">
-
-        <div class="rf-week-header">
-    """
-
-    for item in WEEK_DATES:
-        active = item["date"] == selected_date
-
-        html += f"""
-            <div class="rf-week-day {'active' if active else ''}">
-                <div class="rf-week-day-name">
-                    {item['day']}
+            st.markdown(
+                f"""
+                <div style="text-align: center; padding: 8px 4px; border-radius: 8px; background-color: {header_bg}; color: {header_color}; margin-bottom: 10px;">
+                    <span style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">{week_day_labels[i]}</span><br>
+                    <strong style="font-size: 16px;">{current_day.day}</strong>
                 </div>
+                """,
+                unsafe_allow_html=True,
+            )
 
-                <div class="rf-week-day-number">
-                    {item['date']}
+            day_events = [e for e in events if e["date"] == current_day]
+            day_events = sorted(day_events, key=lambda x: x["startTime"])
+
+            if not day_events:
+                st.markdown("<div style='text-align:center; color:#94A3B8; font-size:12px; margin-top:12px;'>—</div>", unsafe_allow_html=True)
+            else:
+                for event in day_events:
+                    color = event["color"]
+                    st.markdown(
+                        f"""
+                        <div style="background: #F8FAFC; border-left: 3px solid {color}; border-radius: 6px; padding: 6px 8px; margin-bottom: 6px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+                            <div style="font-weight: 600; font-size: 12px; color: #1E293B; line-height: 1.2;">{esc(event['title'])}</div>
+                            <div style="font-size: 10px; color: #64748B; margin-top: 4px;">🕒 {esc(event['startTime'])}</div>
+                            <div style="font-size: 10px; color: #64748B;">📍 {esc(event['space'])}</div>
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
+
+
+def _render_monthly_view(events: list, selected_date: date):
+    month_name = PT_MONTHS[selected_date.month]
+    _render_calendar_navigation(f"{month_name} de {selected_date.year}")
+    st.divider()
+
+    # Mapeamento de eventos por data
+    events_by_date = {}
+    for e in events:
+        events_by_date.setdefault(e["date"], []).append(e)
+
+    # Matriz do mês
+    cal = calendar.Calendar(firstweekday=0)
+    month_days = cal.monthdatescalendar(selected_date.year, selected_date.month)
+
+    # Cabeçalho dos dias da semana
+    header_cols = st.columns(7)
+    week_days = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"]
+    for idx, day_name in enumerate(week_days):
+        header_cols[idx].markdown(
+            f'<div class="month-header-cell">{day_name}</div>',
+            unsafe_allow_html=True
+        )
+
+    # Renderiza semana por semana usando as colunas nativas do Streamlit
+    for week in month_days:
+        cols = st.columns(7)
+        for idx, day in enumerate(week):
+            is_other_month = day.month != selected_date.month
+            is_selected = day == selected_date
+
+            classes = ["month-day-cell"]
+            if is_other_month:
+                classes.append("other-month")
+            if is_selected:
+                classes.append("selected-day")
+
+            day_events = events_by_date.get(day, [])
+            events_html = ""
+
+            for ev in day_events[:3]:
+                events_html += f"""
+                <div class="month-event-pill" style="background-color: {ev['color']};" title="{esc(ev['title'])} ({ev['startTime']})">
+                    {esc(ev['startTime'])} {esc(ev['title'])}
                 </div>
-
-                <div class="rf-week-day-month">
-                    {item['month']}
-                </div>
-            </div>
-        """
-
-    html += """
-        </div>
-
-        <div class="rf-week-body">
-    """
-
-    for item in WEEK_DATES:
-        active = item["date"] == selected_date
-
-        day_events = [
-            event
-            for event in events
-            if event["dayNumber"] == item["date"]
-        ]
-
-        html += f"""
-            <div class="rf-week-column {'active' if active else ''}">
-        """
-
-        if not day_events:
-            html += """
-                <div class="rf-empty-day">
-                    Sem eventos
-                </div>
-            """
-        else:
-            for event in day_events:
-                color = event["color"]
-
-                html += f"""
-                    <div
-                        class="rf-event"
-                        style="
-                            background:{color}12;
-                            border-left-color:{color};
-                        "
-                    >
-                        <p class="rf-event-title">
-                            {esc(event["title"])}
-                        </p>
-
-                        <p class="rf-event-time">
-                            🕒 {esc(event["startTime"])}
-                        </p>
-                    </div>
                 """
 
-        html += """
-            </div>
-        """
+            if len(day_events) > 3:
+                events_html += f"<div style='font-size: 9px; color: #64748B; text-align: right;'>+{len(day_events) - 3} mais</div>"
 
-    html += """
-        </div>
-    </div>
-    """
-
-    st.html(html)
-
-
-# =========================================================
-# VISÃO DIÁRIA
-# =========================================================
-
-def _render_daily_view(events: list):
-    selected_date = st.session_state.agenda_selected_date
-
-    _render_calendar_navigation(
-        "Quarta-feira, 21 de agosto de 2026"
-    )
-
-    st.markdown(
-        '<div style="height:16px;"></div>',
-        unsafe_allow_html=True,
-    )
-
-    day_events = [
-        event
-        for event in events
-        if event["dayNumber"] == selected_date
-    ]
-
-    html = """
-    <div class="rf-calendar-card">
-        <div class="rf-daily-calendar">
-
-            <div class="rf-daily-date">
-
-                <div class="rf-daily-number">
-                    <strong>21</strong>
-                    <span>AGO</span>
+            cols[idx].markdown(
+                f"""
+                <div class="{" ".join(classes)}">
+                    <div class="month-day-num">{day.day}</div>
+                    {events_html}
                 </div>
-
-                <div>
-                    <p class="rf-daily-title">
-                        Quarta-feira
-                    </p>
-
-                    <p class="rf-daily-subtitle">
-                        21 de agosto de 2026
-                    </p>
-                </div>
-
-            </div>
-    """
-
-    if not day_events:
-        html += """
-            <div
-                style="
-                    text-align:center;
-                    padding:50px 0;
-                    color:#A1A1AA;
-                    font-size:12px;
-                "
-            >
-                Nenhuma atividade neste dia.
-            </div>
-        """
-
-    else:
-        for event in day_events:
-            color = event["color"]
-
-            html += f"""
-                <div class="rf-daily-event">
-
-                    <div class="rf-daily-time">
-                        {esc(event["startTime"])}
-                    </div>
-
-                    <div
-                        class="rf-daily-event-card"
-                        style="
-                            border-left:3px solid {color};
-                        "
-                    >
-                        <p
-                            style="
-                                font-size:13px;
-                                font-weight:600;
-                                color:#1C1C2E;
-                                margin:0 0 5px 0;
-                            "
-                        >
-                            {esc(event["title"])}
-                        </p>
-
-                        <p
-                            style="
-                                font-size:11px;
-                                color:#71717A;
-                                margin:0;
-                            "
-                        >
-                            🕒 {esc(event["startTime"])}
-                            – {esc(event["endTime"])}
-                            &nbsp;&nbsp;
-                            📍 {esc(event["space"])}
-                        </p>
-                    </div>
-
-                </div>
-            """
-
-    html += """
-        </div>
-    </div>
-    """
-
-    st.html(html)
-
-
-# =========================================================
-# VISÃO MENSAL
-# =========================================================
-
-def _render_monthly_view(events: list):
-    selected_date = st.session_state.agenda_selected_date
-
-    _render_calendar_navigation(
-        "Agosto 2026"
-    )
-
-    st.markdown(
-        '<div style="height:16px;"></div>',
-        unsafe_allow_html=True,
-    )
-
-    days_with_events = {
-        event["dayNumber"]
-        for event in events
-    }
-
-    html = """
-    <div class="rf-calendar-card">
-
-        <div class="rf-month-grid">
-    """
-
-    # Cabeçalho
-    for day in WEEK_DAYS:
-        html += f"""
-            <div class="rf-month-weekday">
-                {day}
-            </div>
-        """
-
-    # Espaços antes do dia 1
-    for _ in range(5):
-        html += """
-            <div class="rf-month-cell"></div>
-        """
-
-    # Dias
-    for day in range(1, 32):
-        active = day == selected_date
-        has_event = day in days_with_events
-
-        html += f"""
-            <div class="rf-month-cell {'active' if active else ''}">
-
-                <div class="rf-month-number">
-                    {day}
-                </div>
-        """
-
-        day_events = [
-            event
-            for event in events
-            if event["dayNumber"] == day
-        ]
-
-        for event in day_events:
-            color = event["color"]
-
-            html += f"""
-                <div
-                    class="rf-month-event"
-                    style="
-                        background:{color}15;
-                        color:#1C1C2E;
-                        border-left:2px solid {color};
-                    "
-                >
-                    {esc(event["title"])}
-                </div>
-            """
-
-        if has_event and not day_events:
-            html += """
-                <div
-                    style="
-                        width:5px;
-                        height:5px;
-                        background:#6D28D9;
-                        border-radius:50%;
-                        margin-top:8px;
-                    "
-                ></div>
-            """
-
-        html += """
-            </div>
-        """
-
-    html += """
-        </div>
-    </div>
-    """
-
-    st.html(html)
+                """,
+                unsafe_allow_html=True,
+            )
 
 
 # =========================================================
@@ -729,25 +375,12 @@ def _render_monthly_view(events: list):
 def agenda(user: dict):
     _render_styles()
 
-    # Estado inicial
-    st.session_state.setdefault(
-        "agenda_view_tab",
-        "Semanal",
-    )
+    if "agenda_view_tab" not in st.session_state:
+        st.session_state.agenda_view_tab = "Semanal"
 
-    st.session_state.setdefault(
-        "agenda_selected_date",
-        21,
-    )
+    selected_date = _get_current_selected_date()
 
-    # =====================================================
-    # CABEÇALHO
-    # =====================================================
-
-    col_header, col_view = st.columns(
-        [2, 1],
-        vertical_alignment="center",
-    )
+    col_header, col_view = st.columns([2, 1], vertical_alignment="center")
 
     with col_header:
         page_header(
@@ -756,29 +389,18 @@ def agenda(user: dict):
         )
 
     with col_view:
-        view_tab = st.segmented_control(
+        st.segmented_control(
             "Visualização",
             ["Diário", "Semanal", "Mensal"],
-            key="agenda_view_control",
-            default=st.session_state.agenda_view_tab,
+            key="agenda_view_tab",
         )
-
-        if view_tab:
-            st.session_state.agenda_view_tab = view_tab
-
-    # =====================================================
-    # CALENDÁRIO
-    # =====================================================
-
-    events = AGENDA_EVENTS
 
     active_view = st.session_state.agenda_view_tab
 
-    if active_view == "Diário":
-        _render_daily_view(events)
-
-    elif active_view == "Mensal":
-        _render_monthly_view(events)
-
-    else:
-        _render_weekly_view(events)
+    with st.container():
+        if active_view == "Diário":
+            _render_daily_view(AGENDA_EVENTS, selected_date)
+        elif active_view == "Mensal":
+            _render_monthly_view(AGENDA_EVENTS, selected_date)
+        else:
+            _render_weekly_view(AGENDA_EVENTS, selected_date)
