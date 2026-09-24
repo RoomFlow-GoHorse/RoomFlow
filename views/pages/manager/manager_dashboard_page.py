@@ -1,3 +1,4 @@
+import pandas as pd
 import streamlit as st
 
 from controllers import mock_data_service
@@ -5,180 +6,94 @@ from controllers.app_state_service import go
 from views.components.ui_components import badge, page_header
 
 
-def _stat_card(label, value, tone="default"):
-    """Renderiza um card de indicador."""
+QUICK_ACTIONS = [
+    ("Reservas", "Analisar e decidir sobre solicitações", "reservas", ":material/meeting_room:"),
+    ("Espaços", "Gerenciar capacidade e recursos das salas", "espacos", ":material/home_work:"),
+    ("Conflitos", "Resolver conflitos de reservas e horários", "conflitos", ":material/warning:"),
+]
 
-    colors = {
-        "default": "#231F20",
-        "success": "#15803D",
-        "warning": "#B45309",
-        "danger": "#B91C1C",
-    }
 
-    value_color = colors.get(
-        tone,
-        colors["default"],
+def _navigate(page: str) -> None:
+    go(page)
+    st.rerun()
+
+
+def _render_stats(pending: int, approved: int, available: int, conflicts: int) -> None:
+    """Renderiza os cards de indicadores no mesmo padrão de métricas do admin."""
+    metrics_data = (
+        ("Pendentes", pending, "Aguardando análise", "normal" if pending == 0 else "inverse"),
+        ("Aprovadas", approved, "Reservas ativas", "normal"),
+        ("Salas livres", available, "Disponíveis hoje", "normal"),
+        ("Conflitos abertos", conflicts, "Requer atenção", "off" if conflicts == 0 else "inverse"),
     )
 
-    card_key = (
-        f"manager_stat_{label.lower().replace(' ', '_')}"
-    )
-
-    st.markdown(
-        f"""
-        <style>
-            .st-key-{card_key} {{
-                background: var(--surface-card);
-                border: 1px solid var(--stroke);
-                border-radius: 14px;
-                padding: 18px;
-                min-height: 128px;
-            }}
-
-            .st-key-{card_key} [data-testid="stMetricLabel"] {{
-                color: var(--graphite-muted);
-                font-size: 11px;
-                font-weight: 600;
-                letter-spacing: 0.06em;
-                text-transform: uppercase;
-            }}
-
-            .st-key-{card_key} [data-testid="stMetricValue"] {{
-                color: {value_color};
-                font-size: 28px;
-                font-weight: 650;
-            }}
-
-            .st-key-{card_key} [data-testid="stMetricDelta"] {{
-                display: none;
-            }}
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    with st.container(
-        key=card_key,
-        border=True,
+    for column, (label, value, delta, delta_color) in zip(
+        st.columns(4, gap="small"),
+        metrics_data,
     ):
-        st.metric(
-            label=label,
-            value=value,
-        )
+        with column.container(border=True):
+            st.metric(label, value, delta=delta, delta_color=delta_color)
 
 
-def _quick_action(icon, title, description, key, target):
-    """Renderiza uma ação rápida."""
-
-    with st.container(border=True):
-        columns = st.columns(
-            [0.8, 4.2, 0.5],
-            vertical_alignment="center",
-        )
-
-        with columns[0]:
-            st.write(icon)
-
-        with columns[1]:
-            st.write(f"**{title}**")
+def _render_quick_actions() -> None:
+    """Renderiza as ações rápidas com padrão idêntico ao dashboard admin."""
+    st.subheader("Acesso rápido")
+    for label, description, page, icon in QUICK_ACTIONS:
+        with st.container(border=True):
+            col_info, col_btn = st.columns([3, 1], vertical_alignment="center")
+            with col_info:
+                st.markdown(f"{icon} **{label}**")
+            with col_btn:
+                if st.button("Abrir", key=f"quick_action_{page}", icon=":material/arrow_forward:", use_container_width=True):
+                    _navigate(page)
             st.caption(description)
 
-        with columns[2]:
-            if st.button(
-                "",
-                key=key,
-                icon=":material/arrow_forward:",
-                help=f"Acessar {title.lower()}",
-            ):
-                go(target)
 
+def _render_pending_reservations(pending_reservations: list[dict]) -> None:
+    """Renderiza a seção de solicitações pendentes com botão no topo alinhado à direita."""
+    header_columns = st.columns([1, 0.3], vertical_alignment="center")
 
-def _reservation_row(reservation, key):
-    """Renderiza uma solicitação de reserva."""
+    with header_columns[0]:
+        st.subheader("Solicitações pendentes")
+
+    with header_columns[1]:
+        if st.button("Ver todas", key="manager_dashboard_ver_reservas", icon=":material/arrow_forward:", use_container_width=True):
+            _navigate("reservas")
 
     with st.container(border=True):
-        columns = st.columns(
-            [0.7, 3.4, 1.5, 1.1],
-            vertical_alignment="center",
-        )
-
-        with columns[0]:
-            st.write(":material/meeting_room:")
-
-        with columns[1]:
-            title = reservation.get(
-                "title",
-                "Reserva",
-            )
-
-            space = reservation.get(
-                "space",
-                "Espaço não informado",
-            )
-
-            st.write(f"**{title}**")
-            st.caption(space)
-
-        with columns[2]:
-            date = reservation.get("date", "")
-            start = reservation.get("start", "")
-            end = reservation.get("end", "")
-
-            st.caption(f"**{date}**")
-            st.caption(f"{start} – {end}")
-
-        with columns[3]:
-            st.html(
-                badge(
-                    reservation.get("status", "")
-                )
+        if not pending_reservations:
+            st.info("Nenhuma solicitação pendente.")
+        else:
+            rows = [
+                {
+                    "Título": res.get("title", "Reserva"),
+                    "Espaço": res.get("space", "Espaço não informado"),
+                    "Data": res.get("date", ""),
+                    "Horário": f"{res.get('start', '')} – {res.get('end', '')}",
+                    "Status": res.get("status", "").capitalize(),
+                }
+                for res in pending_reservations[:4]
+            ]
+            st.dataframe(
+                pd.DataFrame(rows),
+                column_config={
+                    "Título": st.column_config.TextColumn("Título", width="medium"),
+                    "Espaço": st.column_config.TextColumn("Espaço", width="medium"),
+                    "Data": st.column_config.TextColumn("Data", width="small"),
+                    "Horário": st.column_config.TextColumn("Horário", width="medium"),
+                    "Status": st.column_config.TextColumn("Status", width="small"),
+                },
+                hide_index=True,
+                width="stretch",
             )
 
 
-def _space_row(space):
-    """Renderiza uma linha de status de espaço."""
-
-    with st.container():
-        columns = st.columns(
-            [3.5, 1.3],
-            vertical_alignment="center",
-        )
-
-        with columns[0]:
-            name = space.get(
-                "name",
-                "Espaço",
-            )
-
-            location = space.get(
-                "location",
-                "",
-            )
-
-            st.write(f"**{name}**")
-
-            if location:
-                st.caption(location)
-
-        with columns[1]:
-            st.html(
-                badge(
-                    space.get("status", "")
-                )
-            )
-
-
-def _occupancy_bar(label, count, total):
-    """Renderiza uma barra de ocupação."""
-
-    percentage = (
-        count / total
-        if total
-        else 0
-    )
+def _occupancy_bar(label: str, count: int, total: int) -> None:
+    """Renderiza uma linha de barra de progresso no mesmo layout visual da distribuição por perfil."""
+    percentage = count / total if total else 0.0
 
     columns = st.columns(
-        [1.1, 3.8, 0.4],
+        [1.5, 3.5, 0.4],
         vertical_alignment="center",
     )
 
@@ -186,271 +101,103 @@ def _occupancy_bar(label, count, total):
         st.caption(label)
 
     with columns[1]:
-        st.progress(
-            percentage,
-            text=None,
-        )
+        st.progress(percentage, text=None)
 
     with columns[2]:
         st.write(f"**{count}**")
 
 
-def dashboard(user):
-    reservations = mock_data_service.reservations()
-    spaces = mock_data_service.spaces()
-    conflicts = st.session_state.get(
-        "conflicts",
-        [],
-    )
+def _render_space_status_and_occupancy(spaces: list[dict]) -> None:
+    """Renderiza lado a lado os painéis de status e ocupação dos espaços."""
+    col_status, col_occupancy = st.columns(2, gap="medium")
 
-    pending_reservations = [
-        item
-        for item in reservations
-        if item.get("status")
-        in {"pendente", "em_analise"}
-    ]
+    # --- PAINEL: STATUS DOS ESPAÇOS ---
+    with col_status:
+        header_columns = st.columns([1, 0.3], vertical_alignment="center")
+        with header_columns[0]:
+            st.subheader("Status dos espaços")
+        with header_columns[1]:
+            if st.button("Gerenciar", key="manager_dashboard_gerenciar_espacos", icon=":material/home_work:", use_container_width=True):
+                _navigate("espacos")
 
-    approved_reservations = [
-        item
-        for item in reservations
-        if item.get("status") == "aprovada"
-    ]
-
-    available_spaces = [
-        item
-        for item in spaces
-        if item.get("status") == "disponivel"
-    ]
-
-    occupied_spaces = [
-        item
-        for item in spaces
-        if item.get("status") == "ocupado"
-    ]
-
-    blocked_spaces = [
-        item
-        for item in spaces
-        if item.get("status") == "bloqueado"
-    ]
-
-    open_conflicts = [
-        item
-        for item in conflicts
-        if item.get("status")
-        in {"nao_resolvido", "em_analise"}
-    ]
-
-    page_header(
-        "Painel operacional",
-        "Visão geral das reservas, espaços e conflitos do dia.",
-    )
-
-    # ------------------------------------------------------------------
-    # Indicadores principais
-    # ------------------------------------------------------------------
-
-    metric_columns = st.columns(4)
-
-    with metric_columns[0]:
-        _stat_card(
-            "Pendentes",
-            len(pending_reservations),
-            "warning",
-        )
-
-    with metric_columns[1]:
-        _stat_card(
-            "Aprovadas",
-            len(approved_reservations),
-            "success",
-        )
-
-    with metric_columns[2]:
-        _stat_card(
-            "Salas livres",
-            len(available_spaces),
-            "default",
-        )
-
-    with metric_columns[3]:
-        _stat_card(
-            "Conflitos abertos",
-            len(open_conflicts),
-            "danger",
-        )
-
-    st.write("")
-
-    # ------------------------------------------------------------------
-    # Acesso rápido + solicitações
-    # ------------------------------------------------------------------
-
-    main_columns = st.columns(
-        [1, 2],
-        gap="large",
-    )
-
-    with main_columns[0]:
-        st.subheader("Acesso rápido")
-
-        _quick_action(
-            ":material/meeting_room:",
-            "Reservas",
-            "Analisar e decidir sobre solicitações",
-            "manager_dashboard_reservas",
-            "reservas",
-        )
-
-        _quick_action(
-            ":material/home_work:",
-            "Espaços",
-            "Gerenciar capacidade e recursos das salas",
-            "manager_dashboard_espacos",
-            "espacos",
-        )
-
-        _quick_action(
-            ":material/warning:",
-            "Conflitos",
-            "Resolver conflitos de reservas e horários",
-            "manager_dashboard_conflitos",
-            "conflitos",
-        )
-
-    with main_columns[1]:
         with st.container(border=True):
-            header_columns = st.columns(
-                [1, 0.25],
-                vertical_alignment="center",
-            )
-
-            with header_columns[0]:
-                st.subheader(
-                    "Solicitações pendentes"
-                )
-
-                if pending_reservations:
-                    st.caption(
-                        f"{len(pending_reservations)} "
-                        "solicitação(ões) aguardando análise."
-                    )
-
-            with header_columns[1]:
-                if st.button(
-                    "Ver todas",
-                    key="manager_dashboard_ver_reservas",
-                    icon=":material/arrow_forward:",
-                ):
-                    go("reservas")
-
-            if not pending_reservations:
-                st.info(
-                    "Nenhuma solicitação pendente."
-                )
-            else:
-                for index, reservation in enumerate(
-                    pending_reservations[:4]
-                ):
-                    _reservation_row(
-                        reservation,
-                        f"pending_reservation_{index}",
-                    )
-
-    st.write("")
-
-    # ------------------------------------------------------------------
-    # Status dos espaços + ocupação
-    # ------------------------------------------------------------------
-
-    bottom_columns = st.columns(
-        2,
-        gap="large",
-    )
-
-    with bottom_columns[0]:
-        with st.container(border=True):
-            header_columns = st.columns(
-                [1, 0.25],
-                vertical_alignment="center",
-            )
-
-            with header_columns[0]:
-                st.subheader(
-                    "Status dos espaços"
-                )
-
-            with header_columns[1]:
-                if st.button(
-                    "Gerenciar",
-                    key="manager_dashboard_gerenciar_espacos",
-                    icon=":material/arrow_forward:",
-                ):
-                    go("espacos")
-
             if not spaces:
-                st.caption(
-                    "Nenhum espaço cadastrado."
-                )
+                st.caption("Nenhum espaço cadastrado.")
             else:
-                for space in spaces[:5]:
-                    _space_row(space)
+                rows = [
+                    {
+                        "Espaço": space.get("name", "Espaço"),
+                        "Localização": space.get("location", "N/I"),
+                        "Status": space.get("status", "").capitalize(),
+                    }
+                    for space in spaces[:5]
+                ]
+                st.dataframe(
+                    pd.DataFrame(rows),
+                    column_config={
+                        "Espaço": st.column_config.TextColumn("Espaço", width="medium"),
+                        "Localização": st.column_config.TextColumn("Localização", width="medium"),
+                        "Status": st.column_config.TextColumn("Status", width="small"),
+                    },
+                    hide_index=True,
+                    width="stretch",
+                )
 
-    with bottom_columns[1]:
+    # --- PAINEL: OCUPAÇÃO DOS ESPAÇOS ---
+    with col_occupancy:
+        header_columns = st.columns([1, 0.3], vertical_alignment="center")
+        with header_columns[0]:
+            st.subheader("Ocupação dos espaços")
+        with header_columns[1]:
+            if st.button("Ver mais", key="manager_dashboard_ver_ocupacao", icon=":material/arrow_forward:", use_container_width=True):
+                _navigate("ocupacao")
+
+        available_count = sum(1 for s in spaces if s.get("status") == "disponivel")
+        occupied_count = sum(1 for s in spaces if s.get("status") == "ocupado")
+        blocked_count = sum(1 for s in spaces if s.get("status") == "bloqueado")
+        total_spaces = len(spaces)
+
         with st.container(border=True):
-            header_columns = st.columns(
-                [1, 0.25],
-                vertical_alignment="center",
-            )
+            _occupancy_bar("Disponíveis", available_count, total_spaces)
+            _occupancy_bar("Ocupadas", occupied_count, total_spaces)
+            _occupancy_bar("Bloqueadas", blocked_count, total_spaces)
 
-            with header_columns[0]:
-                st.subheader(
-                    "Ocupação dos espaços"
-                )
-
-            with header_columns[1]:
-                if st.button(
-                    "Ver mais",
-                    key="manager_dashboard_ver_ocupacao",
-                    icon=":material/arrow_forward:",
-                ):
-                    go("ocupacao")
-
-            total_spaces = len(spaces)
-
-            _occupancy_bar(
-                "Disponíveis",
-                len(available_spaces),
-                total_spaces,
-            )
-
-            _occupancy_bar(
-                "Ocupadas",
-                len(occupied_spaces),
-                total_spaces,
-            )
-
-            _occupancy_bar(
-                "Bloqueadas",
-                len(blocked_spaces),
-                total_spaces,
-            )
-
-            occupancy_rate = (
-                round(
-                    (
-                        len(occupied_spaces)
-                        / total_spaces
-                    )
-                    * 100
-                )
-                if total_spaces
-                else 0
-            )
+            occupancy_rate = round((occupied_count / total_spaces) * 100) if total_spaces else 0
 
             st.divider()
 
-            st.caption(
-                f"Taxa de ocupação atual: "
-                f"**{occupancy_rate}%**"
-            )
+            st.caption(f"Taxa de ocupação atual: **{occupancy_rate}%**")
+
+
+def dashboard(user):
+    page_header("Painel operacional", "Visão geral das reservas, espaços e conflitos do dia.")
+
+    reservations = mock_data_service.reservations()
+    spaces = mock_data_service.spaces()
+    conflicts = st.session_state.get("conflicts", [])
+
+    pending_reservations = [item for item in reservations if item.get("status") in {"pendente", "em_analise"}]
+    approved_reservations = [item for item in reservations if item.get("status") == "aprovada"]
+    available_spaces = [item for item in spaces if item.get("status") == "disponivel"]
+    open_conflicts = [item for item in conflicts if item.get("status") in {"nao_resolvido", "em_analise"}]
+
+    # 1. Indicadores Superiores
+    _render_stats(
+        pending=len(pending_reservations),
+        approved=len(approved_reservations),
+        available=len(available_spaces),
+        conflicts=len(open_conflicts),
+    )
+    st.space("small")
+
+    # 2. Ações Rápidas + Solicitações Pendentes
+    actions, pending_panel = st.columns([1, 2], gap="medium")
+    with actions:
+        _render_quick_actions()
+    with pending_panel:
+        _render_pending_reservations(pending_reservations)
+
+    st.space("small")
+
+    # 3. Status dos Espaços + Ocupação
+    _render_space_status_and_occupancy(spaces)
