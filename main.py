@@ -20,7 +20,7 @@ from views.pages.shared import account_settings_page, agenda_page, notifications
 
 st.set_page_config(
     page_title="RoomFlow",
-    page_icon="R",
+    page_icon=":material/meeting_room:",
     layout="wide",
     initial_sidebar_state="expanded",
 )

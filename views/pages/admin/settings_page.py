@@ -3,6 +3,7 @@ from datetime import time
 
 from controllers import mock_data_service
 from controllers.app_state_service import set_toast
+from views.components.ui_components import page_header
 
 
 # =========================================================
@@ -10,10 +11,10 @@ from controllers.app_state_service import set_toast
 # =========================================================
 
 CATEGORIES = [
-    ("geral",         "Informações gerais"),
-    ("politicas",     "Políticas de reserva"),
-    ("conflitos",     "Regras de conflito"),
-    ("notificacoes",  "Notificações"),
+    ("geral",         "Informações gerais",   ":material/info:"),
+    ("politicas",     "Políticas de reserva",  ":material/policy:"),
+    ("conflitos",     "Regras de conflito",    ":material/gavel:"),
+    ("notificacoes",  "Notificações",          ":material/notifications:"),
 ]
 
 NOTIFICATION_OPTIONS = [
@@ -120,8 +121,10 @@ def _section_notificacoes():
 
 def settings(user):
     # --- Cabeçalho ---
-    st.title("Configurações do sistema")
-    st.caption("Políticas, regras e preferências globais do RoomFlow.")
+    page_header(
+        "Configurações do sistema",
+        "Políticas, regras e preferências globais do RoomFlow.",
+    )
 
     # --- Estado da categoria ativa ---
     if "settings_category" not in st.session_state:
@@ -139,14 +142,15 @@ def settings(user):
     # ---------------------------------------------------------
     with col_menu:
         with st.container(border=True):
-            for cat_id, cat_label in CATEGORIES:
+            for cat_id, cat_label, cat_icon in CATEGORIES:
                 is_active = st.session_state.settings_category == cat_id
 
                 if st.button(
                     cat_label,
                     key=f"cfg_cat_{cat_id}",
+                    icon=cat_icon,
                     type="primary" if is_active else "tertiary",
-                    use_container_width=True,
+                    width="stretch",
                 ):
                     st.session_state.settings_category = cat_id
                     st.rerun()
@@ -156,7 +160,7 @@ def settings(user):
     # ---------------------------------------------------------
     with col_content:
         active_label = next(
-            label for cid, label in CATEGORIES
+            label for cid, label, _ in CATEGORIES
             if cid == st.session_state.settings_category
         )
 
@@ -180,6 +184,8 @@ def settings(user):
                 "Salvar configurações",
                 key="cfg_salvar",
                 type="primary",
+                icon=":material/save:",
+                width="stretch",
             ):
                 set_toast("Configurações salvas com sucesso.")
                 st.rerun()

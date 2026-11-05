@@ -7,7 +7,7 @@ section[data-testid="stSidebar"][aria-expanded="true"] {
   min-width: 240px !important;
   max-width: 240px !important;
 
-  background: #ffffff !important;
+  background: var(--surface-card) !important;
   border-right: 1px solid var(--stroke);
 }
 
@@ -16,7 +16,7 @@ section[data-testid="stSidebar"][aria-expanded="true"] {
 ========================================================= */
 
 section[data-testid="stSidebar"] > div:first-child {
-  background: #ffffff !important;
+  background: var(--surface-card) !important;
 }
 
 /* =========================================================
@@ -28,7 +28,7 @@ section[data-testid="stSidebar"] [data-testid="stSidebarContent"] {
   flex-direction: column !important;
   padding: 20px 12px 16px !important;
 
-  background: #ffffff !important;
+  background: var(--surface-card) !important;
   overflow-x: hidden !important;
 }
 
@@ -169,7 +169,7 @@ section[data-testid="stSidebar"] .st-key-rf_sidebar_footer {
 
   border-top: 1px solid var(--stroke);
 
-  background: #ffffff !important;
+  background: var(--surface-card) !important;
 
   z-index: 10;
 }
