@@ -52,10 +52,10 @@ class Institution(Base):
     institution_type: Mapped[str] = mapped_column(
         String(60), nullable=False
     )
-    city: Mapped[str] = mapped_column(String(100), nullable=False)
-    state: Mapped[str] = mapped_column(String(2), nullable=False)
-    phone: Mapped[str] = mapped_column(String(20), nullable=False)
-    email: Mapped[str] = mapped_column(String(255), nullable=False)
+    city: Mapped[str] = mapped_column(String(100), nullable=True) 
+    state: Mapped[str] = mapped_column(String(2), nullable=True) #Campos alterados para permitir valores nulos
+    phone: Mapped[str] = mapped_column(String(20), nullable=True)
+    email: Mapped[str] = mapped_column(String(255), nullable=True)
     status: Mapped[str] = mapped_column(
         String(30), default="ativo", nullable=False
     )
