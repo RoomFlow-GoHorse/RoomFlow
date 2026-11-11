@@ -30,9 +30,18 @@ def upgrade() -> None:
         sa.Column("email", sa.String(255), nullable=True),
         sa.Column("status", sa.String(30), nullable=False, server_default=sa.text("'ativo'")),
         sa.UniqueConstraint("cnpj",name="uq_instituicoes_cnpj"),
-    # TODO: Adicionar a criação de tabela de vínculo entre usuários e instituições
-    
     )
+
+    op.create_table("usuario_instituicao",
+        sa.Column("id", sa.Integer(), primary_key=True),
+        sa.Column("user_id", sa.Integer(), sa.ForeignKey("usuarios.id"), nullable=False,),
+        sa.Column("institution_id", sa.Integer(), sa.ForeignKey("instituicoes.id"), nullable=False,),
+        sa.Column("registration_number", sa.String(50), nullable=True,),
+        sa.Column("role", sa.String(30), nullable=False),
+        sa.Column("status", sa.String(30), nullable=False, server_default=sa.text("'ativo'"),),
+        sa.UniqueConstraint("user_id", "institution_id", name="uq_usuario_instituicao_usuario_instituicao",),
+        sa.UniqueConstraint("institution_id", "registration_number", name="uq_usuario_instituicao_matricula",),
+    ) 
 
 
 def downgrade() -> None:
