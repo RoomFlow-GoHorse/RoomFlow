@@ -45,4 +45,6 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    # Remove a tabela de vínculo netre usuários e instituições primeiro
+    op.drop_table("usuario_instituicao")
     op.drop_table("instituicoes")
