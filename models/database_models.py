@@ -1,5 +1,5 @@
 
-from sqlalchemy import ForeignKey, String, UniqueConstraint
+from sqlalchemy import ForeignKey, String, UniqueConstraint, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from config.database import Base
@@ -57,7 +57,7 @@ class Institution(Base):
     phone: Mapped[str] = mapped_column(String(20), nullable=True)
     email: Mapped[str] = mapped_column(String(255), nullable=True)
     status: Mapped[str] = mapped_column(
-        String(30), default="ativo", nullable=False
+        String(30), default="ativo", server_default=text("'ativo'"), nullable=False #server_default para definir o valor no banco visto que apenas default define apenas no SQLAlchemy
     )
 
     # Vínculos dos usuários com a instituição.
@@ -101,7 +101,7 @@ class UserInstitution(Base):
     # A função e situação são específicas deste vínculo.
     role: Mapped[str] = mapped_column(String(30), nullable=False)
     status: Mapped[str] = mapped_column(
-        String(30), default="ativo", nullable=False
+        String(30), default="ativo", server_default=text("'ativo'"), nullable=False #server_default para definir o valor no banco visto que apenas default define apenas no SQLAlchemy
     )
 
     user: Mapped["User"] = relationship(
