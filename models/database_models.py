@@ -52,11 +52,11 @@ class Institution(Base):
     institution_type: Mapped[str] = mapped_column(
         String(60), nullable=False
     )
-    city: Mapped[str] = mapped_column(String(100), nullable=True) 
-    state: Mapped[str] = mapped_column(String(2), nullable=True) #Campos alterados para permitir valores nulos
-    phone: Mapped[str] = mapped_column(String(20), nullable=True)
-    email: Mapped[str] = mapped_column(String(255), nullable=True)
-    status: Mapped[str] = mapped_column(
+    city: Mapped[str | None] = mapped_column(String(100), nullable=True) 
+    state: Mapped[str | None] = mapped_column(String(2), nullable=True) #Campos alterados para permitir valores nulos
+    phone: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    status: Mapped[str | None] = mapped_column(
         String(30), default="ativo", server_default=text("'ativo'"), nullable=False #server_default para definir o valor no banco visto que apenas default define apenas no SQLAlchemy
     )
 
