@@ -458,7 +458,7 @@ def _render_structure_config():
     bid = st.session_state.fp_sel_building
     current_b = _current_building()
 
-    with st.expander("⚙️ Configurar estrutura da instituição", expanded=False):
+    with st.expander(":material/settings: Configurar estrutura da instituição", expanded=False):
         col_b, col_f = st.columns(2, gap="medium")
 
         # -------------------------------------------------
@@ -469,7 +469,7 @@ def _render_structure_config():
                 hc1, hc2 = st.columns([3, 1])
                 hc1.markdown("**Blocos**")
                 with hc2:
-                    if st.button("＋ Bloco", key="fp_open_add_building", use_container_width=True):
+                    if st.button("", key="fp_open_add_building", icon=":material/add:", help="Adicionar bloco"):
                         _dialog_add_building()
 
                 if not buildings:
@@ -489,10 +489,10 @@ def _render_structure_config():
                                     _select_building(b["id"])
                                     st.rerun()
                         with rc2:
-                            if st.button("✏️", key=f"fp_ren_b_{b['id']}", help="Renomear"):
+                            if st.button("", key=f"fp_ren_b_{b['id']}", icon=":material/edit:", help="Renomear"):
                                 _dialog_rename_building(b)
                         with rc3:
-                            if st.button("🗑", key=f"fp_del_b_{b['id']}", help="Remover"):
+                            if st.button("", key=f"fp_del_b_{b['id']}", icon=":material/delete:", help="Remover"):
                                 _dialog_confirm_remove_building(b)
 
         # -------------------------------------------------
@@ -504,7 +504,7 @@ def _render_structure_config():
                 floor_title = f"**Andares** — {current_b['name']}" if current_b else "**Andares**"
                 hf1.markdown(floor_title)
                 with hf2:
-                    if st.button("＋ Andar", key="fp_open_add_floor", use_container_width=True, disabled=not current_b):
+                    if st.button("", key="fp_open_add_floor", icon=":material/add:", help="Adicionar andar", disabled=not current_b):
                         if current_b:
                             _dialog_add_floor(current_b)
 
@@ -531,10 +531,10 @@ def _render_structure_config():
                                         st.session_state.fp_positioning = None
                                         st.rerun()
                             with fc2:
-                                if st.button("✏️", key=f"fp_ren_f_{f['id']}", help="Renomear"):
+                                if st.button("", key=f"fp_ren_f_{f['id']}", icon=":material/edit:", help="Renomear"):
                                     _dialog_rename_floor(f, current_b)
                             with fc3:
-                                if st.button("🗑", key=f"fp_del_f_{f['id']}", help="Remover"):
+                                if st.button("", key=f"fp_del_f_{f['id']}", icon=":material/delete:", help="Remover"):
                                     _dialog_confirm_remove_floor(f, current_b)
 
 
@@ -605,10 +605,10 @@ def _render_floor_plan(current_b: dict | None, current_f: dict | None, plan: dic
                 """
                 <div style="text-align:center; padding:32px 16px;">
                   <div style="font-size:32px; margin-bottom:8px;">🗺️</div>
-                  <p style="font-weight:600; color:#1C1C2E; margin-bottom:4px;">
+                  <p style="font-weight:600; color:var(--graphite); margin-bottom:4px;">
                     Adicione a planta deste andar
                   </p>
-                  <p style="font-size:12px; color:#71717A;">
+                  <p style="font-size:12px; color:var(--graphite-muted);">
                     Aceito: PNG, JPG, SVG
                   </p>
                 </div>
@@ -644,13 +644,13 @@ def _render_floor_plan(current_b: dict | None, current_f: dict | None, plan: dic
             f_label = current_f["name"] if current_f else ""
             st.caption(f"{b_label} · {f_label}")
         with pc2:
-            if st.button("🗑 Remover planta", key="fp_remove_plan", type="tertiary"):
+            if st.button("", key="fp_remove_plan", icon=":material/delete:", help="Remover planta", type="tertiary"):
                 st.session_state.plans[_plan_key()] = {"src": None, "positions": {}}
                 st.rerun()
 
         # Planta SVG ou imagem
         if plan["src"] == "demo":
-            st.html(f'<div style="border:1px solid #E4E1DB; border-radius:8px; overflow:hidden;">{_DEMO_SVG}</div>')
+            st.html(f'<div style="border:1px solid var(--stroke); border-radius:8px; overflow:hidden;">{_DEMO_SVG}</div>')
         else:
             st.image(plan["src"], use_container_width=True)
 
@@ -668,7 +668,7 @@ def _render_floor_plan(current_b: dict | None, current_f: dict | None, plan: dic
                 )
                 mc2.caption(f"x:{pos['x']:.0f}% y:{pos['y']:.0f}%")
                 with mc3:
-                    if st.button("✕", key=f"fp_unpin_{room_id}", help="Remover da planta"):
+                    if st.button("", key=f"fp_unpin_{room_id}", icon=":material/close:", help="Remover da planta"):
                         new_pos = {k: v for k, v in positions.items() if k != room_id}
                         st.session_state.plans[_plan_key()] = {**plan, "positions": new_pos}
                         for s in st.session_state.spaces:
@@ -691,7 +691,7 @@ def _render_rooms_panel(current_b: dict | None, current_f: dict | None, plan: di
     hc1.markdown("**Salas do andar**")
     with hc2:
         disabled = not (current_b and current_f)
-        if st.button("＋ Sala", key="fp_open_add_room", use_container_width=True, disabled=disabled):
+        if st.button("", key="fp_open_add_room", icon=":material/add:", help="Adicionar sala", disabled=disabled):
             if current_b and current_f:
                 _dialog_add_room(current_b, current_f)
 
@@ -712,11 +712,11 @@ def _render_rooms_panel(current_b: dict | None, current_f: dict | None, plan: di
                 r_head1, r_head2 = st.columns([4, 1])
                 with r_head1:
                     st.markdown(
-                        f'<div style="font-size:14px; font-weight:600; color:#1C1C2E;">{room["name"]}</div>',
+                        f'<div style="font-size:14px; font-weight:600; color:var(--graphite);">{room["name"]}</div>',
                         unsafe_allow_html=True,
                     )
                 with r_head2:
-                    if st.button("🗑", key=f"fp_del_room_{rid}", help="Remover sala"):
+                    if st.button("", key=f"fp_del_room_{rid}", icon=":material/delete:", help="Remover sala"):
                         st.session_state.spaces = [s for s in st.session_state.spaces if s["id"] != rid]
                         if rid in positions:
                             new_pos = {k: v for k, v in positions.items() if k != rid}
@@ -730,12 +730,12 @@ def _render_rooms_panel(current_b: dict | None, current_f: dict | None, plan: di
 
                 if is_positioned:
                     st.markdown(
-                        '<span style="background:#DCFCE7; color:#15803D; font-size:11px; font-weight:600; padding:2px 8px; border-radius:999px; display:inline-block; margin-bottom:0;">✓ Posicionada</span>',
+                        '<span style="background:var(--success-bg); color:var(--success); font-size:11px; font-weight:600; padding:2px 8px; border-radius:999px; display:inline-block; margin-bottom:0;">✓ Posicionada</span>',
                         unsafe_allow_html=True,
                     )
                 else:
                     st.markdown(
-                        '<span style="background:#FEF3C7; color:#B45309; font-size:11px; font-weight:600; padding:2px 8px; border-radius:999px; display:inline-block; margin-bottom:0;">Não posicionada</span>',
+                        '<span style="background:var(--warning-bg); color:var(--warning); font-size:11px; font-weight:600; padding:2px 8px; border-radius:999px; display:inline-block; margin-bottom:0;">Não posicionada</span>',
                         unsafe_allow_html=True,
                     )
 

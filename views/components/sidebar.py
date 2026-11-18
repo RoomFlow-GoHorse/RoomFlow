@@ -4,7 +4,7 @@ from config.constants import ROLE_NAV
 from controllers import auth_service
 from controllers.app_state_service import go
 from controllers.mock_data_service import notifications_for
-from views.components.ui_components import ASSETS_DIR, LOGO_FILES, role_label
+from views.components.ui_components import ASSETS_DIR, LOGO_FILES, is_dark_theme, role_label
 
 
 NAV_ICONS = {
@@ -63,7 +63,8 @@ def render_sidebar(user):
 
     with st.sidebar:
         with st.container(key="rf_sidebar_logo"):
-            st.image(ASSETS_DIR / LOGO_FILES["dark"], width=150)
+            logo_key = "light" if is_dark_theme() else "dark"
+            st.image(ASSETS_DIR / LOGO_FILES[logo_key], width=150)
 
         st.divider()
         with st.container(key="rf_sidebar_navigation_label"):
