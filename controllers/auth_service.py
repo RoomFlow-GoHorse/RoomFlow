@@ -5,7 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 
 from config.database import SessionLocal
-from models.database_models import User
+from models.database_models import Usuario
 from controllers.password_service import verify_password
 
 
@@ -17,7 +17,7 @@ def login(email, password):
 
     try:
         with SessionLocal() as session:
-            user = session.scalar(select(User).where(User.email == email))
+            user = session.scalar(select(Usuario).where(Usuario.email == email))
 
             if not user:
                 return None, "Não encontramos uma conta com esses dados. Confirme seu cadastro com a instituição."
