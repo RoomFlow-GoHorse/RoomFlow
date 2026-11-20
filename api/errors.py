@@ -11,6 +11,7 @@ def _error_response(
     code: str,
     message: str,
     details: list[dict[str, Any]] | None = None,
+    headers: dict[str, str] | None = None,
 ) -> JSONResponse:
     return JSONResponse(
         status_code=status_code,
@@ -21,6 +22,7 @@ def _error_response(
                 "details": details,
             }
         },
+        headers=headers,
     )
 
 
@@ -39,7 +41,7 @@ async def http_exception_handler(
         if isinstance(exc.detail, str)
         else "A solicitação não pode ser concluída."
     )
-    return _error_response(exc.status_code, code, message)
+    return _error_response(exc.status_code, code, message, headers=exc.headers)
 
 
 async def validation_exception_handler(

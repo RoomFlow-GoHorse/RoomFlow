@@ -9,17 +9,21 @@ from api.errors import (
     unhandled_exception_handler,
     validation_exception_handler,
 )
+from application.services.authentication_service import AuthenticationService
+from controllers.http.auth import router as auth_router
 from controllers.http.health import router as health_router
 from controllers.http.spaces import router as spaces_router
 from application.ports.space_repository import SpaceRepository
 from infrastructure.repositories.in_memory_space_repository import (
     InMemorySpaceRepository,
 )
+from infrastructure.authentication_factory import build_authentication_service
 
 
 def create_app(
     space_repository: SpaceRepository | None = None,
     environment: str | None = None,
+    authentication_service: AuthenticationService | None = None,
 ) -> FastAPI:
     """Build the API; ``APP_ENV`` defaults to production and hides demo routes."""
     app = FastAPI(title="RoomFlow API", version="0.1.0")
@@ -32,7 +36,13 @@ def create_app(
         else InMemorySpaceRepository()
     )
     app.state.environment = active_environment
+    app.state.authentication_service = (
+        authentication_service
+        if authentication_service is not None
+        else build_authentication_service(active_environment)
+    )
     app.include_router(health_router)
+    app.include_router(auth_router)
     if active_environment in {"development", "test"}:
         app.include_router(spaces_router)
     app.add_exception_handler(StarletteHTTPException, http_exception_handler)
