@@ -11,13 +11,15 @@ from api.errors import (
 )
 from application.services.authentication_service import AuthenticationService
 from controllers.http.auth import router as auth_router
+from controllers.http.admin_users import router as admin_users_router
 from controllers.http.health import router as health_router
+from controllers.http.institutions import router as institutions_router
 from controllers.http.spaces import router as spaces_router
 from application.ports.space_repository import SpaceRepository
 from infrastructure.repositories.in_memory_space_repository import (
     InMemorySpaceRepository,
 )
-from infrastructure.authentication_factory import build_authentication_service
+from infrastructure.authentication_factory import build_application_runtime
 
 
 def create_app(
@@ -36,15 +38,18 @@ def create_app(
         else InMemorySpaceRepository()
     )
     app.state.environment = active_environment
-    app.state.authentication_service = (
-        authentication_service
-        if authentication_service is not None
-        else build_authentication_service(active_environment)
-    )
+    runtime = build_application_runtime(active_environment)
+    app.state.authentication_service = authentication_service or runtime.authentication
+    app.state.user_repository = runtime.users
+    app.state.institution_repository = runtime.institutions
+    app.state.user_management_service = runtime.user_management
+    app.state.institution_management_service = runtime.institution_management
     app.include_router(health_router)
     app.include_router(auth_router)
     if active_environment in {"development", "test"}:
         app.include_router(spaces_router)
+        app.include_router(admin_users_router)
+        app.include_router(institutions_router)
     app.add_exception_handler(StarletteHTTPException, http_exception_handler)
     app.add_exception_handler(RequestValidationError, validation_exception_handler)
     app.add_exception_handler(Exception, unhandled_exception_handler)

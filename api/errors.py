@@ -35,6 +35,8 @@ async def http_exception_handler(
         401: "unauthorized",
         403: "forbidden",
         404: "not_found",
+        409: "conflict",
+        429: "too_many_requests",
     }.get(exc.status_code, "http_error")
     message = (
         exc.detail

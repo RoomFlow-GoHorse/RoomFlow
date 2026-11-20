@@ -5,7 +5,9 @@ from application.services.authentication_service import (
     AuthenticationService,
     InvalidSession,
 )
+from application.services.institution_management_service import InstitutionManagementService
 from application.services.space_service import SpaceService
+from application.services.user_management_service import UserManagementService
 from models.domain.entities.user import User
 
 
@@ -18,6 +20,14 @@ def get_space_service(request: Request) -> SpaceService:
 
 def get_authentication_service(request: Request) -> AuthenticationService:
     return request.app.state.authentication_service
+
+
+def get_user_management_service(request: Request) -> UserManagementService:
+    return request.app.state.user_management_service
+
+
+def get_institution_management_service(request: Request) -> InstitutionManagementService:
+    return request.app.state.institution_management_service
 
 
 def get_current_user(

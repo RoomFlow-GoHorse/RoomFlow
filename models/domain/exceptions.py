@@ -8,3 +8,11 @@ class PermissionDenied(DomainAuthorizationError):
 
 class InstitutionAccessDenied(DomainAuthorizationError):
     """The target institution is outside the authenticated user's scope."""
+
+
+class DuplicateResource(Exception):
+    """A resource conflicts with an existing unique value."""
+
+
+class ResourceNotFound(Exception):
+    """A requested resource does not exist."""
