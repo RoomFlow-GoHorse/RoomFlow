@@ -73,21 +73,24 @@ def _render_styles():
         """
         <style>
         .rf-calendar-card {
-            background: #FFFFFF;
-            border: 1px solid #E4E4E7;
+            background: var(--surface-card);
+            border: 1px solid var(--stroke);
             border-radius: 12px;
             padding: 16px;
             margin-bottom: 12px;
         }
         
         .rf-event-card {
-            background: #F8FAFC;
+            background: var(--surface-alt);
             border-left: 4px solid #6D28D9;
             border-radius: 8px;
             padding: 10px 14px;
             margin-bottom: 10px;
             box-shadow: 0 1px 3px rgba(0,0,0,0.05);
         }
+
+        .rf-event-title { color: var(--graphite); }
+        .rf-event-meta { color: var(--graphite-soft); }
 
         .rf-badge {
             display: inline-block;
@@ -102,17 +105,17 @@ def _render_styles():
             text-align: center;
             font-weight: 600;
             font-size: 13px;
-            color: #64748B;
+            color: var(--graphite-muted);
             padding: 6px 0;
-            background: #F1F5F9;
+            background: var(--surface-alt);
             border-radius: 6px;
             margin-bottom: 8px;
         }
 
         .month-day-cell {
             min-height: 95px;
-            background: #FFFFFF;
-            border: 1px solid #E2E8F0;
+            background: var(--surface-card);
+            border: 1px solid var(--stroke);
             border-radius: 8px;
             padding: 6px;
             display: flex;
@@ -123,19 +126,19 @@ def _render_styles():
         }
 
         .month-day-cell.other-month {
-            background: #F8FAFC;
+            background: var(--surface-alt);
             opacity: 0.4;
         }
 
         .month-day-cell.selected-day {
             border: 2px solid #6D28D9;
-            background-color: #F3E8FF;
+            background-color: var(--brand-light);
         }
 
         .month-day-num {
             font-size: 12px;
             font-weight: 700;
-            color: #334155;
+            color: var(--graphite);
             margin-bottom: 2px;
         }
 
@@ -200,7 +203,7 @@ def _render_calendar_navigation(title: str):
 
     with col_title:
         st.markdown(
-            f"<h4 style='text-align: center; margin: 0; color: #1E293B;'>{title}</h4>",
+            f"<h4 style='text-align: center; margin: 0; color: var(--graphite);'>{title}</h4>",
             unsafe_allow_html=True,
         )
 
@@ -245,12 +248,12 @@ def _render_daily_view(events: list, selected_date: date):
             f"""
             <div class="rf-event-card" style="border-left-color: {color};">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                    <strong style="font-size: 15px; color: #0F172A;">{esc(event["title"])}</strong>
+                    <strong class="rf-event-title" style="font-size: 15px;">{esc(event["title"])}</strong>
                     <span class="rf-badge" style="background-color: {color}1F; color: {color};">
                         {esc(event["type"])}
                     </span>
                 </div>
-                <div style="font-size: 13px; color: #475569;">
+                <div class="rf-event-meta" style="font-size: 13px;">
                     🕒 <strong>{esc(event["startTime"])} – {esc(event["endTime"])}</strong> &nbsp;|&nbsp; 📍 {esc(event["space"])} ({esc(event["location"])})
                 </div>
             </div>
@@ -275,8 +278,8 @@ def _render_weekly_view(events: list, selected_date: date):
         is_selected = current_day == selected_date
 
         with col:
-            header_bg = "#6D28D9" if is_selected else "#F1F5F9"
-            header_color = "#FFFFFF" if is_selected else "#334155"
+            header_bg = "#6D28D9" if is_selected else "var(--surface-alt)"
+            header_color = "#FFFFFF" if is_selected else "var(--graphite)"
 
             st.markdown(
                 f"""
@@ -292,16 +295,16 @@ def _render_weekly_view(events: list, selected_date: date):
             day_events = sorted(day_events, key=lambda x: x["startTime"])
 
             if not day_events:
-                st.markdown("<div style='text-align:center; color:#94A3B8; font-size:12px; margin-top:12px;'>—</div>", unsafe_allow_html=True)
+                st.markdown("<div style='text-align:center; color:var(--graphite-muted); font-size:12px; margin-top:12px;'>—</div>", unsafe_allow_html=True)
             else:
                 for event in day_events:
                     color = event["color"]
                     st.markdown(
                         f"""
-                        <div style="background: #F8FAFC; border-left: 3px solid {color}; border-radius: 6px; padding: 6px 8px; margin-bottom: 6px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
-                            <div style="font-weight: 600; font-size: 12px; color: #1E293B; line-height: 1.2;">{esc(event['title'])}</div>
-                            <div style="font-size: 10px; color: #64748B; margin-top: 4px;">🕒 {esc(event['startTime'])}</div>
-                            <div style="font-size: 10px; color: #64748B;">📍 {esc(event['space'])}</div>
+                        <div style="background: var(--surface-alt); border-left: 3px solid {color}; border-radius: 6px; padding: 6px 8px; margin-bottom: 6px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+                            <div style="font-weight: 600; font-size: 12px; color: var(--graphite); line-height: 1.2;">{esc(event['title'])}</div>
+                            <div style="font-size: 10px; color: var(--graphite-muted); margin-top: 4px;">🕒 {esc(event['startTime'])}</div>
+                            <div style="font-size: 10px; color: var(--graphite-muted);">📍 {esc(event['space'])}</div>
                         </div>
                         """,
                         unsafe_allow_html=True,
@@ -355,7 +358,7 @@ def _render_monthly_view(events: list, selected_date: date):
                 """
 
             if len(day_events) > 3:
-                events_html += f"<div style='font-size: 9px; color: #64748B; text-align: right;'>+{len(day_events) - 3} mais</div>"
+                events_html += f"<div style='font-size: 9px; color: var(--graphite-muted); text-align: right;'>+{len(day_events) - 3} mais</div>"
 
             cols[idx].markdown(
                 f"""
