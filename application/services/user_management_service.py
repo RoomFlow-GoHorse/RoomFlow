@@ -1,4 +1,5 @@
 import secrets
+import re
 from dataclasses import replace
 
 from application.ports.institution_repository import InstitutionRepository
@@ -69,12 +70,23 @@ class UserManagementService:
         institution_id = self._permissions.authorize_listing(
             actor, Permission.MANAGE_USERS
         )
+        clean_name = name.strip()
         normalized_email = email.strip().lower()
+        if not clean_name:
+            raise ValueError("Informe o nome do usuário.")
+        if len(clean_name) > 150 or len(normalized_email) > 255:
+            raise ValueError("Nome ou e-mail excede o tamanho permitido.")
+        if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", normalized_email):
+            raise ValueError("Informe um e-mail válido.")
+        if len(password) < 8:
+            raise ValueError("A senha deve possuir pelo menos 8 caracteres.")
+        if len(password) > 1024:
+            raise ValueError("A senha excede o tamanho permitido.")
         if self._users.find_by_email(normalized_email):
             raise DuplicateResource("Já existe uma conta com este e-mail.")
         user = User(
             id=f"u-{secrets.token_urlsafe(12)}",
-            name=name.strip(),
+            name=clean_name,
             email=normalized_email,
             profile=Profile(profile),
             institution_id=institution_id,
@@ -87,14 +99,36 @@ class UserManagementService:
         account = self._account_in_scope(actor, user_id)
         updated = replace(account.user, profile=Profile(profile))
         saved = replace(account, user=updated)
-        self._users.save(saved)
+        if self._is_removing_active_admin(account.user, updated):
+            self._users.save_preserving_active_admin(
+                saved, account.user.institution_id or ""
+            )
+        else:
+            self._users.save(saved)
         return updated
 
     def set_status(self, actor: User, user_id: str, status: UserStatus) -> User:
         account = self._account_in_scope(actor, user_id)
         updated = replace(account.user, status=UserStatus(status))
-        self._users.save(replace(account, user=updated))
+        saved = replace(account, user=updated)
+        if self._is_removing_active_admin(account.user, updated):
+            self._users.save_preserving_active_admin(
+                saved, account.user.institution_id or ""
+            )
+        else:
+            self._users.save(saved)
         return updated
+
+    @staticmethod
+    def _is_removing_active_admin(current: User, updated: User) -> bool:
+        return (
+            current.profile is Profile.ADMIN
+            and current.status is UserStatus.ACTIVE
+            and (
+                updated.profile is not Profile.ADMIN
+                or updated.status is not UserStatus.ACTIVE
+            )
+        )
 
     def update_own_profile(self, actor: User, name: str, email: str) -> User:
         self._permissions.authorize_own_account(actor, actor.id)

@@ -1,8 +1,11 @@
 import unittest
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from fastapi.testclient import TestClient
 
 from api.app import create_app
+from models.domain.exceptions import LastActiveAdministrator
+from models.domain.entities.user import UserStatus
 
 
 def login(client: TestClient, email: str, password: str) -> str:
@@ -116,6 +119,98 @@ class AccountManagementApiTests(unittest.TestCase):
         self.assertEqual([item["id"] for item in search.json()["data"]], [user_id])
         self.assertEqual(by_id.status_code, 200)
         self.assertEqual(update_role.json()["data"]["profile"], "gerente")
+
+        deactivated = self.client.patch(
+            f"/admin/users/{user_id}/status", headers=self.admin_headers,
+            json={"status": "inativo"},
+        )
+        listed_inactive = self.client.get(
+            "/admin/users?q=pessoa.nova", headers=self.admin_headers,
+        )
+        activated = self.client.patch(
+            f"/admin/users/{user_id}/status", headers=self.admin_headers,
+            json={"status": "ativo"},
+        )
+        self.assertEqual(deactivated.status_code, 200)
+        self.assertEqual(listed_inactive.json()["data"][0]["status"], "inativo")
+        self.assertEqual(activated.json()["data"]["status"], "ativo")
+
+    def test_user_creation_requires_eight_character_password(self) -> None:
+        short = self.client.post(
+            "/admin/users", headers=self.admin_headers,
+            json={"name": "Short Pass", "email": "short@example.edu", "password": "1234567"},
+        )
+        valid = self.client.post(
+            "/admin/users", headers=self.admin_headers,
+            json={"name": "Valid Pass", "email": "valid@example.edu", "password": "12345678"},
+        )
+        self.assertEqual(short.status_code, 422)
+        self.assertEqual(valid.status_code, 201)
+
+    def test_last_active_admin_cannot_be_demoted_or_deactivated(self) -> None:
+        demote = self.client.patch(
+            "/admin/users/u1/profile", headers=self.admin_headers,
+            json={"profile": "gerente"},
+        )
+        deactivate = self.client.patch(
+            "/admin/users/u1/status", headers=self.admin_headers,
+            json={"status": "inativo"},
+        )
+        current = self.client.get("/admin/users/u1", headers=self.admin_headers)
+        self.assertEqual(demote.status_code, 409)
+        self.assertEqual(deactivate.status_code, 409)
+        self.assertEqual(current.json()["data"]["profile"], "admin")
+        self.assertEqual(current.json()["data"]["status"], "ativo")
+
+    def test_admin_change_is_allowed_when_another_active_admin_remains(self) -> None:
+        second = self.client.post(
+            "/admin/users", headers=self.admin_headers,
+            json={
+                "name": "Second Admin", "email": "second.admin@example.edu",
+                "password": "secure-password", "profile": "admin",
+            },
+        )
+        second_id = second.json()["data"]["id"]
+        demote_second = self.client.patch(
+            f"/admin/users/{second_id}/profile", headers=self.admin_headers,
+            json={"profile": "gerente"},
+        )
+        block_last = self.client.patch(
+            "/admin/users/u1/status", headers=self.admin_headers,
+            json={"status": "inativo"},
+        )
+        self.assertEqual(second.status_code, 201)
+        self.assertEqual(demote_second.status_code, 200)
+        self.assertEqual(block_last.status_code, 409)
+
+    def test_concurrent_admin_deactivation_leaves_one_active_admin(self) -> None:
+        self.client.post(
+            "/admin/users", headers=self.admin_headers,
+            json={
+                "name": "Concurrent Admin", "email": "concurrent.admin@example.edu",
+                "password": "secure-password", "profile": "admin",
+            },
+        )
+        runtime = self.client_context.app.state.user_management_service
+        admin = self.client_context.app.state.user_repository.find_by_email("admin@gmail.com").user
+        second_id = self.client_context.app.state.user_repository.find_by_email("concurrent.admin@example.edu").user.id
+
+        def disable(user_id: str):
+            try:
+                runtime.set_status(admin, user_id, UserStatus.INACTIVE)
+                return "disabled"
+            except LastActiveAdministrator:
+                return "blocked"
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            results = list(as_completed([executor.submit(disable, "u1"), executor.submit(disable, second_id)]))
+            outcomes = [future.result() for future in results]
+        active_admins = [
+            account for account in self.client_context.app.state.user_repository.list_by_institution("inst-demo")
+            if account.user.profile.value == "admin" and account.user.is_active
+        ]
+        self.assertCountEqual(outcomes, ["disabled", "blocked"])
+        self.assertEqual(len(active_admins), 1)
 
     def test_duplicate_user_email_is_rejected(self) -> None:
         payload = {

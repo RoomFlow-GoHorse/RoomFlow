@@ -1,8 +1,10 @@
 from threading import RLock
 from collections.abc import Iterable
 
-from models.domain.exceptions import DuplicateResource
+from models.domain.exceptions import DuplicateResource, LastActiveAdministrator, ResourceNotFound
 from models.domain.entities.user_account import UserAccount
+from models.domain.entities.profile import Profile
+from models.domain.entities.user import UserStatus
 
 
 class InMemoryUserRepository:
@@ -43,13 +45,45 @@ class InMemoryUserRepository:
 
     def save(self, account: UserAccount) -> None:
         with self._lock:
+            self._save_unlocked(account)
+
+    def save_preserving_active_admin(
+        self, account: UserAccount, institution_id: str
+    ) -> None:
+        """Atomically apply an administrator change while preserving an active admin."""
+        with self._lock:
             current = self._by_id.get(account.user.id)
-            if current is None:
-                raise KeyError(account.user.id)
-            normalized_email = account.user.email.strip().lower()
-            existing = self._by_email.get(normalized_email)
-            if existing is not None and existing.user.id != account.user.id:
-                raise DuplicateResource("Já existe uma conta com este e-mail.")
-            self._by_email.pop(current.user.email.strip().lower(), None)
-            self._by_email[normalized_email] = account
-            self._by_id[account.user.id] = account
+            if (
+                current is None
+                or current.user.institution_id != institution_id
+                or account.user.institution_id != institution_id
+            ):
+                raise ResourceNotFound("Usu\u00e1rio n\u00e3o encontrado.")
+
+            active_admins_after_change = sum(
+                1
+                for user_id, stored in self._by_id.items()
+                if user_id != account.user.id
+                and stored.user.institution_id == institution_id
+                and stored.user.profile is Profile.ADMIN
+                and stored.user.status is UserStatus.ACTIVE
+            )
+            if account.user.profile is Profile.ADMIN and account.user.status is UserStatus.ACTIVE:
+                active_admins_after_change += 1
+            if active_admins_after_change < 1:
+                raise LastActiveAdministrator(
+                    "A institui\u00e7\u00e3o precisa manter pelo menos um administrador ativo."
+                )
+            self._save_unlocked(account)
+
+    def _save_unlocked(self, account: UserAccount) -> None:
+        current = self._by_id.get(account.user.id)
+        if current is None:
+            raise ResourceNotFound("Usu\u00e1rio n\u00e3o encontrado.")
+        normalized_email = account.user.email.strip().lower()
+        existing = self._by_email.get(normalized_email)
+        if existing is not None and existing.user.id != account.user.id:
+            raise DuplicateResource("J\u00e1 existe uma conta com este e-mail.")
+        self._by_email.pop(current.user.email.strip().lower(), None)
+        self._by_email[normalized_email] = account
+        self._by_id[account.user.id] = account

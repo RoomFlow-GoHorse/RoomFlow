@@ -8,6 +8,7 @@ from models.domain.entities.user import User, UserStatus
 from models.domain.exceptions import (
     DomainAuthorizationError,
     DuplicateResource,
+    LastActiveAdministrator,
     ResourceNotFound,
 )
 
@@ -35,7 +36,7 @@ class SingleUserResponse(BaseModel):
 class CreateUserRequest(BaseModel):
     name: str = Field(min_length=1, max_length=150)
     email: str = Field(min_length=5, max_length=255, pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
-    password: str = Field(min_length=6, max_length=1024)
+    password: str = Field(min_length=8, max_length=1024)
     profile: Profile = Profile.REQUESTER
 
 
@@ -75,6 +76,8 @@ def create_user(
         _raise_http_error(403, str(exc))
     except DuplicateResource as exc:
         _raise_http_error(409, str(exc))
+    except ValueError as exc:
+        _raise_http_error(422, str(exc))
     return SingleUserResponse(data=_user_response(user))
 
 
@@ -106,6 +109,8 @@ def update_profile(
         _raise_http_error(403, str(exc))
     except ResourceNotFound as exc:
         _raise_http_error(404, str(exc))
+    except LastActiveAdministrator as exc:
+        _raise_http_error(409, str(exc))
     return SingleUserResponse(data=_user_response(user))
 
 
@@ -122,6 +127,8 @@ def update_status(
         _raise_http_error(403, str(exc))
     except ResourceNotFound as exc:
         _raise_http_error(404, str(exc))
+    except LastActiveAdministrator as exc:
+        _raise_http_error(409, str(exc))
     return SingleUserResponse(data=_user_response(user))
 
 

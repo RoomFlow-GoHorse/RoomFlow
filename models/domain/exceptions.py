@@ -16,3 +16,7 @@ class DuplicateResource(Exception):
 
 class ResourceNotFound(Exception):
     """A requested resource does not exist."""
+
+
+class LastActiveAdministrator(Exception):
+    """The institution must keep at least one active administrator."""

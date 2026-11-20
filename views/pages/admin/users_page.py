@@ -6,7 +6,7 @@ from controllers.streamlit_runtime import get_streamlit_actor, get_streamlit_run
 from models.domain.entities.authorized_enrollment import EnrollmentStatus
 from models.domain.entities.profile import Profile
 from models.domain.entities.user import User, UserStatus
-from models.domain.exceptions import DomainAuthorizationError, DuplicateResource, ResourceNotFound
+from models.domain.exceptions import DomainAuthorizationError, DuplicateResource, LastActiveAdministrator, ResourceNotFound
 from views.components.ui_components import page_header
 
 
@@ -36,7 +36,7 @@ def _user_dialog(actor: User, editing_user: User | None = None):
                     st.error("Informe nome, e-mail e uma senha com pelo menos 8 caracteres.")
                     return
                 runtime.user_management.create_user(actor, name, email, password, selected_profile)
-        except (DuplicateResource, DomainAuthorizationError, ValueError) as exc:
+        except (DuplicateResource, DomainAuthorizationError, LastActiveAdministrator, ResourceNotFound, ValueError) as exc:
             st.error(str(exc))
             return
         st.rerun()
@@ -203,8 +203,12 @@ def users_page(user):
             label = "Desativar" if selected_user.is_active else "Ativar"
             next_status = UserStatus.INACTIVE if selected_user.is_active else UserStatus.ACTIVE
             if status_col.button(label, width="stretch"):
-                runtime.user_management.set_status(actor, selected_user.id, next_status)
-                st.rerun()
+                try:
+                    runtime.user_management.set_status(actor, selected_user.id, next_status)
+                except (DomainAuthorizationError, LastActiveAdministrator, ResourceNotFound) as exc:
+                    st.error(str(exc))
+                else:
+                    st.rerun()
         else:
             st.info("Nenhum usuario encontrado.")
         if st.button("Novo usuario", type="primary", icon=":material/person_add:"):

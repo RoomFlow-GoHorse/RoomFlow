@@ -25,13 +25,21 @@ class MemberSignupStreamlitTests(unittest.TestCase):
 
     def test_streamlit_admin_user_page_renders_with_authenticated_identity(self):
         runtime = get_streamlit_runtime()
+        admin = runtime.users.find_by_email("admin@gmail.com").user
+        member_email = f"streamlit-admin-list-{secrets.token_hex(4)}@example.edu"
+        runtime.user_management.create_user(
+            admin, "Backend Listed User", member_email, "secure-password"
+        )
         login = runtime.authentication.login("admin@gmail.com", "admin123", "streamlit-admin-page")
         app = AppTest.from_file(str(Path(__file__).resolve().parents[1] / "main.py"))
         app.query_params["page"] = "usuarios"
         app.session_state["auth_token"] = login.access_token
+        app.session_state["users_search"] = member_email
         app.run(timeout=15)
         self.assertEqual(len(app.exception), 0)
         self.assertTrue(any(tab.label == "Codigos e matriculas" for tab in app.tabs))
+        user_selector = next(item for item in app.selectbox if item.key == "managed_user_select")
+        self.assertTrue(any(member_email in option for option in user_selector.options))
 
     def test_streamlit_page_completes_simulated_email_confirmation(self):
         runtime = get_streamlit_runtime()
