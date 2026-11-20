@@ -39,6 +39,8 @@ def create_app(
     app.state.space_repository = space_repository or runtime.spaces
     app.state.space_query_service = SpaceService(app.state.space_repository)
     app.state.space_management_service = runtime.space_management
+    app.state.resource_management_service = runtime.resource_management
+    app.state.floor_plan_management_service = runtime.floor_plan_management
     app.state.authentication_service = authentication_service or runtime.authentication
     app.state.user_repository = runtime.users
     app.state.institution_repository = runtime.institutions

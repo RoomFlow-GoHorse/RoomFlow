@@ -21,6 +21,7 @@ class Space:
     building_id: str = ""
     floor_id: str = ""
     active: bool = True
+    resource_ids: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if not self.id.strip() or not self.institution_id.strip():
@@ -37,3 +38,5 @@ class Space:
             raise ValueError("Uma sala inativa não pode estar marcada como ativa.")
         if self.occupancy < 0:
             raise ValueError("A ocupação não pode ser negativa.")
+        if len(set(self.resource_ids)) != len(self.resource_ids):
+            raise ValueError("Uma sala não pode ter o mesmo recurso associado mais de uma vez.")

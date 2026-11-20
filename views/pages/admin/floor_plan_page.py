@@ -1,3 +1,5 @@
+import base64
+import html
 import time as _time
 import streamlit as st
 
@@ -92,9 +94,6 @@ def _boot():
         }
         for item in runtime.space_management.list_spaces(actor, include_inactive=True)
     ]
-    if "plans" not in st.session_state:
-        st.session_state.plans = {}
-
     blist = _buildings()
     if "fp_sel_building" not in st.session_state or not any(b["id"] == st.session_state.fp_sel_building for b in blist):
         st.session_state.fp_sel_building = blist[0]["id"] if blist else ""
@@ -145,8 +144,36 @@ def _plan_key() -> str:
     return f"{st.session_state.fp_sel_building}__{st.session_state.fp_sel_floor}"
 
 
+def _upload_key(kind: str) -> str:
+    state_key = f"fp_{kind}_widget_key_{_plan_key()}"
+    if state_key not in st.session_state:
+        st.session_state[state_key] = f"fp_{kind}_{_plan_key()}_{_uid()}"
+    return st.session_state[state_key]
+
+
+def _reset_upload_keys() -> None:
+    for kind in ("upload", "replace"):
+        st.session_state[f"fp_{kind}_widget_key_{_plan_key()}"] = f"fp_{kind}_{_plan_key()}_{_uid()}"
+
+
 def _current_plan() -> dict:
-    return st.session_state.plans.get(_plan_key(), {"src": None, "positions": {}})
+    floor = _current_floor()
+    actor = get_streamlit_actor()
+    if floor is None or actor is None:
+        return {"src": None, "positions": {}}
+    runtime = get_streamlit_runtime()
+    plan = runtime.floor_plan_management.get_for_floor(actor, floor["id"])
+    if plan is None:
+        return {"src": None, "positions": {}}
+    try:
+        saved_plan, content = runtime.floor_plan_management.read_file(actor, floor["id"])
+    except ResourceNotFound:
+        return {"src": None, "positions": {}}
+    return {
+        "src": content,
+        "media_type": saved_plan.media_type,
+        "positions": {item.space_id: {"x": item.x, "y": item.y} for item in saved_plan.positions},
+    }
 
 
 def _rooms_for(building_name: str, floor_name: str) -> list[dict]:
@@ -227,7 +254,12 @@ def _dialog_rename_building(building: dict):
 def _dialog_confirm_remove_building(building: dict):
     has_floors = any(f.get("buildingId") == building["id"] for f in _all_floors())
     has_rooms = any(s.get("building") == building["name"] for s in st.session_state.spaces)
-    has_plans = any(k.startswith(f"{building['id']}__") for k in st.session_state.plans)
+    actor = get_streamlit_actor()
+    runtime = get_streamlit_runtime()
+    has_plans = actor is not None and any(
+        runtime.floor_plan_management.get_for_floor(actor, floor["id"]) is not None
+        for floor in _building_floors(building["id"])
+    )
 
     if has_floors or has_rooms or has_plans:
         st.warning("Prédios com andares ou salas ativos não podem ser inativados. Os registros serão preservados.")
@@ -321,8 +353,8 @@ def _dialog_confirm_remove_floor(floor: dict, building: dict):
         s.get("building") == building["name"] and s.get("floor") == floor["name"]
         for s in st.session_state.spaces
     )
-    plan_key = f"{building['id']}__{floor['id']}"
-    has_plan = plan_key in st.session_state.plans
+    actor = get_streamlit_actor()
+    has_plan = actor is not None and get_streamlit_runtime().floor_plan_management.get_for_floor(actor, floor["id"]) is not None
 
     if has_rooms or has_plan:
         st.warning("Inative as salas antes de inativar este andar. Os registros e a planta serão preservados.")
@@ -673,21 +705,36 @@ def _render_floor_plan(current_b: dict | None, current_f: dict | None, plan: dic
             uploaded = st.file_uploader(
                 "Selecionar arquivo",
                 type=["png", "jpg", "jpeg", "svg"],
-                key=f"fp_upload_{_plan_key()}",
+                key=_upload_key("upload"),
                 label_visibility="collapsed",
+                max_upload_size=10,
             )
             if uploaded:
-                import base64
-                data = base64.b64encode(uploaded.read()).decode()
-                mime = uploaded.type or "image/png"
-                src = f"data:{mime};base64,{data}"
-                st.session_state.plans[_plan_key()] = {**plan, "src": src}
-                st.rerun()
+                actor = get_streamlit_actor()
+                try:
+                    get_streamlit_runtime().floor_plan_management.upload(
+                        actor, current_f["id"], uploaded.name, uploaded.getvalue()
+                    )
+                except (DomainAuthorizationError, ResourceNotFound, ValueError, PermissionError) as exc:
+                    st.error(str(exc))
+                else:
+                    _reset_upload_keys()
+                    set_toast("Planta enviada e salva.")
+                    st.rerun()
 
             st.write("")
             if st.button("Usar planta de exemplo", key="fp_demo_plan", use_container_width=True):
-                st.session_state.plans[_plan_key()] = {**plan, "src": "demo"}
-                st.rerun()
+                actor = get_streamlit_actor()
+                try:
+                    get_streamlit_runtime().floor_plan_management.upload(
+                        actor, current_f["id"], "planta-exemplo.svg", _DEMO_SVG.encode("utf-8")
+                    )
+                except (DomainAuthorizationError, ResourceNotFound, ValueError, PermissionError) as exc:
+                    st.error(str(exc))
+                else:
+                    _reset_upload_keys()
+                    set_toast("Planta de exemplo salva.")
+                    st.rerun()
         return
 
     # ── Exibir planta ────────────────────────────────────
@@ -700,14 +747,52 @@ def _render_floor_plan(current_b: dict | None, current_f: dict | None, plan: dic
             st.caption(f"{b_label} · {f_label}")
         with pc2:
             if st.button("", key="fp_remove_plan", icon=":material/delete:", help="Remover planta", type="tertiary"):
-                st.session_state.plans[_plan_key()] = {"src": None, "positions": {}}
-                st.rerun()
+                actor = get_streamlit_actor()
+                try:
+                    get_streamlit_runtime().floor_plan_management.remove(actor, current_f["id"])
+                except (DomainAuthorizationError, ResourceNotFound, ValueError, PermissionError) as exc:
+                    st.error(str(exc))
+                else:
+                    _reset_upload_keys()
+                    set_toast("Planta removida.")
+                    st.rerun()
 
         # Planta SVG ou imagem
-        if plan["src"] == "demo":
-            st.html(f'<div style="border:1px solid var(--stroke); border-radius:8px; overflow:hidden;">{_DEMO_SVG}</div>')
-        else:
-            st.image(plan["src"], use_container_width=True)
+        data_uri = f"data:{plan['media_type']};base64,{base64.b64encode(plan['src']).decode('ascii')}"
+        markers = []
+        for room_id, pos in positions.items():
+            room = next((item for item in rooms if item["id"] == room_id), None)
+            if room:
+                label = html.escape(room["name"])
+                markers.append(
+                    f'<span title="{label}" style="position:absolute;left:{float(pos["x"]):.2f}%;top:{float(pos["y"]):.2f}%;transform:translate(-50%,-50%);display:flex;align-items:center;gap:4px;background:#6D28D9;color:#fff;border:2px solid #fff;border-radius:999px;padding:4px 9px;font:600 11px sans-serif;white-space:nowrap;box-shadow:0 1px 5px #0005">📍 {label}</span>'
+                )
+        st.html(
+            '<div style="position:relative;width:100%;border:1px solid var(--stroke);border-radius:8px;overflow:hidden">'
+            f'<img alt="Planta do andar" src="{data_uri}" style="display:block;width:100%;height:auto">'
+            + "".join(markers)
+            + "</div>"
+        )
+
+        with st.expander("Substituir planta"):
+            replacement = st.file_uploader(
+                "Enviar nova planta (PNG, JPG ou SVG)",
+                type=["png", "jpg", "jpeg", "svg"],
+                key=_upload_key("replace"),
+                max_upload_size=10,
+            )
+            if replacement:
+                actor = get_streamlit_actor()
+                try:
+                    get_streamlit_runtime().floor_plan_management.upload(
+                        actor, current_f["id"], replacement.name, replacement.getvalue()
+                    )
+                except (DomainAuthorizationError, ResourceNotFound, ValueError, PermissionError) as exc:
+                    st.error(str(exc))
+                else:
+                    _reset_upload_keys()
+                    set_toast("Planta substituída. As posições das salas foram mantidas.")
+                    st.rerun()
 
         # Marcadores de salas posicionadas
         if positions:
@@ -724,14 +809,15 @@ def _render_floor_plan(current_b: dict | None, current_f: dict | None, plan: dic
                 mc2.caption(f"x:{pos['x']:.0f}% y:{pos['y']:.0f}%")
                 with mc3:
                     if st.button("", key=f"fp_unpin_{room_id}", icon=":material/close:", help="Remover da planta"):
-                        new_pos = {k: v for k, v in positions.items() if k != room_id}
-                        st.session_state.plans[_plan_key()] = {**plan, "positions": new_pos}
-                        for s in st.session_state.spaces:
-                            if s["id"] == room_id:
-                                s.pop("position", None)
-                        if st.session_state.fp_positioning == room_id:
-                            st.session_state.fp_positioning = None
-                        st.rerun()
+                        actor = get_streamlit_actor()
+                        try:
+                            get_streamlit_runtime().floor_plan_management.remove_room_position(actor, current_f["id"], room_id)
+                        except (DomainAuthorizationError, ResourceNotFound, ValueError, PermissionError) as exc:
+                            st.error(str(exc))
+                        else:
+                            if st.session_state.fp_positioning == room_id:
+                                st.session_state.fp_positioning = None
+                            st.rerun()
 
 
 # =========================================================
@@ -821,14 +907,16 @@ def _render_rooms_panel(current_b: dict | None, current_f: dict | None, plan: di
                     cb1, cb2 = st.columns(2)
                     with cb1:
                         if st.button("Confirmar", key=f"fp_confirm_pos_{rid}", type="primary", use_container_width=True):
-                            pos_data = {"x": float(px), "y": float(py)}
-                            new_positions = {**positions, rid: pos_data}
-                            st.session_state.plans[_plan_key()] = {**plan, "positions": new_positions}
-                            for s in st.session_state.spaces:
-                                if s["id"] == rid:
-                                    s["position"] = pos_data
-                            st.session_state.fp_positioning = None
-                            st.rerun()
+                            actor = get_streamlit_actor()
+                            try:
+                                get_streamlit_runtime().floor_plan_management.set_room_position(
+                                    actor, current_f["id"], rid, float(px), float(py)
+                                )
+                            except (DomainAuthorizationError, ResourceNotFound, ValueError, PermissionError) as exc:
+                                st.error(str(exc))
+                            else:
+                                st.session_state.fp_positioning = None
+                                st.rerun()
                     with cb2:
                         if st.button("Cancelar", key=f"fp_cancel_pos_{rid}", type="tertiary", use_container_width=True):
                             st.session_state.fp_positioning = None
@@ -910,5 +998,5 @@ def floor_plan(user):
             st.rerun()
     with ac2:
         if st.button("Salvar planta", key="fp_save", type="primary", use_container_width=True):
-            set_toast("Planta salva com sucesso.")
+            set_toast("Planta e posições já estão salvas.")
             st.rerun()

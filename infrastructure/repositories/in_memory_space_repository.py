@@ -4,6 +4,8 @@ from threading import RLock
 
 from models.domain.entities.building import Building
 from models.domain.entities.floor import Floor
+from models.domain.entities.floor_plan import FloorPlan, RoomPosition
+from models.domain.entities.resource import Resource
 from models.domain.entities.space import Space
 from models.domain.exceptions import DuplicateResource, ResourceNotFound
 
@@ -16,14 +18,24 @@ class InMemorySpaceRepository:
         spaces: Sequence[Space] | None = None,
         buildings: Sequence[Building] | None = None,
         floors: Sequence[Floor] | None = None,
+        resources: Sequence[Resource] | None = None,
+        floor_plans: Sequence[FloorPlan] | None = None,
     ) -> None:
         self._lock = RLock()
         if spaces is None:
-            self._buildings, self._floors, self._spaces = self._demo_structure()
+            (
+                self._buildings,
+                self._floors,
+                self._spaces,
+                self._resources,
+                self._floor_plans,
+            ) = self._demo_structure()
         else:
             self._spaces = {item.id: item for item in spaces}
             self._buildings = {item.id: item for item in (buildings or ())}
             self._floors = {item.id: item for item in (floors or ())}
+            self._resources = {item.id: item for item in (resources or ())}
+            self._floor_plans = {item.id: item for item in (floor_plans or ())}
 
     def list_all(self) -> tuple[Space, ...]:
         with self._lock:
@@ -143,6 +155,7 @@ class InMemorySpaceRepository:
         status: str | None = None,
         building_id: str | None = None,
         floor_id: str | None = None,
+        resource_id: str | None = None,
         include_inactive: bool = False,
     ) -> tuple[Space, ...]:
         query = search.strip().casefold()
@@ -158,6 +171,8 @@ class InMemorySpaceRepository:
                 if building_id and item.building_id != building_id:
                     continue
                 if floor_id and item.floor_id != floor_id:
+                    continue
+                if resource_id and resource_id not in item.resource_ids:
                     continue
                 if query and query not in " ".join((item.name, item.type, item.building, item.floor, item.location)).casefold():
                     continue
@@ -191,7 +206,111 @@ class InMemorySpaceRepository:
                  if key != space.id and item.floor_id == space.floor_id),
                 "Já existe uma sala com esse nome neste andar.",
             )
+            current = self._spaces[space.id]
+            if current.floor_id != space.floor_id or (current.active and not space.active):
+                self._remove_room_positions(current.floor_id, space.id)
             self._spaces[space.id] = space
+
+    def list_resources(
+        self, institution_id: str, search: str = "", include_inactive: bool = False
+    ) -> tuple[Resource, ...]:
+        query = search.strip().casefold()
+        with self._lock:
+            rows = (
+                item for item in self._resources.values()
+                if item.institution_id == institution_id
+                and (include_inactive or item.active)
+                and (not query or query in item.name.casefold())
+            )
+            return tuple(sorted(rows, key=lambda item: item.name.casefold()))
+
+    def find_resource(self, resource_id: str) -> Resource | None:
+        with self._lock:
+            return self._resources.get(resource_id)
+
+    def add_resource(self, resource: Resource) -> None:
+        with self._lock:
+            self._assert_unique_name(
+                resource.name,
+                (item.name for item in self._resources.values()
+                 if item.institution_id == resource.institution_id),
+                "Já existe um recurso com esse nome na instituição.",
+            )
+            if resource.id in self._resources:
+                raise DuplicateResource("O identificador do recurso já está em uso.")
+            self._resources[resource.id] = resource
+
+    def save_resource(self, resource: Resource) -> None:
+        with self._lock:
+            current = self._resources.get(resource.id)
+            if current is None:
+                raise ResourceNotFound("Recurso não encontrado.")
+            if resource.institution_id != current.institution_id:
+                raise ValueError("Não é permitido transferir um recurso para outra instituição.")
+            self._assert_unique_name(
+                resource.name,
+                (item.name for key, item in self._resources.items()
+                 if key != resource.id and item.institution_id == resource.institution_id),
+                "Já existe um recurso com esse nome na instituição.",
+            )
+            self._resources[resource.id] = resource
+            for space_id, space in tuple(self._spaces.items()):
+                if resource.id in space.resource_ids:
+                    names = tuple(
+                        resource.name if item_id == resource.id else self._resources[item_id].name
+                        for item_id in space.resource_ids
+                    )
+                    self._spaces[space_id] = replace(space, resources=names)
+
+    def find_floor_plan_by_floor(self, floor_id: str) -> FloorPlan | None:
+        with self._lock:
+            return next((item for item in self._floor_plans.values() if item.floor_id == floor_id), None)
+
+    def find_floor_plan(self, plan_id: str) -> FloorPlan | None:
+        with self._lock:
+            return self._floor_plans.get(plan_id)
+
+    def save_floor_plan(self, plan: FloorPlan) -> None:
+        with self._lock:
+            existing = self._floor_plans.get(plan.id)
+            floor = self._floors.get(plan.floor_id)
+            building = self._buildings.get(plan.building_id)
+            if (
+                floor is None or building is None or floor.building_id != building.id
+                or building.institution_id != plan.institution_id
+            ):
+                raise ResourceNotFound("O andar ou prédio da planta não pertence à instituição.")
+            other = next(
+                (item for item in self._floor_plans.values()
+                 if item.floor_id == plan.floor_id and item.id != plan.id),
+                None,
+            )
+            if other:
+                raise DuplicateResource("Este andar já possui uma planta cadastrada.")
+            for position in plan.positions:
+                space = self._spaces.get(position.space_id)
+                if (
+                    space is None or space.institution_id != plan.institution_id
+                    or space.floor_id != plan.floor_id or not space.active
+                ):
+                    raise ResourceNotFound("A posição referencia uma sala inválida para este andar.")
+            if existing and existing.floor_id != plan.floor_id:
+                raise ValueError("A planta não pode ser transferida para outro andar.")
+            self._floor_plans[plan.id] = plan
+
+    def remove_floor_plan(self, floor_id: str) -> FloorPlan | None:
+        with self._lock:
+            plan = next((item for item in self._floor_plans.values() if item.floor_id == floor_id), None)
+            if plan:
+                self._floor_plans.pop(plan.id, None)
+            return plan
+
+    def _remove_room_positions(self, floor_id: str, space_id: str) -> None:
+        plan = next((item for item in self._floor_plans.values() if item.floor_id == floor_id), None)
+        if plan:
+            positions = tuple(item for item in plan.positions if item.space_id != space_id)
+            if positions != plan.positions:
+                self._floor_plans[plan.id] = replace(plan, positions=positions)
 
     def _assert_space_relationship(self, space: Space) -> None:
         floor = self._floors.get(space.floor_id)
@@ -204,6 +323,15 @@ class InMemorySpaceRepository:
             raise ResourceNotFound("O prédio ou andar informado não pertence à instituição da sala.")
         if space.active and (not floor.active or not building.active):
             raise ValueError("Uma sala ativa precisa pertencer a prédio e andar ativos.")
+        if len(space.resource_ids) != len(set(space.resource_ids)):
+            raise ValueError("A sala não pode repetir recursos associados.")
+        if space.resource_ids:
+            selected = [self._resources.get(item_id) for item_id in space.resource_ids]
+            if any(item is None or item.institution_id != space.institution_id for item in selected):
+                raise ResourceNotFound("Um dos recursos não pertence à instituição da sala.")
+            expected_names = tuple(item.name for item in selected if item is not None)
+            if expected_names != space.resources:
+                raise ValueError("Os nomes e identificadores dos recursos da sala não correspondem.")
 
     def count_active_floors(self, building_id: str) -> int:
         with self._lock:
@@ -270,8 +398,23 @@ class InMemorySpaceRepository:
             )
             for id, name, room_type, capacity, building_name, floor_name, status, resources, occupancy in source
         )
+        resource_names = sorted({name for space in spaces for name in space.resources}, key=str.casefold)
+        resources = tuple(
+            Resource(f"res-{index}", "inst-demo", name)
+            for index, name in enumerate(resource_names, start=1)
+        )
+        resource_ids = {item.name.casefold(): item.id for item in resources}
+        spaces = tuple(
+            replace(
+                item,
+                resource_ids=tuple(resource_ids[name.casefold()] for name in item.resources),
+            )
+            for item in spaces
+        )
         return (
             {item.id: item for item in buildings},
             {item.id: item for item in floors},
             {item.id: item for item in spaces},
+            {item.id: item for item in resources},
+            {},
         )

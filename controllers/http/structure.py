@@ -1,12 +1,21 @@
 from typing import Generic, TypeVar
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile
 from pydantic import BaseModel, Field
 
 from application.services.space_service import SpaceService
-from controllers.http.dependencies import get_current_user, get_space_management_service
+from application.services.floor_plan_service import FloorPlanService
+from application.services.resource_management_service import ResourceManagementService
+from controllers.http.dependencies import (
+    get_current_user,
+    get_floor_plan_management_service,
+    get_resource_management_service,
+    get_space_management_service,
+)
 from models.domain.entities.building import Building
 from models.domain.entities.floor import Floor
+from models.domain.entities.floor_plan import FloorPlan
+from models.domain.entities.resource import Resource
 from models.domain.entities.space import Space
 from models.domain.entities.user import User
 from models.domain.exceptions import DomainAuthorizationError, DuplicateResource, ResourceNotFound
@@ -71,6 +80,45 @@ class SpaceResponse(BaseModel):
     location: str
     status: str
     active: bool
+    resources: list[str]
+    resource_ids: list[str]
+
+
+class ResourceRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=100)
+
+
+class ResourceResponse(BaseModel):
+    id: str
+    institution_id: str
+    name: str
+    active: bool
+
+
+class ResourceAssignmentRequest(BaseModel):
+    resource_ids: list[str] = Field(max_length=100)
+
+
+class RoomPositionRequest(BaseModel):
+    x: float = Field(ge=0, le=100)
+    y: float = Field(ge=0, le=100)
+
+
+class RoomPositionResponse(BaseModel):
+    space_id: str
+    x: float
+    y: float
+
+
+class FloorPlanResponse(BaseModel):
+    id: str
+    institution_id: str
+    building_id: str
+    floor_id: str
+    original_filename: str
+    media_type: str
+    checksum: str
+    positions: list[RoomPositionResponse]
 
 
 class ListResponse(BaseModel, Generic[T]):
@@ -185,11 +233,12 @@ def list_institution_spaces(
     status: str | None = None,
     building_id: str | None = None,
     floor_id: str | None = None,
+    resource_id: str | None = None,
     include_inactive: bool = False,
     actor: User = Depends(get_current_user),
     service: SpaceService = Depends(get_space_management_service),
 ):
-    items = _run(lambda: service.list_spaces(actor, q, status, building_id, floor_id, include_inactive))
+    items = _run(lambda: service.list_spaces(actor, q, status, building_id, floor_id, resource_id, include_inactive))
     return ListResponse(data=[_space(item) for item in items])
 
 
@@ -237,6 +286,143 @@ def set_space_status(
     return ItemResponse(data=_space(result))
 
 
+@router.get("/resources", response_model=ListResponse[ResourceResponse])
+def list_resources(
+    q: str = Query(default="", max_length=100),
+    include_inactive: bool = False,
+    actor: User = Depends(get_current_user),
+    service: ResourceManagementService = Depends(get_resource_management_service),
+):
+    items = _run(lambda: service.list_resources(actor, q, include_inactive))
+    return ListResponse(data=[_resource(item) for item in items])
+
+
+@router.get("/resources/{resource_id}", response_model=ItemResponse[ResourceResponse])
+def get_resource(
+    resource_id: str,
+    actor: User = Depends(get_current_user),
+    service: ResourceManagementService = Depends(get_resource_management_service),
+):
+    return ItemResponse(data=_resource(_run(lambda: service.get_resource(actor, resource_id))))
+
+
+@router.post("/resources", response_model=ItemResponse[ResourceResponse], status_code=201)
+def create_resource(
+    payload: ResourceRequest,
+    actor: User = Depends(get_current_user),
+    service: ResourceManagementService = Depends(get_resource_management_service),
+):
+    return ItemResponse(data=_resource(_run(lambda: service.create_resource(actor, payload.name))))
+
+
+@router.patch("/resources/{resource_id}", response_model=ItemResponse[ResourceResponse])
+def update_resource(
+    resource_id: str,
+    payload: ResourceRequest,
+    actor: User = Depends(get_current_user),
+    service: ResourceManagementService = Depends(get_resource_management_service),
+):
+    return ItemResponse(data=_resource(_run(lambda: service.update_resource(actor, resource_id, payload.name))))
+
+
+@router.patch("/resources/{resource_id}/status", response_model=ItemResponse[ResourceResponse])
+def set_resource_status(
+    resource_id: str,
+    payload: ActiveRequest,
+    actor: User = Depends(get_current_user),
+    service: ResourceManagementService = Depends(get_resource_management_service),
+):
+    result = _run(lambda: service.set_resource_active(actor, resource_id, payload.active))
+    return ItemResponse(data=_resource(result))
+
+
+@router.put("/spaces/{space_id}/resources", response_model=ItemResponse[SpaceResponse])
+def set_space_resources(
+    space_id: str,
+    payload: ResourceAssignmentRequest,
+    actor: User = Depends(get_current_user),
+    service: ResourceManagementService = Depends(get_resource_management_service),
+):
+    result = _run(lambda: service.set_space_resources(actor, space_id, payload.resource_ids))
+    return ItemResponse(data=_space(result))
+
+
+@router.get("/floors/{floor_id}/plan", response_model=ItemResponse[FloorPlanResponse])
+def get_floor_plan(
+    floor_id: str,
+    actor: User = Depends(get_current_user),
+    service: FloorPlanService = Depends(get_floor_plan_management_service),
+):
+    plan = _run(lambda: service.get_for_floor(actor, floor_id))
+    if plan is None:
+        raise HTTPException(status_code=404, detail="Planta não encontrada.")
+    return ItemResponse(data=_floor_plan(plan))
+
+
+@router.post("/floors/{floor_id}/plan", response_model=ItemResponse[FloorPlanResponse])
+async def upload_floor_plan(
+    floor_id: str,
+    file: UploadFile = File(...),
+    actor: User = Depends(get_current_user),
+    service: FloorPlanService = Depends(get_floor_plan_management_service),
+):
+    content = await file.read(FloorPlanService.MAX_FILE_SIZE + 1)
+    await file.close()
+    plan = _run(lambda: service.upload(actor, floor_id, file.filename or "", content))
+    return ItemResponse(data=_floor_plan(plan))
+
+
+@router.get("/floors/{floor_id}/plan/file")
+def read_floor_plan_file(
+    floor_id: str,
+    actor: User = Depends(get_current_user),
+    service: FloorPlanService = Depends(get_floor_plan_management_service),
+):
+    plan, content = _run(lambda: service.read_file(actor, floor_id))
+    return Response(
+        content=content,
+        media_type=plan.media_type,
+        headers={
+            "Cache-Control": "private, no-store",
+            "X-Content-Type-Options": "nosniff",
+            "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; sandbox",
+        },
+    )
+
+
+@router.delete("/floors/{floor_id}/plan", status_code=204)
+def delete_floor_plan(
+    floor_id: str,
+    actor: User = Depends(get_current_user),
+    service: FloorPlanService = Depends(get_floor_plan_management_service),
+):
+    _run(lambda: service.remove(actor, floor_id))
+    return Response(status_code=204)
+
+
+@router.put("/floors/{floor_id}/positions/{space_id}", response_model=ItemResponse[FloorPlanResponse])
+def set_room_position(
+    floor_id: str,
+    space_id: str,
+    payload: RoomPositionRequest,
+    actor: User = Depends(get_current_user),
+    service: FloorPlanService = Depends(get_floor_plan_management_service),
+):
+    plan = _run(lambda: service.set_room_position(actor, floor_id, space_id, payload.x, payload.y))
+    return ItemResponse(data=_floor_plan(plan))
+
+
+@router.delete("/floors/{floor_id}/positions/{space_id}", response_model=ItemResponse[FloorPlanResponse])
+def delete_room_position(
+    floor_id: str,
+    space_id: str,
+    actor: User = Depends(get_current_user),
+    service: FloorPlanService = Depends(get_floor_plan_management_service),
+):
+    plan = _run(lambda: service.remove_room_position(actor, floor_id, space_id))
+    return ItemResponse(data=_floor_plan(plan))
+
+
 def _run(action):
     try:
         return action()
@@ -264,4 +450,22 @@ def _space(item: Space) -> SpaceResponse:
         floor_id=item.floor_id, name=item.name, type=item.type, capacity=item.capacity,
         building=item.building, floor=item.floor, location=item.location,
         status=item.status, active=item.active,
+        resources=list(item.resources), resource_ids=list(item.resource_ids),
+    )
+
+
+def _resource(item: Resource) -> ResourceResponse:
+    return ResourceResponse(
+        id=item.id, institution_id=item.institution_id,
+        name=item.name, active=item.active,
+    )
+
+
+def _floor_plan(item: FloorPlan) -> FloorPlanResponse:
+    return FloorPlanResponse(
+        id=item.id, institution_id=item.institution_id,
+        building_id=item.building_id, floor_id=item.floor_id,
+        original_filename=item.original_filename, media_type=item.media_type,
+        checksum=item.checksum,
+        positions=[RoomPositionResponse(space_id=pos.space_id, x=pos.x, y=pos.y) for pos in item.positions],
     )

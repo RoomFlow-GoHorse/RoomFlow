@@ -4,46 +4,28 @@ import streamlit as st
 from controllers import mock_data_service
 from controllers.app_state_service import set_toast
 from controllers.streamlit_runtime import get_streamlit_actor, get_streamlit_runtime
-from models.domain.exceptions import DomainAuthorizationError, ResourceNotFound
+from models.domain.exceptions import DomainAuthorizationError, DuplicateResource, ResourceNotFound
 from views.components.ui_components import badge, page_header
-
-ALL_RESOURCES = [
-    "Projetor",
-    "Ar-condicionado",
-    "Computadores",
-    "Quadro branco",
-    "Sistema de áudio",
-    "Videoconferência",
-    'TV 55"',
-    "Microfones",
-]
 
 # ============================================================
 # HELPERS
 # ============================================================
 
 def _resource_names():
-    names = set(ALL_RESOURCES)
-    
-    for item in mock_data_service.resources():
-        names.add(item["name"] if isinstance(item, dict) else item)
-
-    for space in mock_data_service.spaces():
-        for res in space.get("resources", []):
-            names.add(res)
-
-    return sorted(list(names))
+    actor = get_streamlit_actor()
+    if actor is None:
+        raise PermissionError("Sua sessão expirou. Entre novamente.")
+    return get_streamlit_runtime().resource_management.list_resources(actor, include_inactive=True)
 
 
-def _load_spaces(query: str = "", status: str | None = None):
+def _load_spaces(query: str = "", status: str | None = None, resource_id: str | None = None):
     actor = get_streamlit_actor()
     if actor is None:
         raise PermissionError("Sua sessão expirou. Entre novamente.")
     selected_status = None if status in {None, "Todos"} else status
     real_spaces = get_streamlit_runtime().space_management.list_spaces(
-        actor, search=query, status=selected_status
+        actor, search=query, status=selected_status, resource_id=resource_id
     )
-    mock_spaces = {item["id"]: item for item in mock_data_service.spaces()}
     return [
         {
             "id": item.id,
@@ -51,7 +33,8 @@ def _load_spaces(query: str = "", status: str | None = None):
             "location": item.location,
             "type": item.type,
             "capacity": item.capacity,
-            "resources": mock_spaces.get(item.id, {}).get("resources", list(item.resources)),
+            "resources": list(item.resources),
+            "resource_ids": list(item.resource_ids),
             "status": item.status,
             "active": item.active,
             "building_id": item.building_id,
@@ -61,22 +44,14 @@ def _load_spaces(query: str = "", status: str | None = None):
     ]
 
 
-def _resource_key(value):
-    return " ".join(str(value).split()).casefold()
-
-
 def _register_resource(resource):
-    resource_key = _resource_key(resource)
-
-    if any(_resource_key(name) == resource_key for name in _resource_names()):
+    actor = get_streamlit_actor()
+    if actor is None:
+        raise PermissionError("Sua sessão expirou. Entre novamente.")
+    try:
+        get_streamlit_runtime().resource_management.create_resource(actor, resource)
+    except DuplicateResource:
         return False
-
-    if "resources" not in st.session_state:
-        st.session_state.resources = []
-
-    st.session_state.resources.append(
-        {"name": resource, "total": 0, "available": 0}
-    )
     return True
 
 
@@ -184,17 +159,30 @@ def edit_space_dialog(space):
                 formatted_name = " ".join(new_resource_input.split())
                 if not formatted_name:
                     st.error("Informe o nome do recurso.")
-                elif not _register_resource(formatted_name):
-                    st.warning("Esse recurso já está cadastrado.")
                 else:
-                    set_toast("Recurso criado.")
-                    st.rerun()
+                    try:
+                        created = _register_resource(formatted_name)
+                    except (DomainAuthorizationError, ResourceNotFound, ValueError, PermissionError) as exc:
+                        st.error(str(exc))
+                    else:
+                        if not created:
+                            st.warning("Esse recurso já está cadastrado.")
+                        else:
+                            set_toast("Recurso criado.")
+                            st.rerun()
 
     st.divider()
 
     with st.form(f"edit_space_form_{space['id']}"):
         capacity = st.number_input("Capacidade *", min_value=1, value=int(space["capacity"]))
-        resources = st.multiselect("Recursos disponíveis", _resource_names(), default=space.get("resources", []))
+        catalog = _resource_names()
+        resource_by_id = {item.id: item for item in catalog}
+        selected_resource_ids = st.multiselect(
+            "Recursos disponíveis",
+            options=[item.id for item in catalog if item.active or item.id in space.get("resource_ids", [])],
+            default=[item_id for item_id in space.get("resource_ids", []) if item_id in resource_by_id],
+            format_func=lambda item_id: resource_by_id[item_id].name,
+        )
 
         cancel_col, save_col = st.columns(2)
         with cancel_col:
@@ -209,14 +197,12 @@ def edit_space_dialog(space):
     if submitted:
         actor = get_streamlit_actor()
         try:
-            get_streamlit_runtime().space_management.update_space(
-                actor, space["id"], capacity=capacity
-            )
+            runtime = get_streamlit_runtime()
+            runtime.space_management.update_space(actor, space["id"], capacity=capacity)
+            runtime.resource_management.set_space_resources(actor, space["id"], selected_resource_ids)
         except (DomainAuthorizationError, ResourceNotFound, ValueError, PermissionError) as exc:
             st.error(str(exc))
             return
-        # Resource catalog and associations are handled by the next stage.
-        mock_data_service.update_space(space["id"], capacity, resources)
         st.session_state["edit_space_id"] = None
         set_toast("Dados operacionais do espaço atualizados.")
         st.rerun()
@@ -305,7 +291,7 @@ def _render_dialogs(all_spaces):
 def spaces(user=None):
     page_header("Espaços", "Gerencie a capacidade, recursos e disponibilidade das salas.")
 
-    search_col, status_col = st.columns([3, 1], vertical_alignment="bottom")
+    search_col, status_col, resource_col = st.columns([3, 1, 1], vertical_alignment="bottom")
     query = search_col.text_input("Buscar espaço", placeholder="Buscar por espaço ou localização...", icon=":material/search:", label_visibility="collapsed", key="space_search_query")
     status = status_col.selectbox(
         "Status",
@@ -314,9 +300,22 @@ def spaces(user=None):
         label_visibility="collapsed",
         key="space_status_filter",
     )
+    try:
+        resources = _resource_names()
+    except (DomainAuthorizationError, ResourceNotFound, ValueError, PermissionError) as exc:
+        st.error(str(exc))
+        return
+    resource_labels = {"Todos": "Todos os recursos", **{item.id: item.name for item in resources}}
+    resource_id = resource_col.selectbox(
+        "Recurso",
+        options=["Todos", *(item.id for item in resources)],
+        format_func=resource_labels.get,
+        label_visibility="collapsed",
+        key="space_resource_filter",
+    )
 
     try:
-        items = _load_spaces(query, status)
+        items = _load_spaces(query, status, None if resource_id == "Todos" else resource_id)
     except (DomainAuthorizationError, ResourceNotFound, ValueError, PermissionError) as exc:
         st.error(str(exc))
         return

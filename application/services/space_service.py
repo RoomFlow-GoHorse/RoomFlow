@@ -30,6 +30,7 @@ class SpaceService:
         status: str | None = None,
         building_id: str | None = None,
         floor_id: str | None = None,
+        resource_id: str | None = None,
         include_inactive: bool = False,
     ) -> list[Space]:
         if actor is None:
@@ -51,6 +52,7 @@ class SpaceService:
             status=status,
             building_id=building_id,
             floor_id=floor_id,
+            resource_id=resource_id,
             include_inactive=include_inactive,
         ))
 
@@ -176,6 +178,7 @@ class SpaceService:
             status if status is not None else current.status,
             active=current.active,
             resources=current.resources,
+            resource_ids=current.resource_ids,
             occupancy=current.occupancy,
         )
         self._repository.save_space(updated)
@@ -246,6 +249,7 @@ class SpaceService:
         status: str,
         active: bool = True,
         resources: tuple[str, ...] = (),
+        resource_ids: tuple[str, ...] = (),
         occupancy: int = 0,
     ) -> Space:
         if status not in SPACE_STATUSES:
@@ -262,6 +266,7 @@ class SpaceService:
             location=f"{building.name}, {floor.name}",
             status=status,
             resources=resources,
+            resource_ids=resource_ids,
             occupancy=occupancy,
             institution_id=actor.institution_id or "",
             building_id=building.id,

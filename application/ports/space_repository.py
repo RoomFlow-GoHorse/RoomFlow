@@ -24,6 +24,7 @@ class SpaceRepository(Protocol):
         status: str | None = None,
         building_id: str | None = None,
         floor_id: str | None = None,
+        resource_id: str | None = None,
         include_inactive: bool = False,
     ) -> Sequence[Space]: ...
     def find_space(self, space_id: str) -> Space | None: ...

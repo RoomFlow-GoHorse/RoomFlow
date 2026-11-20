@@ -8,6 +8,8 @@ from application.services.enrollment_management_service import EnrollmentManagem
 from application.services.user_management_service import UserManagementService
 from application.services.member_signup_service import MemberSignupService
 from application.services.space_service import SpaceService
+from application.services.resource_management_service import ResourceManagementService
+from application.services.floor_plan_service import FloorPlanService
 from application.services.login_attempt_limiter import LoginAttemptLimiter
 from infrastructure.repositories.in_memory_institution_repository import InMemoryInstitutionRepository
 from infrastructure.repositories.in_memory_institution_invite_code_repository import InMemoryInstitutionInviteCodeRepository
@@ -15,6 +17,7 @@ from infrastructure.repositories.in_memory_authorized_enrollment_repository impo
 from infrastructure.repositories.in_memory_session_repository import InMemorySessionRepository
 from infrastructure.repositories.in_memory_user_repository import InMemoryUserRepository
 from infrastructure.repositories.in_memory_space_repository import InMemorySpaceRepository
+from infrastructure.storage.temporary_plant_file_storage import TemporaryPlantFileStorage
 from infrastructure.security.pbkdf2_password_hasher import Pbkdf2PasswordHasher
 from infrastructure.spreadsheets.openpyxl_enrollment_parser import OpenpyxlEnrollmentSpreadsheetParser
 from infrastructure.repositories.in_memory_pending_member_signup_repository import InMemoryPendingMemberSignupRepository
@@ -41,6 +44,9 @@ class InMemoryApplicationRuntime:
     pending_member_signups: InMemoryPendingMemberSignupRepository
     spaces: InMemorySpaceRepository
     space_management: SpaceService
+    resource_management: ResourceManagementService
+    floor_plan_management: FloorPlanService
+    plant_file_storage: TemporaryPlantFileStorage
 
 
 def build_application_runtime(environment: str) -> InMemoryApplicationRuntime:
@@ -74,6 +80,7 @@ def build_application_runtime(environment: str) -> InMemoryApplicationRuntime:
     user_repository = InMemoryUserRepository(accounts)
     institution_repository = InMemoryInstitutionRepository(institutions)
     spaces = InMemorySpaceRepository()
+    plant_file_storage = TemporaryPlantFileStorage()
     invite_code_repository = InMemoryInstitutionInviteCodeRepository()
     invite_code_service = InstitutionInviteCodeService(invite_code_repository)
     enrollment_repository = InMemoryAuthorizedEnrollmentRepository()
@@ -123,4 +130,7 @@ def build_application_runtime(environment: str) -> InMemoryApplicationRuntime:
         pending_member_signups=pending_member_signups,
         spaces=spaces,
         space_management=SpaceService(spaces),
+        resource_management=ResourceManagementService(spaces, spaces),
+        floor_plan_management=FloorPlanService(spaces, plant_file_storage),
+        plant_file_storage=plant_file_storage,
     )
