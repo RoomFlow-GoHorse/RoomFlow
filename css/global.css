@@ -224,6 +224,10 @@ body {
   letter-spacing: -0.02em;
 }
 
+.rf-logo__flow {
+  color: var(--brand);
+}
+
 .rf-logo--dark {
   color: #18181B;
 }

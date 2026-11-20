@@ -198,7 +198,12 @@ def logo(size="medium", variant=None, class_name=""):
 
     image_uri = _logo_data_uri(variant)
 
-    wordmark = "" if variant == "mark" else '<span class="rf-logo__name">RoomFlow</span>'
+    wordmark = (
+        ""
+        if variant == "mark"
+        else '<span class="rf-logo__name"><span class="rf-logo__room">Room</span>'
+        '<span class="rf-logo__flow">Flow</span></span>'
+    )
 
     return (
         f'<div class="rf-logo rf-logo--{size} rf-logo--{variant}{extra_class}">'
