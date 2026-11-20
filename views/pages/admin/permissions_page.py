@@ -4,26 +4,38 @@ import streamlit as st
 from views.components.ui_components import page_header
 
 
-# Níveis: acesso completo, somente registros próprios ou sem acesso.
+# A matriz distingue grants efetivos de acessos ainda sem escopo validado.
 PERMISSION_MATRIX = [
-    ("Gerenciar usuários", "full", "none", "none", "none"),
-    ("Gerenciar permissões", "full", "none", "none", "none"),
-    ("Configurações do sistema", "full", "none", "none", "none"),
-    ("Gerenciar espaços", "full", "full", "none", "none"),
-    ("Gerenciar recursos", "full", "full", "none", "none"),
-    ("Tipos de reserva", "full", "full", "none", "none"),
-    ("Criar reservas", "full", "full", "own", "none"),
-    ("Aprovar / rejeitar reservas", "full", "full", "none", "none"),
-    ("Cancelar reservas", "full", "full", "own", "none"),
-    ("Resolver conflitos", "full", "full", "none", "none"),
-    ("Bloquear espaços", "full", "full", "none", "none"),
-    ("Consultar agenda", "full", "full", "full", "full"),
-    ("Localizar espaços", "full", "full", "full", "full"),
-    ("Histórico de reservas", "full", "full", "own", "none"),
-    ("Relatórios de ocupação", "full", "full", "none", "none"),
+    ("Acessar dashboard do administrador", "institution", "none", "none", "none"),
+    ("Acessar dashboard do gerente", "none", "pending", "none", "none"),
+    ("Acessar dashboard do solicitante", "none", "none", "pending", "none"),
+    ("Acessar dashboard do participante", "none", "none", "none", "pending"),
+    ("Gerenciar a própria conta", "own", "own", "own", "own"),
+    ("Gerenciar usuários", "institution", "none", "none", "none"),
+    ("Consultar permissões", "institution", "none", "none", "none"),
+    ("Gerenciar planta da instituição", "institution", "none", "none", "none"),
+    ("Configurações da instituição", "institution", "none", "none", "none"),
+    ("Gerenciar espaços", "none", "pending", "none", "none"),
+    ("Gerenciar recursos", "none", "pending", "none", "none"),
+    ("Criar reservas", "none", "none", "pending", "none"),
+    ("Aprovar / rejeitar reservas", "none", "pending", "none", "none"),
+    ("Cancelar próprias reservas", "none", "none", "own_pending", "none"),
+    ("Resolver conflitos", "none", "pending", "none", "none"),
+    ("Bloquear espaços", "none", "pending", "none", "none"),
+    ("Consultar agenda", "none", "none", "pending", "pending"),
+    ("Localizar espaços", "none", "none", "none", "pending"),
+    ("Histórico de reservas", "none", "pending", "own_pending", "none"),
+    ("Consultar notificações", "none", "none", "pending", "pending"),
+    ("Relatórios de ocupação", "none", "pending", "none", "none"),
 ]
 
-ACCESS_LABELS = {"full": "Completo", "own": "Próprio", "none": "—"}
+ACCESS_LABELS = {
+    "institution": "Instituição do vínculo",
+    "own": "Próprio usuário",
+    "own_pending": "Próprio*",
+    "pending": "A validar",
+    "none": "—",
+}
 
 
 def _permission_dataframe() -> pd.DataFrame:
@@ -46,7 +58,10 @@ def permissions(user):
 
     with st.container(border=True):
         st.caption(
-            ":material/info: Completo: acesso a todos os registros · Próprio: apenas os próprios registros · —: sem acesso"
+            ":material/info: Instituição do vínculo: escopo do admin autenticado · "
+            "Próprio usuário: apenas a própria conta · "
+            "Próprio*: somente registros do solicitante, escopo institucional pendente · "
+            "A validar: não concede acesso efetivo pela API"
         )
 
     st.dataframe(
@@ -63,6 +78,7 @@ def permissions(user):
     )
 
     st.info(
-        "Apenas o administrador pode editar a matriz de permissões. Alterações afetam imediatamente todos os usuários do perfil selecionado.",
+        "As permissões efetivas do admin se limitam à instituição vinculada. "
+        "Os escopos marcados como 'A validar' aguardam decisão da equipe e não são grants da API.",
         icon=":material/shield:",
     )
