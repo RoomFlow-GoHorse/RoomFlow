@@ -42,13 +42,13 @@ def _timeline(spaces, reservations):
         rows.append(f'<div class="rf-occ-row"><div class="rf-occ-room"><strong>{escape(space["name"])}</strong><span>{escape(space.get("location", ""))} · {space.get("capacity", 0)} pessoas</span></div><div class="rf-occ-track">{"".join(blocks)}</div></div>')
     style = """
     <style>
-        .rf-occ { border: 1px solid var(--stroke); border-radius: 12px; background: #fff; overflow-x: auto; }
+        .rf-occ { border: 1px solid var(--stroke); border-radius: 12px; background: var(--surface-card); overflow-x: auto; }
         .rf-occ-inner { min-width: 1050px; }
         .rf-occ-head, .rf-occ-row { display: grid; grid-template-columns: 170px 1fr; }
         .rf-occ-head { background: var(--surface-alt); border-bottom: 1px solid var(--stroke); }
         .rf-occ-room { padding: 14px 16px; border-right: 1px solid var(--stroke); display: flex; flex-direction: column; justify-content: center; gap: 4px; }
         .rf-occ-room span { font-size: 11px; color: var(--graphite-muted); }
-        .rf-occ-times, .rf-occ-track { position: relative; background-image: repeating-linear-gradient(to right, transparent 0, transparent calc(6.25% - 1px), #e4e1db calc(6.25% - 1px), #e4e1db 6.25%); }
+        .rf-occ-times, .rf-occ-track { position: relative; background-image: repeating-linear-gradient(to right, transparent 0, transparent calc(6.25% - 1px), var(--stroke) calc(6.25% - 1px), var(--stroke) 6.25%); }
         .rf-occ-times { height: 48px; display: flex; justify-content: space-between; padding: 16px 8px 0; font-size: 11px; color: var(--graphite-muted); }
         .rf-occ-row { min-height: 76px; border-bottom: 1px solid var(--stroke); }
         .rf-occ-row:last-child { border: 0; }
