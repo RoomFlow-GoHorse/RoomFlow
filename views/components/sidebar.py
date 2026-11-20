@@ -55,6 +55,15 @@ def _navigate(page):
     go(page)
 
 
+def _sidebar_logo_variant():
+    theme = getattr(st.context, "theme", None)
+    theme_type = getattr(theme, "type", None) or getattr(theme, "base", None)
+    if not theme_type and hasattr(theme, "get"):
+        theme_type = theme.get("type") or theme.get("base")
+
+    return "light" if theme_type == "dark" or is_dark_theme() else "dark"
+
+
 def render_sidebar(user):
     current_page = st.session_state.get("page", "landing")
     role = user.get("role", "participante")
@@ -63,8 +72,7 @@ def render_sidebar(user):
 
     with st.sidebar:
         with st.container(key="rf_sidebar_logo"):
-            logo_key = "light" if is_dark_theme() else "dark"
-            st.html(logo(size="small", variant=logo_key))
+            st.html(logo(size="small", variant=_sidebar_logo_variant()))
 
         st.divider()
         with st.container(key="rf_sidebar_navigation_label"):
