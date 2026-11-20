@@ -1,16 +1,13 @@
-import time
+from html import escape
 import streamlit as st
 
-from controllers import mock_data_service
+from sqlalchemy import select
+from sqlalchemy.exc import SQLAlchemyError
+
+from config.database import SessionLocal
+from models.database_models import Instituicao
 from controllers.app_state_service import go
 from views.components.ui_components import logo
-
-DEMO_INSTITUTIONS = [
-    "Faculdade de Tecnologia XPTO",
-    "Universidade Federal do Exemplo",
-    "Centro Universitário ABC",
-    "Instituto de Educação Superior",
-]
 
 def _init_state():
     defaults = {
@@ -19,7 +16,6 @@ def _init_state():
         "signup_member_email": "",
         "signup_member_ra": "",
         "signup_member_instituicao": "",
-        "signup_member_instituicao_select": "Selecione sua instituiÃ§Ã£o...",
         "signup_member_senha": "",
         "signup_member_confirm_senha": "",
         "signup_member_error": "",
@@ -145,22 +141,29 @@ def _render_form():
                 placeholder="Ex: 202612345",
             )
 
-        institutions = mock_data_service.institutions()
-        if not institutions:
-            institutions = DEMO_INSTITUTIONS
-
-        st.selectbox(
-            "Instituição *",
-            ["Selecione sua instituição..."] + institutions,
-            key="signup_member_instituicao_select",
-        )
-
-        if st.session_state.signup_member_instituicao_select == "Selecione sua instituição...":
-            st.session_state.signup_member_instituicao = ""
+        try:
+            with SessionLocal() as sessao:
+                instituicoes = sessao.scalars(
+                    select(Instituicao.name)
+                    .where(Instituicao.status == "ativo")
+                    .distinct()
+                    .order_by(Instituicao.name)
+                ).all()
+        except SQLAlchemyError:
+            instituicoes = []
+            st.error("Não foi possível carregar as instituições. Tente novamente.")
         else:
-            st.session_state.signup_member_instituicao = (
-                st.session_state.signup_member_instituicao_select
-            )
+            if not instituicoes:
+                st.info("Nenhuma instituição ativa cadastrada.")
+
+        st.session_state.signup_member_instituicao = st.selectbox(
+            "Instituição *",
+            instituicoes,
+            index=None,
+            placeholder="Selecione sua instituição...",
+            key="signup_member_instituicao_select",
+            disabled=not instituicoes,
+        )
 
         c3, c4 = st.columns(2)
         with c3:
@@ -192,6 +195,7 @@ def _render_form():
     if st.button(
         "Criar conta →",
         key="signup_member_submit",
+        disabled=not instituicoes,
         type="primary",
         width="stretch",
     ):
@@ -241,20 +245,20 @@ def _render_success():
                     {check_circle_svg}
                 </div>
                 <h2>Conta criada com sucesso!</h2>
-                <p>Seu vínculo com <strong>{st.session_state.signup_member_instituicao}</strong> foi confirmado. Sua conta está pronta para uso.</p>
+                <p>Seu vínculo com <strong>{escape(st.session_state.signup_member_instituicao)}</strong> foi confirmado. Sua conta está pronta para uso.</p>
 
                 <div class="rf-summary">
                     <div>
                         <span>Nome</span>
-                        <strong>{st.session_state.signup_member_nome}</strong>
+                        <strong>{escape(st.session_state.signup_member_nome)}</strong>
                     </div>
                     <div>
                         <span>E-mail</span>
-                        <strong>{st.session_state.signup_member_email}</strong>
+                        <strong>{escape(st.session_state.signup_member_email)}</strong>
                     </div>
                     <div>
                         <span>Instituição</span>
-                        <strong>{st.session_state.signup_member_instituicao}</strong>
+                        <strong>{escape(st.session_state.signup_member_instituicao)}</strong>
                     </div>
                     <div>
                         <span>Status</span>
