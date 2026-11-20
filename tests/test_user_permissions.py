@@ -1,11 +1,11 @@
 import unittest
 
-from domain.entities.institution import Institution
-from domain.entities.permission import Permission
-from domain.entities.profile import Profile
-from domain.entities.user import User, UserStatus
-from domain.exceptions import InstitutionAccessDenied, PermissionDenied
-from domain.policies.permission_policy import PermissionPolicy
+from models.domain.entities.institution import Institution
+from models.domain.entities.permission import Permission
+from models.domain.entities.profile import Profile
+from models.domain.entities.user import User, UserStatus
+from models.domain.exceptions import InstitutionAccessDenied, PermissionDenied
+from models.domain.policies.permission_policy import PermissionPolicy
 
 
 class UserPermissionTests(unittest.TestCase):

@@ -1,7 +1,7 @@
-from domain.entities.institution import Institution
-from domain.entities.profile import Profile
-from domain.entities.user import User
-from domain.exceptions import InstitutionAccessDenied
+from models.domain.entities.institution import Institution
+from models.domain.entities.profile import Profile
+from models.domain.entities.user import User
+from models.domain.exceptions import InstitutionAccessDenied
 
 
 class InstitutionAccessPolicy:

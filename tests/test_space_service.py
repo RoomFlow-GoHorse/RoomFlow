@@ -1,7 +1,7 @@
 import unittest
 
 from application.services.space_service import SpaceService
-from domain.entities.space import Space
+from models.domain.entities.space import Space
 from infrastructure.repositories.in_memory_space_repository import (
     InMemorySpaceRepository,
 )

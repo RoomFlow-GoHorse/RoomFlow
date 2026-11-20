@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, ConfigDict
 
-from api.dependencies import get_space_service
+from controllers.http.dependencies import get_space_service
 from application.services.space_service import SpaceService
 
 

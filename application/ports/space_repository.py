@@ -1,6 +1,6 @@
 from typing import Protocol, Sequence
 
-from domain.entities.space import Space
+from models.domain.entities.space import Space
 
 
 class SpaceRepository(Protocol):

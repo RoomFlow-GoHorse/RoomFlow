@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from enum import Enum
 
-from domain.entities.profile import Profile
+from models.domain.entities.profile import Profile
 
 
 class UserStatus(str, Enum):

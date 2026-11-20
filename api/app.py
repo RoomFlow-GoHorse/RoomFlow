@@ -9,8 +9,8 @@ from api.errors import (
     unhandled_exception_handler,
     validation_exception_handler,
 )
-from api.routes.health import router as health_router
-from api.routes.spaces import router as spaces_router
+from controllers.http.health import router as health_router
+from controllers.http.spaces import router as spaces_router
 from application.ports.space_repository import SpaceRepository
 from infrastructure.repositories.in_memory_space_repository import (
     InMemorySpaceRepository,

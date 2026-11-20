@@ -1,9 +1,9 @@
-from domain.entities.institution import Institution
-from domain.entities.permission import Permission
-from domain.entities.profile import Profile
-from domain.entities.user import User
-from domain.exceptions import PermissionDenied
-from domain.policies.institution_access_policy import InstitutionAccessPolicy
+from models.domain.entities.institution import Institution
+from models.domain.entities.permission import Permission
+from models.domain.entities.profile import Profile
+from models.domain.entities.user import User
+from models.domain.exceptions import PermissionDenied
+from models.domain.policies.institution_access_policy import InstitutionAccessPolicy
 
 
 class PermissionPolicy:

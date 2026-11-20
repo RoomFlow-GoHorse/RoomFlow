@@ -5,12 +5,12 @@ from fastapi import Query
 from fastapi.testclient import TestClient
 
 from api.app import create_app
-from api.dependencies import get_space_service
+from controllers.http.dependencies import get_space_service
 from api.main import app as entrypoint_app
-from domain.entities.space import Space
 from infrastructure.repositories.in_memory_space_repository import (
     InMemorySpaceRepository,
 )
+from models.domain.entities.space import Space
 
 
 class ApiTests(unittest.TestCase):

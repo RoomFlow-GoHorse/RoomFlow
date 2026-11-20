@@ -1,6 +1,6 @@
 from collections.abc import Sequence
 
-from domain.entities.space import Space
+from models.domain.entities.space import Space
 
 
 class InMemorySpaceRepository:

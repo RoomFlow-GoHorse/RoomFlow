@@ -1,5 +1,5 @@
 from application.ports.space_repository import SpaceRepository
-from domain.entities.space import Space
+from models.domain.entities.space import Space
 
 
 class SpaceService:
