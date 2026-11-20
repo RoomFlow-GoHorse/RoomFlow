@@ -1,8 +1,12 @@
 from threading import RLock
+from collections.abc import Callable
+from typing import TypeVar
 from collections.abc import Sequence
 
 from models.domain.entities.authorized_enrollment import AuthorizedEnrollment
 from models.domain.exceptions import DuplicateResource, ResourceNotFound
+
+T = TypeVar("T")
 
 
 class InMemoryAuthorizedEnrollmentRepository:
@@ -74,6 +78,21 @@ class InMemoryAuthorizedEnrollmentRepository:
             consumed = enrollment.consume(user_id)
             self._items[key] = consumed
             return consumed
+
+    def consume_with(
+        self, institution_id: str, registration_number: str, user_id: str,
+        operation: Callable[[], T],
+    ) -> tuple[AuthorizedEnrollment, T]:
+        """Run account creation while the enrollment is locked; commit both or neither."""
+        with self._lock:
+            key = self._key(institution_id, registration_number)
+            enrollment = self._items.get(key)
+            if enrollment is None or not enrollment.is_available:
+                raise ResourceNotFound("Matrícula não disponível.")
+            result = operation()
+            consumed = enrollment.consume(user_id)
+            self._items[key] = consumed
+            return consumed, result
 
     @staticmethod
     def _key(institution_id: str, registration_number: str) -> tuple[str, str]:

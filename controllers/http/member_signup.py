@@ -6,7 +6,15 @@ from application.services.enrollment_management_service import (
     MemberIdentityNotConfirmed,
     TooManyEnrollmentAttempts,
 )
-from controllers.http.dependencies import get_enrollment_management_service
+from application.services.member_signup_service import (
+    InvalidEmailVerification,
+    MemberSignupService,
+)
+from controllers.http.dependencies import (
+    get_enrollment_management_service,
+    get_member_signup_service,
+)
+from models.domain.exceptions import DuplicateResource
 
 
 router = APIRouter(prefix="/auth/signup/member", tags=["member registration"])
@@ -22,6 +30,24 @@ class MemberInstitutionPreviewRequest(BaseModel):
 
 
 class MemberInstitutionPreviewResponse(BaseModel):
+    data: dict[str, str]
+
+
+class MemberSignupStartRequest(MemberInstitutionPreviewRequest):
+    password: str = Field(min_length=8, max_length=1024)
+
+
+class MemberSignupStartResponse(BaseModel):
+    data: dict[str, str]
+
+
+class VerifyEmailRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    token: str = Field(min_length=20, max_length=200)
+
+
+class MemberSignupCompleteResponse(BaseModel):
     data: dict[str, str]
 
 
@@ -54,3 +80,56 @@ def preview_member_institution(
     return MemberInstitutionPreviewResponse(
         data={"institution_name": preview.institution_name}
     )
+
+
+@router.post("/start", response_model=MemberSignupStartResponse, status_code=202)
+def start_member_signup(
+    payload: MemberSignupStartRequest,
+    request: Request,
+    service: MemberSignupService = Depends(get_member_signup_service),
+) -> MemberSignupStartResponse:
+    attempt_key = request.client.host if request.client else "local"
+    try:
+        started = service.start(
+            name=payload.name,
+            email=payload.email,
+            registration_number=payload.registration_number,
+            institutional_code=payload.institutional_code,
+            password=payload.password,
+            attempt_key=attempt_key,
+        )
+    except MemberIdentityNotConfirmed:
+        raise HTTPException(status_code=400, detail="N\u00e3o foi poss\u00edvel concluir o cadastro com os dados informados.") from None
+    except DuplicateResource:
+        raise HTTPException(status_code=400, detail="N\u00e3o foi poss\u00edvel concluir o cadastro com os dados informados.") from None
+    except TooManyEnrollmentAttempts:
+        raise HTTPException(status_code=429, detail="Muitas tentativas. Aguarde e tente novamente.", headers={"Retry-After": "60"}) from None
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from None
+    return MemberSignupStartResponse(data={
+        "institution_name": started.institution_name,
+        "email": started.email,
+        "status": "verification_sent",
+    })
+
+
+@router.post("/verify-email", response_model=MemberSignupCompleteResponse)
+def verify_member_email(
+    payload: VerifyEmailRequest,
+    request: Request,
+    service: MemberSignupService = Depends(get_member_signup_service),
+) -> MemberSignupCompleteResponse:
+    attempt_key = request.client.host if request.client else "local"
+    try:
+        registered = service.verify_email(payload.token, attempt_key)
+    except TooManyEnrollmentAttempts:
+        raise HTTPException(status_code=429, detail="Muitas tentativas. Aguarde e tente novamente.", headers={"Retry-After": "60"}) from None
+    except InvalidEmailVerification:
+        raise HTTPException(status_code=400, detail="Token inv\u00e1lido, expirado ou j\u00e1 utilizado.") from None
+    return MemberSignupCompleteResponse(data={
+        "id": registered.user.id,
+        "email": registered.user.email,
+        "profile": registered.user.profile.value,
+        "institution_id": registered.user.institution_id or "",
+        "status": registered.user.status.value,
+    })

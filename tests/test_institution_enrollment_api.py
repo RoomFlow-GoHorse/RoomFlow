@@ -1,5 +1,8 @@
 import unittest
+from dataclasses import replace
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timedelta, timezone
+import hashlib
 from io import BytesIO
 
 from fastapi.testclient import TestClient
@@ -11,6 +14,7 @@ from infrastructure.repositories.in_memory_authorized_enrollment_repository impo
 )
 from models.domain.entities.authorized_enrollment import AuthorizedEnrollment
 from models.domain.exceptions import ResourceNotFound
+from concurrent.futures import as_completed
 
 
 def token_for(client: TestClient, email: str, password: str) -> str:
@@ -200,10 +204,13 @@ class InstitutionEnrollmentApiTests(unittest.TestCase):
             },
         )
         self.assertEqual(member_cannot_assign_profile.status_code, 422)
-        # Public request cannot pick an institution or profile, and account finalization remains pending.
+        # Public request cannot pick an institution or profile.
         self.assertEqual(
-            self.client.post("/auth/signup/member", json={"profile": "admin"}).status_code,
-            404,
+            self.client.post("/auth/signup/member/start", json={
+                "name": "Maria Silva", "email": "maria@example.edu", "registration_number": "AUTHORIZED",
+                "institutional_code": code, "password": "password-123", "profile": "admin",
+            }).status_code,
+            422,
         )
         still_available = self.client.get(
             "/admin/enrollments?q=AUTHORIZED",
@@ -211,6 +218,138 @@ class InstitutionEnrollmentApiTests(unittest.TestCase):
         )
         self.assertEqual(still_available.status_code, 200)
         self.assertEqual(still_available.json()["data"][0]["status"], "ativo")
+
+    def _start_signup(self, registration_number="RA-NEW", email="student@example.edu"):
+        code = self._rotate_code()
+        self.client.post("/admin/enrollments", headers=self.headers, json={
+            "registration_number": registration_number,
+            "name": "Test Student", "email": email,
+        })
+        payload = {
+            "name": "Test Student", "email": email,
+            "registration_number": registration_number,
+            "institutional_code": code, "password": "secure-password-123",
+        }
+        response = self.client.post("/auth/signup/member/start", json=payload)
+        return response, self.client_context.app.state.simulated_email_sender.latest_for(email)
+
+    def test_email_verified_signup_creates_participant_and_consumes_ra_once(self):
+        started, email = self._start_signup()
+        self.assertEqual(started.status_code, 202)
+        self.assertNotIn("token", started.text.lower())
+        self.assertEqual(started.json()["data"]["institution_name"], "Institui\u00e7\u00e3o de Demonstra\u00e7\u00e3o")
+        self.assertIsNotNone(email)
+
+        complete = self.client.post("/auth/signup/member/verify-email", json={"token": email.verification_token})
+        self.assertEqual(complete.status_code, 200)
+        data = complete.json()["data"]
+        self.assertEqual(data["profile"], "participante")
+        self.assertEqual(data["institution_id"], "inst-demo")
+        self.assertEqual(data["status"], "ativo")
+        self.assertEqual(self.client.post("/auth/login", json={
+            "email": "student@example.edu", "password": "secure-password-123",
+        }).status_code, 200)
+        self.assertEqual(self.client.get("/admin/enrollments?q=RA-NEW", headers=self.headers).json()["data"][0]["status"], "utilizado")
+        self.assertEqual(self.client.post("/auth/signup/member/verify-email", json={"token": email.verification_token}).status_code, 400)
+        self.assertEqual(self.client.post("/auth/signup/member/start", json={
+            "name": "Test Student", "email": "another@example.edu", "registration_number": "RA-NEW",
+            "institutional_code": self._rotate_code(), "password": "secure-password-123",
+        }).status_code, 400)
+
+    def test_invalid_and_rotated_invitation_tokens_cannot_create_member(self):
+        started, email = self._start_signup("RA-ROTATE", "rotate@example.edu")
+        self.assertEqual(started.status_code, 202)
+        self._rotate_code()
+        response = self.client.post("/auth/signup/member/verify-email", json={"token": email.verification_token})
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(self.client.post("/auth/login", json={
+            "email": "rotate@example.edu", "password": "secure-password-123",
+        }).status_code, 401)
+
+    def test_wrong_email_token_never_creates_account(self):
+        response, _ = self._start_signup("RA-WRONG", "wrong@example.edu")
+        self.assertEqual(response.status_code, 202)
+        invalid = self.client.post("/auth/signup/member/verify-email", json={"token": "x" * 40})
+        self.assertEqual(invalid.status_code, 400)
+        self.assertEqual(self.client.post("/auth/login", json={
+            "email": "wrong@example.edu", "password": "secure-password-123",
+        }).status_code, 401)
+
+    def test_member_identity_validation_attempts_are_limited(self):
+        payload = {
+            "name": "Unknown", "email": "unknown@example.edu",
+            "registration_number": "NOT-AUTHORIZED", "institutional_code": "invalid-code",
+        }
+        responses = [self.client.post("/auth/signup/member/preview", json=payload) for _ in range(9)]
+        self.assertTrue(all(response.status_code == 400 for response in responses[:8]))
+        self.assertEqual(responses[8].status_code, 429)
+
+    def test_simultaneous_verification_of_one_token_creates_one_account(self):
+        _, email = self._start_signup("RA-RACE", "race@example.edu")
+        token = email.verification_token
+        app = self.client_context.app
+
+        def verify():
+            return app.state.member_signup_service.verify_email(token, "parallel-test")
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            futures = [executor.submit(verify) for _ in range(2)]
+            outcomes = []
+            for future in as_completed(futures):
+                try:
+                    outcomes.append(future.result())
+                except Exception as exc:
+                    outcomes.append(exc)
+        self.assertEqual(sum(not isinstance(result, Exception) for result in outcomes), 1)
+        self.assertEqual(sum(isinstance(result, Exception) for result in outcomes), 1)
+        self.assertEqual(self.client.post("/auth/login", json={
+            "email": "race@example.edu", "password": "secure-password-123",
+        }).status_code, 200)
+
+    def test_expired_verification_token_is_rejected(self):
+        _, email = self._start_signup("RA-EXPIRED", "expired@example.edu")
+        digest = hashlib.sha256(email.verification_token.encode("utf-8")).hexdigest()
+        repository = self.client_context.app.state.pending_member_signups
+        pending = repository.find_by_digest(digest)
+        repository.save(replace(pending, expires_at=datetime.now(timezone.utc) - timedelta(seconds=1)))
+        response = self.client.post("/auth/signup/member/verify-email", json={"token": email.verification_token})
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(self.client.post("/auth/login", json={
+            "email": "expired@example.edu", "password": "secure-password-123",
+        }).status_code, 401)
+
+    def test_concurrent_members_with_same_email_create_only_one_account(self):
+        code = self._rotate_code()
+        for ra in ("RA-DUP-A", "RA-DUP-B"):
+            self.client.post("/admin/enrollments", headers=self.headers, json={
+                "registration_number": ra, "name": "Same Student", "email": "same@example.edu",
+            })
+        tokens = []
+        for ra in ("RA-DUP-A", "RA-DUP-B"):
+            started = self.client.post("/auth/signup/member/start", json={
+                "name": "Same Student", "email": "same@example.edu",
+                "registration_number": ra, "institutional_code": code,
+                "password": "secure-password-123",
+            })
+            self.assertEqual(started.status_code, 202)
+            tokens.append(self.client_context.app.state.simulated_email_sender.latest_for("same@example.edu").verification_token)
+
+        service = self.client_context.app.state.member_signup_service
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            futures = [executor.submit(service.verify_email, token, f"parallel-{i}") for i, token in enumerate(tokens)]
+            outcomes = []
+            for future in as_completed(futures):
+                try:
+                    outcomes.append(future.result())
+                except Exception as exc:
+                    outcomes.append(exc)
+        self.assertEqual(sum(not isinstance(result, Exception) for result in outcomes), 1)
+        self.assertEqual(sum(isinstance(result, Exception) for result in outcomes), 1)
+        self.assertEqual(self.client.post("/auth/login", json={
+            "email": "same@example.edu", "password": "secure-password-123",
+        }).status_code, 200)
+        statuses = self.client.get("/admin/enrollments?q=RA-DUP", headers=self.headers).json()["data"]
+        self.assertEqual(sum(item["status"] == "utilizado" for item in statuses), 1)
 
     def test_admin_cannot_manage_enrollment_from_another_institution(self) -> None:
         second_signup = self.client.post(

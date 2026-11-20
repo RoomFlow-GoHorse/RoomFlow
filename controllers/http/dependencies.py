@@ -10,6 +10,7 @@ from application.services.institution_invite_code_service import InstitutionInvi
 from application.services.institution_management_service import InstitutionManagementService
 from application.services.space_service import SpaceService
 from application.services.user_management_service import UserManagementService
+from application.services.member_signup_service import MemberSignupService
 from models.domain.entities.user import User
 
 
@@ -38,6 +39,10 @@ def get_institution_invite_code_service(request: Request) -> InstitutionInviteCo
 
 def get_enrollment_management_service(request: Request) -> EnrollmentManagementService:
     return request.app.state.enrollment_management_service
+
+
+def get_member_signup_service(request: Request) -> MemberSignupService:
+    return request.app.state.member_signup_service
 
 
 def get_current_user(

@@ -42,7 +42,7 @@ class InstitutionInviteCodeService:
             raw_code = secrets.token_urlsafe(24)
             entity = InstitutionInviteCode(
                 institution_id=institution_id,
-                digest=self._digest(raw_code),
+                digest=self.digest_code(raw_code),
                 created_at=datetime.now(timezone.utc),
             )
             try:
@@ -55,7 +55,10 @@ class InstitutionInviteCodeService:
     def resolve_active_code(self, raw_code: str) -> str | None:
         if not raw_code or len(raw_code) > 200:
             return None
-        record = self._repository.find_active_by_digest(self._digest(raw_code))
+        return self.resolve_active_digest(self.digest_code(raw_code))
+
+    def resolve_active_digest(self, digest: str) -> str | None:
+        record = self._repository.find_active_by_digest(digest)
         return record.institution_id if record else None
 
     def _institution_scope(
@@ -66,5 +69,5 @@ class InstitutionInviteCodeService:
         )
 
     @staticmethod
-    def _digest(raw_code: str) -> str:
+    def digest_code(raw_code: str) -> str:
         return hashlib.sha256(raw_code.encode("utf-8")).hexdigest()

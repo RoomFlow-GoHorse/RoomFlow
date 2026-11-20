@@ -50,6 +50,9 @@ def create_app(
     app.state.institution_invite_code_service = runtime.invite_codes
     app.state.authorized_enrollment_repository = runtime.authorized_enrollments
     app.state.enrollment_management_service = runtime.enrollment_management
+    app.state.member_signup_service = runtime.member_signup
+    app.state.simulated_email_sender = runtime.simulated_email_sender
+    app.state.pending_member_signups = runtime.pending_member_signups
     app.include_router(health_router)
     app.include_router(auth_router)
     if active_environment in {"development", "test"}:

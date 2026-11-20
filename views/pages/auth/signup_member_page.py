@@ -1,10 +1,13 @@
 import secrets
+import os
 import streamlit as st
 
 from application.services.enrollment_management_service import (
     MemberIdentityNotConfirmed,
     TooManyEnrollmentAttempts,
 )
+from application.services.member_signup_service import InvalidEmailVerification
+from models.domain.exceptions import DuplicateResource
 from controllers.app_state_service import go
 from controllers.streamlit_runtime import get_streamlit_runtime
 from views.components.ui_components import logo
@@ -39,6 +42,7 @@ def _reset():
         "signup_member_senha",
         "signup_member_confirm_senha",
         "signup_member_error",
+        "signup_member_token",
     ]
 
     for key in keys:
@@ -64,8 +68,8 @@ def _validate():
         return "Informe o código institucional recebido da sua instituição."
     if not senha:
         return "Crie uma senha para continuar."
-    if len(senha) < 6:
-        return "A senha deve possuir pelo menos 6 caracteres."
+    if len(senha) < 8:
+        return "A senha deve possuir pelo menos 8 caracteres."
     if not confirm:
         return "Confirme a senha para continuar."
     if senha != confirm:
@@ -158,7 +162,7 @@ def _render_form():
                 placeholder="••••••••",
                 type="password",
             )
-            st.markdown('<span class="rf-field-help" style="font-size:12px; color:#A1A1AA;">Mínimo de 6 caracteres.</span>', unsafe_allow_html=True)
+            st.markdown('<span class="rf-field-help" style="font-size:12px; color:#A1A1AA;">Mínimo de 8 caracteres.</span>', unsafe_allow_html=True)
         with c4:
             st.text_input(
                 "Confirmar senha *",
@@ -253,20 +257,63 @@ def _render_confirm():
             st.session_state.signup_member_error = "N\u00e3o foi poss\u00edvel confirmar os dados informados. Verifique com sua institui\u00e7\u00e3o."
             st.session_state.signup_member_screen = "error"
         else:
-            st.session_state.signup_member_instituicao = preview.institution_name
-            st.session_state.signup_member_screen = "profile_pending"
+            try:
+                started = get_streamlit_runtime().member_signup.start(
+                    name=st.session_state.signup_member_nome.strip(),
+                    email=st.session_state.signup_member_email.strip(),
+                    registration_number=st.session_state.signup_member_ra.strip(),
+                    institutional_code=st.session_state.signup_member_codigo_institucional.strip(),
+                    password=st.session_state.signup_member_senha,
+                    attempt_key=st.session_state.signup_member_attempt_key,
+                )
+            except (MemberIdentityNotConfirmed, TooManyEnrollmentAttempts, DuplicateResource, ValueError):
+                st.session_state.signup_member_error = "N\u00e3o foi poss\u00edvel iniciar o cadastro. Verifique os dados e tente novamente."
+                st.session_state.signup_member_screen = "error"
+            else:
+                st.session_state.signup_member_instituicao = started.institution_name
+                st.session_state.signup_member_screen = "email_pending"
         st.rerun()
 
 
-def _render_profile_pending():
+def _render_email_pending():
     st.info(
-        f"A institui\u00e7\u00e3o {st.session_state.signup_member_instituicao} foi confirmada. "
-        "A conclus\u00e3o do cadastro ainda n\u00e3o est\u00e1 dispon\u00edvel. Entre em contato com a institui\u00e7\u00e3o.",
-        icon=":material/info:",
+        f"Enviamos uma confirma\u00e7\u00e3o para {st.session_state.signup_member_email}. "
+        "Confirme o e-mail para ativar sua conta.",
+        icon=":material/mark_email_unread:",
     )
-    if st.button("Voltar ao in\u00edcio", key="signup_member_pending_back", width="stretch"):
+    environment = os.getenv("APP_ENV", "development").strip().lower()
+    if environment in {"development", "test"}:
+        message = get_streamlit_runtime().simulated_email_sender.latest_for(
+            st.session_state.signup_member_email
+        )
+        if message:
+            st.caption("Caixa de e-mail simulada para desenvolvimento:")
+            st.code(message.verification_token)
+            if st.button("Confirmar e-mail", type="primary", key="signup_member_verify_email"):
+                try:
+                    get_streamlit_runtime().member_signup.verify_email(
+                        message.verification_token,
+                        st.session_state.signup_member_attempt_key,
+                    )
+                except InvalidEmailVerification:
+                    st.session_state.signup_member_error = "Token inv\u00e1lido, expirado ou j\u00e1 utilizado."
+                    st.session_state.signup_member_screen = "error"
+                except TooManyEnrollmentAttempts:
+                    st.session_state.signup_member_error = "Muitas tentativas. Aguarde e tente novamente."
+                    st.session_state.signup_member_screen = "error"
+                else:
+                    st.session_state.signup_member_screen = "success"
+                st.rerun()
+
+
+def _render_success():
+    st.success(
+        f"E-mail confirmado. Sua conta participante da institui\u00e7\u00e3o "
+        f"{st.session_state.signup_member_instituicao} est\u00e1 ativa."
+    )
+    if st.button("Entrar", type="primary", key="signup_member_login"):
         _reset()
-        go("landing")
+        go("login")
 
 def _render_error():
     x_circle_svg = '<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>'
@@ -358,16 +405,16 @@ def signup_member():
         _render_validating()
         return
 
-    if screen == "success":
-        _render_profile_pending()
-        return
-
     if screen == "confirm":
         _render_confirm()
         return
 
-    if screen == "profile_pending":
-        _render_profile_pending()
+    if screen == "email_pending":
+        _render_email_pending()
+        return
+
+    if screen == "success":
+        _render_success()
         return
 
     if screen == "error":
