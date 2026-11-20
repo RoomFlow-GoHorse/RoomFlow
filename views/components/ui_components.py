@@ -16,15 +16,15 @@ from views.components.badges import badge
 ASSETS_DIR = Path(__file__).resolve().parents[2] / "assets"
 
 LOGO_FILES = {
-    "dark": "logo-preta.png",
-    "light": "logo-branca.png",
+    "dark": "logo-preta-icone.png",
+    "light": "logo-branca-icone.png",
     "mark": "logo-icone.png",
 }
 
 LOGO_SIZES = {
-    "small": "110px",
-    "medium": "150px",
-    "large": "210px",
+    "small": "26px",
+    "medium": "32px",
+    "large": "40px",
     "mark": "38px",
 }
 
@@ -198,13 +198,16 @@ def logo(size="medium", variant=None, class_name=""):
 
     image_uri = _logo_data_uri(variant)
 
+    wordmark = "" if variant == "mark" else '<span class="rf-logo__name">RoomFlow</span>'
+
     return (
-        f'<div class="rf-logo rf-logo--{size}{extra_class}">'
+        f'<div class="rf-logo rf-logo--{size} rf-logo--{variant}{extra_class}">'
         f'<img '
         f'class="rf-logo__image" '
         f'src="{image_uri}" '
         f'alt="{alt_text}" '
         f'style="width:{LOGO_SIZES[size]};">'
+        f'{wordmark}'
         f'</div>'
     )
 

@@ -207,10 +207,38 @@ body {
 .rf-logo {
   display: flex;
   align-items: center;
-  gap: 10px;
-  font-size: 20px;
+  gap: 8px;
+  font-size: 18px;
   font-weight: 700;
   color: var(--graphite);
+}
+
+.rf-logo__image {
+  display: block;
+  height: auto;
+  flex: 0 0 auto;
+}
+
+.rf-logo__name {
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.rf-logo--dark {
+  color: #18181B;
+}
+
+.rf-logo--light {
+  color: #FFFFFF;
+}
+
+.rf-logo--small {
+  font-size: 17px;
+}
+
+.rf-logo--large {
+  gap: 10px;
+  font-size: 22px;
 }
 
 .rf-avatar {
