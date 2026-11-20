@@ -3,6 +3,8 @@ import streamlit as st
 
 from controllers import mock_data_service
 from controllers.app_state_service import set_toast
+from controllers.streamlit_runtime import get_streamlit_actor, get_streamlit_runtime
+from models.domain.exceptions import DomainAuthorizationError, ResourceNotFound
 from views.components.ui_components import badge, page_header
 
 ALL_RESOURCES = [
@@ -31,6 +33,32 @@ def _resource_names():
             names.add(res)
 
     return sorted(list(names))
+
+
+def _load_spaces(query: str = "", status: str | None = None):
+    actor = get_streamlit_actor()
+    if actor is None:
+        raise PermissionError("Sua sessão expirou. Entre novamente.")
+    selected_status = None if status in {None, "Todos"} else status
+    real_spaces = get_streamlit_runtime().space_management.list_spaces(
+        actor, search=query, status=selected_status
+    )
+    mock_spaces = {item["id"]: item for item in mock_data_service.spaces()}
+    return [
+        {
+            "id": item.id,
+            "name": item.name,
+            "location": item.location,
+            "type": item.type,
+            "capacity": item.capacity,
+            "resources": mock_spaces.get(item.id, {}).get("resources", list(item.resources)),
+            "status": item.status,
+            "active": item.active,
+            "building_id": item.building_id,
+            "floor_id": item.floor_id,
+        }
+        for item in real_spaces
+    ]
 
 
 def _resource_key(value):
@@ -119,6 +147,14 @@ def block_space_dialog(space):
             st.error("Informe o motivo do bloqueio.")
             return
 
+        actor = get_streamlit_actor()
+        try:
+            get_streamlit_runtime().space_management.update_space(
+                actor, space["id"], status="bloqueado"
+            )
+        except (DomainAuthorizationError, ResourceNotFound, ValueError, PermissionError) as exc:
+            st.error(str(exc))
+            return
         _, affected = mock_data_service.block_space(space["id"], reason.strip())
         message = (
             f"Sala bloqueada. {len(affected)} reserva(s) foram sinalizadas em Conflitos."
@@ -171,6 +207,15 @@ def edit_space_dialog(space):
         st.rerun()
 
     if submitted:
+        actor = get_streamlit_actor()
+        try:
+            get_streamlit_runtime().space_management.update_space(
+                actor, space["id"], capacity=capacity
+            )
+        except (DomainAuthorizationError, ResourceNotFound, ValueError, PermissionError) as exc:
+            st.error(str(exc))
+            return
+        # Resource catalog and associations are handled by the next stage.
         mock_data_service.update_space(space["id"], capacity, resources)
         st.session_state["edit_space_id"] = None
         set_toast("Dados operacionais do espaço atualizados.")
@@ -225,6 +270,10 @@ def _space_table_and_actions(items):
     with col_block:
         if is_blocked:
             if st.button("Desbloquear", icon=":material/lock_open:", use_container_width=True, key="btn_action_unblock_space"):
+                actor = get_streamlit_actor()
+                get_streamlit_runtime().space_management.update_space(
+                    actor, selected_space["id"], status="disponivel"
+                )
                 mock_data_service.toggle_space(selected_space["id"])
                 set_toast("Sala desbloqueada.")
                 st.rerun()
@@ -266,7 +315,11 @@ def spaces(user=None):
         key="space_status_filter",
     )
 
-    items = mock_data_service.spaces(status, query)
+    try:
+        items = _load_spaces(query, status)
+    except (DomainAuthorizationError, ResourceNotFound, ValueError, PermissionError) as exc:
+        st.error(str(exc))
+        return
 
     st.write("")
 
@@ -275,13 +328,17 @@ def spaces(user=None):
         return
 
     _space_table_and_actions(items)
-    _render_dialogs(mock_data_service.spaces())
+    _render_dialogs(_load_spaces())
 
 
 def occupancy(user=None):
     page_header("Ocupação", "Acompanhe a situação das salas e as reservas em andamento.")
 
-    items = mock_data_service.spaces()
+    try:
+        items = _load_spaces()
+    except (DomainAuthorizationError, ResourceNotFound, ValueError, PermissionError) as exc:
+        st.error(str(exc))
+        return
     counts = (
         ("Ocupadas", sum(i["status"] == "ocupado" for i in items)),
         ("Disponíveis", sum(i["status"] == "disponivel" for i in items)),

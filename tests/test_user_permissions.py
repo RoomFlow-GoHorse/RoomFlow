@@ -60,12 +60,17 @@ class UserPermissionTests(unittest.TestCase):
             )
 
     def test_other_profiles_have_no_effective_grants_until_scope_is_decided(self) -> None:
-        for profile in (Profile.MANAGER, Profile.REQUESTER, Profile.PARTICIPANT):
+        for profile in (Profile.REQUESTER, Profile.PARTICIPANT):
             with self.subTest(profile=profile):
                 self.assertEqual(
                     self.permission_policy.effective_permissions(profile),
                     frozenset({Permission.MANAGE_OWN_ACCOUNT}),
                 )
+
+    def test_manager_can_manage_rooms_but_not_institution_structure(self) -> None:
+        grants = self.permission_policy.effective_permissions(Profile.MANAGER)
+        self.assertIn(Permission.MANAGE_SPACES, grants)
+        self.assertNotIn(Permission.MANAGE_FLOOR_PLAN, grants)
 
         requester = User(
             id="requester-1",

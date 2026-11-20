@@ -18,11 +18,10 @@ from controllers.http.institution_invite_codes import router as invite_code_rout
 from controllers.http.enrollments import router as enrollments_router
 from controllers.http.member_signup import router as member_signup_router
 from controllers.http.spaces import router as spaces_router
+from controllers.http.structure import router as structure_router
 from application.ports.space_repository import SpaceRepository
-from infrastructure.repositories.in_memory_space_repository import (
-    InMemorySpaceRepository,
-)
 from infrastructure.authentication_factory import build_application_runtime
+from application.services.space_service import SpaceService
 
 
 def create_app(
@@ -35,13 +34,11 @@ def create_app(
     active_environment = (
         environment or os.getenv("APP_ENV", "production")
     ).strip().lower()
-    app.state.space_repository = (
-        space_repository
-        if space_repository is not None
-        else InMemorySpaceRepository()
-    )
     app.state.environment = active_environment
     runtime = build_application_runtime(active_environment)
+    app.state.space_repository = space_repository or runtime.spaces
+    app.state.space_query_service = SpaceService(app.state.space_repository)
+    app.state.space_management_service = runtime.space_management
     app.state.authentication_service = authentication_service or runtime.authentication
     app.state.user_repository = runtime.users
     app.state.institution_repository = runtime.institutions
@@ -57,6 +54,7 @@ def create_app(
     app.include_router(auth_router)
     if active_environment in {"development", "test"}:
         app.include_router(spaces_router)
+        app.include_router(structure_router)
         app.include_router(admin_users_router)
         app.include_router(institutions_router)
         app.include_router(invite_code_router)

@@ -5,14 +5,14 @@ from models.domain.exceptions import InstitutionAccessDenied
 
 
 class InstitutionAccessPolicy:
-    """Limits the confirmed admin profile to its institution relationship."""
+    """Resolves the institution linked to profiles with confirmed grants."""
 
     def resolve_listing_scope(
         self,
         user: User,
         requested_institution_id: str | None = None,
     ) -> str:
-        institution_id = self._admin_institution_id(user)
+        institution_id = self._institution_id(user)
         if (
             requested_institution_id is not None
             and requested_institution_id != institution_id
@@ -27,20 +27,20 @@ class InstitutionAccessPolicy:
         user: User,
         resource_institution: Institution,
     ) -> None:
-        institution_id = self._admin_institution_id(user)
+        institution_id = self._institution_id(user)
         if resource_institution.id != institution_id:
             raise InstitutionAccessDenied(
                 "O recurso pertence a outra instituição."
             )
 
     @staticmethod
-    def _admin_institution_id(user: User) -> str:
-        if user.profile is not Profile.ADMIN:
+    def _institution_id(user: User) -> str:
+        if user.profile not in {Profile.ADMIN, Profile.MANAGER}:
             raise InstitutionAccessDenied(
                 "O escopo institucional deste perfil ainda não foi definido."
             )
         if not user.institution_id:
             raise InstitutionAccessDenied(
-                "O administrador autenticado não possui vínculo institucional."
+                "O usuário autenticado não possui vínculo institucional."
             )
         return user.institution_id

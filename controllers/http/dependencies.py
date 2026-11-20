@@ -18,7 +18,11 @@ bearer_scheme = HTTPBearer(auto_error=False)
 
 
 def get_space_service(request: Request) -> SpaceService:
-    return SpaceService(repository=request.app.state.space_repository)
+    return request.app.state.space_query_service
+
+
+def get_space_management_service(request: Request) -> SpaceService:
+    return request.app.state.space_management_service
 
 
 def get_authentication_service(request: Request) -> AuthenticationService:

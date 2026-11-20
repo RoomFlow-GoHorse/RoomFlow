@@ -7,12 +7,14 @@ from application.services.institution_invite_code_service import InstitutionInvi
 from application.services.enrollment_management_service import EnrollmentManagementService
 from application.services.user_management_service import UserManagementService
 from application.services.member_signup_service import MemberSignupService
+from application.services.space_service import SpaceService
 from application.services.login_attempt_limiter import LoginAttemptLimiter
 from infrastructure.repositories.in_memory_institution_repository import InMemoryInstitutionRepository
 from infrastructure.repositories.in_memory_institution_invite_code_repository import InMemoryInstitutionInviteCodeRepository
 from infrastructure.repositories.in_memory_authorized_enrollment_repository import InMemoryAuthorizedEnrollmentRepository
 from infrastructure.repositories.in_memory_session_repository import InMemorySessionRepository
 from infrastructure.repositories.in_memory_user_repository import InMemoryUserRepository
+from infrastructure.repositories.in_memory_space_repository import InMemorySpaceRepository
 from infrastructure.security.pbkdf2_password_hasher import Pbkdf2PasswordHasher
 from infrastructure.spreadsheets.openpyxl_enrollment_parser import OpenpyxlEnrollmentSpreadsheetParser
 from infrastructure.repositories.in_memory_pending_member_signup_repository import InMemoryPendingMemberSignupRepository
@@ -37,6 +39,8 @@ class InMemoryApplicationRuntime:
     member_signup: MemberSignupService
     simulated_email_sender: InMemoryEmailSender
     pending_member_signups: InMemoryPendingMemberSignupRepository
+    spaces: InMemorySpaceRepository
+    space_management: SpaceService
 
 
 def build_application_runtime(environment: str) -> InMemoryApplicationRuntime:
@@ -69,6 +73,7 @@ def build_application_runtime(environment: str) -> InMemoryApplicationRuntime:
     limiter = LoginAttemptLimiter() if environment in {"development", "test"} else None
     user_repository = InMemoryUserRepository(accounts)
     institution_repository = InMemoryInstitutionRepository(institutions)
+    spaces = InMemorySpaceRepository()
     invite_code_repository = InMemoryInstitutionInviteCodeRepository()
     invite_code_service = InstitutionInviteCodeService(invite_code_repository)
     enrollment_repository = InMemoryAuthorizedEnrollmentRepository()
@@ -116,4 +121,6 @@ def build_application_runtime(environment: str) -> InMemoryApplicationRuntime:
         member_signup=member_signup,
         simulated_email_sender=simulated_email_sender,
         pending_member_signups=pending_member_signups,
+        spaces=spaces,
+        space_management=SpaceService(spaces),
     )
