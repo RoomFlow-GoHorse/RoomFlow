@@ -90,6 +90,17 @@ configurado precisa ter acesso ao banco.
 # Alembic cria as tabelas e registra a versão
 .venv/bin/alembic upgrade head
 ```
+
+Para cadastrar os perfis padrão no banco configurado no `.env`, rode na raiz
+do projeto depois das migrações:
+
+```bash
+.venv/bin/python -m scripts.seed_perfis
+```
+
+O comando cadastra Administrador, Gerente, Solicitante e Participante. Você pode
+rodá-lo novamente sem duplicar os perfis.
+
 Para alterações futuras nos modelos, use o Alembic:
 
 ```bash
