@@ -14,6 +14,9 @@ from controllers.http.auth import router as auth_router
 from controllers.http.admin_users import router as admin_users_router
 from controllers.http.health import router as health_router
 from controllers.http.institutions import router as institutions_router
+from controllers.http.institution_invite_codes import router as invite_code_router
+from controllers.http.enrollments import router as enrollments_router
+from controllers.http.member_signup import router as member_signup_router
 from controllers.http.spaces import router as spaces_router
 from application.ports.space_repository import SpaceRepository
 from infrastructure.repositories.in_memory_space_repository import (
@@ -44,12 +47,18 @@ def create_app(
     app.state.institution_repository = runtime.institutions
     app.state.user_management_service = runtime.user_management
     app.state.institution_management_service = runtime.institution_management
+    app.state.institution_invite_code_service = runtime.invite_codes
+    app.state.authorized_enrollment_repository = runtime.authorized_enrollments
+    app.state.enrollment_management_service = runtime.enrollment_management
     app.include_router(health_router)
     app.include_router(auth_router)
     if active_environment in {"development", "test"}:
         app.include_router(spaces_router)
         app.include_router(admin_users_router)
         app.include_router(institutions_router)
+        app.include_router(invite_code_router)
+        app.include_router(enrollments_router)
+        app.include_router(member_signup_router)
     app.add_exception_handler(StarletteHTTPException, http_exception_handler)
     app.add_exception_handler(RequestValidationError, validation_exception_handler)
     app.add_exception_handler(Exception, unhandled_exception_handler)

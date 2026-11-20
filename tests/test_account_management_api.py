@@ -50,6 +50,7 @@ class AccountManagementApiTests(unittest.TestCase):
         self.assertEqual(data["administrator"]["profile"], "admin")
         self.assertEqual(data["administrator"]["status"], "ativo")
         self.assertEqual(data["institution"]["cnpj"], "12345678000195")
+        self.assertTrue(data["invitation_code"])
 
         owner_token = login(
             self.client, "responsavel@exemplo.edu.br", "senha-segura"

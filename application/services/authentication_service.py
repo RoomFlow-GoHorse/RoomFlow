@@ -1,6 +1,6 @@
 import hashlib
 import secrets
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timedelta, timezone
 
 from application.ports.clock import Clock
@@ -101,6 +101,20 @@ class AuthenticationService:
         if session is None or not session.is_valid_at(now):
             raise InvalidSession
         self._sessions.save(session.revoke(now))
+
+    def change_password(self, user_id: str, current_password: str, new_password: str) -> None:
+        account = self._users.find_by_id(user_id)
+        if (
+            account is None
+            or not account.user.is_active
+            or not self._password_hasher.verify_password(
+                current_password, account.password_hash
+            )
+        ):
+            raise InvalidCredentials
+        self._users.save(
+            replace(account, password_hash=self._password_hasher.hash_password(new_password))
+        )
 
     @staticmethod
     def _digest(token: str) -> str:

@@ -96,6 +96,21 @@ class UserManagementService:
         self._users.save(replace(account, user=updated))
         return updated
 
+    def update_own_profile(self, actor: User, name: str, email: str) -> User:
+        self._permissions.authorize_own_account(actor, actor.id)
+        account = self._users.find_by_id(actor.id)
+        if account is None:
+            raise ResourceNotFound("Usuário não encontrado.")
+        normalized_email = email.strip().lower()
+        existing = self._users.find_by_email(normalized_email)
+        if existing is not None and existing.user.id != actor.id:
+            raise DuplicateResource("Já existe uma conta com este e-mail.")
+        updated = replace(
+            account.user, name=name.strip(), email=normalized_email
+        )
+        self._users.save(replace(account, user=updated))
+        return updated
+
     def _account_in_scope(self, actor: User, user_id: str) -> UserAccount:
         self._permissions.authorize_listing(actor, Permission.MANAGE_USERS)
         account = self._users.find_by_id(user_id)

@@ -1,28 +1,43 @@
-import streamlit as st
+﻿import streamlit as st
 
-from models.mock_data import USERS, password_hash
+from application.services.authentication_service import InvalidCredentials, InvalidSession
+from controllers.streamlit_runtime import get_streamlit_runtime
 
 
 def login(email, password):
     email = email.strip().lower()
-
     if not email or not password:
         return None, "E-mail ou senha incorretos. Verifique seus dados e tente novamente."
-
-    user = next((item for item in USERS if item["email"].lower() == email), None)
-    if not user:
-        return None, "Não encontramos uma conta com esses dados. Confirme seu cadastro com a instituição."
-    if user.get("password_hash") != password_hash(password):
+    try:
+        result = get_streamlit_runtime().authentication.login(
+            email, password, attempt_key="streamlit-local"
+        )
+    except InvalidCredentials:
         return None, "E-mail ou senha incorretos. Verifique seus dados e tente novamente."
-    if user["status"] != "ativo":
-        return None, "Esta conta está inativa. Entre em contato com a instituição."
 
-    session_user = {key: value for key, value in user.items() if key != "password_hash"}
+    account = result.user
+    session_user = {
+        "id": account.id,
+        "name": account.name,
+        "email": account.email,
+        "role": account.profile.value,
+        "status": account.status.value,
+        "institution_id": account.institution_id,
+        "initials": "".join(part[0] for part in account.name.split()[:2]).upper(),
+    }
+    st.session_state.auth_token = result.access_token
     st.session_state.user = session_user
     return session_user, ""
 
 
 def logout():
+    token = st.session_state.get("auth_token")
+    if token:
+        try:
+            get_streamlit_runtime().authentication.logout(token)
+        except InvalidSession:
+            pass
+    st.session_state.auth_token = None
     st.session_state.user = None
     st.session_state.page = "landing"
     st.query_params.clear()

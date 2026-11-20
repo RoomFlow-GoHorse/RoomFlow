@@ -2,8 +2,11 @@ import streamlit as st
 
 from config.constants import ROLE_LABELS
 from controllers import auth_service
-from models.mock_data import USERS, password_hash
+from models.mock_data import USERS
 from views.components.ui_components import page_header
+from application.services.authentication_service import InvalidCredentials
+from controllers.streamlit_runtime import get_streamlit_actor, get_streamlit_runtime
+from models.domain.exceptions import DomainAuthorizationError, DuplicateResource
 
 
 SECTIONS = {
@@ -366,6 +369,18 @@ def _profile(user):
                 st.error("Informe o e-mail.")
                 return
 
+            actor = get_streamlit_actor(user)
+            if actor is None:
+                st.error("Sua sessão expirou. Entre novamente.")
+                return
+            try:
+                get_streamlit_runtime().user_management.update_own_profile(
+                    actor, name, email
+                )
+            except (DomainAuthorizationError, DuplicateResource) as exc:
+                st.error(str(exc))
+                return
+
             user.update(
                 {
                     "name": name.strip(),
@@ -442,107 +457,38 @@ def _profile(user):
 
 def _security(user):
     _section_header("seguranca")
-
     st.info(
-        "Use uma senha forte e exclusiva. "
-        "Recomendamos combinar letras, números e caracteres especiais.",
+        "Use uma senha forte e exclusiva. Recomendamos combinar letras, numeros e caracteres especiais.",
         icon=":material/shield:",
     )
-
-    st.write("")
-
-    with st.form(
-        "account_security",
-        border=False,
-    ):
-        current = st.text_input(
-            "Senha atual",
-            type="password",
-            placeholder="Digite sua senha atual",
-        )
-
-        new_password = st.text_input(
-            "Nova senha",
-            type="password",
-            placeholder="Mínimo de 8 caracteres",
-        )
-
+    with st.form("account_security", border=False):
+        current = st.text_input("Senha atual", type="password", placeholder="Digite sua senha atual")
+        new_password = st.text_input("Nova senha", type="password", placeholder="Minimo de 8 caracteres")
         if new_password:
-            if len(new_password) < 6:
-                strength = "Fraca"
-            elif len(new_password) < 10:
-                strength = "Média"
-            else:
-                strength = "Forte"
-
-            st.caption(
-                f"Força da senha: **{strength}**"
-            )
-
-        confirm = st.text_input(
-            "Confirmar nova senha",
-            type="password",
-            placeholder="Repita sua nova senha",
-        )
-
+            strength = "Fraca" if len(new_password) < 6 else "Media" if len(new_password) < 10 else "Forte"
+            st.caption(f"Forca da senha: **{strength}**")
+        confirm = st.text_input("Confirmar nova senha", type="password", placeholder="Repita sua nova senha")
         st.divider()
-
-        submitted = st.form_submit_button(
-            "Alterar senha",
-            type="primary",
-            icon=":material/lock:",
-        )
-
+        submitted = st.form_submit_button("Alterar senha", type="primary", icon=":material/lock:")
     if not submitted:
         return
-
-    source = next(
-        (
-            item
-            for item in st.session_state.users
-            if item["id"] == user["id"]
-        ),
-        None,
-    )
-
     if not current:
         st.error("Informe a senha atual.")
         return
-
-    if (
-        not source
-        or source.get("password_hash")
-        != password_hash(current)
-    ):
-        st.error(
-            "A senha atual informada não confere."
-        )
-        return
-
     if len(new_password) < 8:
-        st.error(
-            "A nova senha deve ter pelo menos 8 caracteres."
-        )
+        st.error("A nova senha deve ter pelo menos 8 caracteres.")
         return
-
     if new_password != confirm:
-        st.error("As senhas não coincidem.")
+        st.error("As senhas nao coincidem.")
         return
-
-    source["password_hash"] = password_hash(
-        new_password
-    )
-
-    for item in USERS:
-        if item["id"] == user["id"]:
-            item["password_hash"] = source[
-                "password_hash"
-            ]
-
-    st.success(
-        "Senha alterada com sucesso.",
-        icon=":material/check_circle:",
-    )
+    try:
+        get_streamlit_runtime().authentication.change_password(
+            user["id"], current, new_password
+        )
+    except InvalidCredentials:
+        st.error("A senha atual informada nao confere.")
+        return
+    st.success("Senha alterada com sucesso.", icon=":material/check_circle:")
 
 
 def _preferences():

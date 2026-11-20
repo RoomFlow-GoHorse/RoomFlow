@@ -3,11 +3,16 @@ from dataclasses import dataclass
 from application.services.authentication_service import AuthenticationService
 from application.services.login_attempt_limiter import LoginAttemptLimiter
 from application.services.institution_management_service import InstitutionManagementService
+from application.services.institution_invite_code_service import InstitutionInviteCodeService
+from application.services.enrollment_management_service import EnrollmentManagementService
 from application.services.user_management_service import UserManagementService
 from infrastructure.repositories.in_memory_institution_repository import InMemoryInstitutionRepository
+from infrastructure.repositories.in_memory_institution_invite_code_repository import InMemoryInstitutionInviteCodeRepository
+from infrastructure.repositories.in_memory_authorized_enrollment_repository import InMemoryAuthorizedEnrollmentRepository
 from infrastructure.repositories.in_memory_session_repository import InMemorySessionRepository
 from infrastructure.repositories.in_memory_user_repository import InMemoryUserRepository
 from infrastructure.security.pbkdf2_password_hasher import Pbkdf2PasswordHasher
+from infrastructure.spreadsheets.openpyxl_enrollment_parser import OpenpyxlEnrollmentSpreadsheetParser
 from models.domain.entities.profile import Profile
 from models.domain.entities.institution import Institution
 from models.domain.entities.user import User, UserStatus
@@ -21,6 +26,9 @@ class InMemoryApplicationRuntime:
     institutions: InMemoryInstitutionRepository
     user_management: UserManagementService
     institution_management: InstitutionManagementService
+    invite_codes: InstitutionInviteCodeService
+    authorized_enrollments: InMemoryAuthorizedEnrollmentRepository
+    enrollment_management: EnrollmentManagementService
 
 
 def build_application_runtime(environment: str) -> InMemoryApplicationRuntime:
@@ -53,11 +61,23 @@ def build_application_runtime(environment: str) -> InMemoryApplicationRuntime:
     limiter = LoginAttemptLimiter() if environment in {"development", "test"} else None
     user_repository = InMemoryUserRepository(accounts)
     institution_repository = InMemoryInstitutionRepository(institutions)
+    invite_code_repository = InMemoryInstitutionInviteCodeRepository()
+    invite_code_service = InstitutionInviteCodeService(invite_code_repository)
+    enrollment_repository = InMemoryAuthorizedEnrollmentRepository()
     authentication = AuthenticationService(
         users=user_repository,
         sessions=InMemorySessionRepository(),
         password_hasher=hasher,
         login_limiter=limiter,
+    )
+    if accounts:
+        invite_code_service.issue_or_replace(accounts[0].user)
+    enrollment_management = EnrollmentManagementService(
+        enrollments=enrollment_repository,
+        institutions=institution_repository,
+        invite_codes=invite_code_service,
+        spreadsheet_parser=OpenpyxlEnrollmentSpreadsheetParser(),
+        attempt_limiter=LoginAttemptLimiter(max_attempts=8),
     )
     return InMemoryApplicationRuntime(
         authentication=authentication,
@@ -69,4 +89,7 @@ def build_application_runtime(environment: str) -> InMemoryApplicationRuntime:
         institution_management=InstitutionManagementService(
             institution_repository, user_repository, hasher
         ),
+        invite_codes=invite_code_service,
+        authorized_enrollments=enrollment_repository,
+        enrollment_management=enrollment_management,
     )

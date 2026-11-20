@@ -8,8 +8,10 @@ from application.services.institution_management_service import (
 )
 from controllers.http.dependencies import (
     get_current_user,
+    get_institution_invite_code_service,
     get_institution_management_service,
 )
+from application.services.institution_invite_code_service import InstitutionInviteCodeService
 from models.domain.entities.institution import Institution
 from models.domain.entities.user import User
 from models.domain.exceptions import (
@@ -63,8 +65,14 @@ class RegisteredOwnerResponse(BaseModel):
     status: str
 
 
+class InstitutionRegistrationData(BaseModel):
+    institution: InstitutionResponse
+    administrator: RegisteredOwnerResponse
+    invitation_code: str
+
+
 class RegistrationResponse(BaseModel):
-    data: dict[str, InstitutionResponse | RegisteredOwnerResponse]
+    data: InstitutionRegistrationData
 
 
 class SingleInstitutionResponse(BaseModel):
@@ -75,6 +83,7 @@ class SingleInstitutionResponse(BaseModel):
 def register_institution(
     payload: InstitutionRegistrationRequest,
     service: InstitutionManagementService = Depends(get_institution_management_service),
+    invitation_codes: InstitutionInviteCodeService = Depends(get_institution_invite_code_service),
 ) -> RegistrationResponse:
     try:
         institution, owner = service.register(InstitutionRegistration(**payload.model_dump()))
@@ -82,16 +91,18 @@ def register_institution(
         raise HTTPException(status_code=409, detail=str(exc)) from None
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from None
-    return RegistrationResponse(data={
-        "institution": _institution_response(institution),
-        "administrator": RegisteredOwnerResponse(
+    code, _ = invitation_codes.issue_or_replace(owner)
+    return RegistrationResponse(data=InstitutionRegistrationData(
+        institution=_institution_response(institution),
+        administrator=RegisteredOwnerResponse(
             id=owner.id,
             name=owner.name,
             email=owner.email,
             profile=owner.profile.value,
             status=owner.status.value,
         ),
-    })
+        invitation_code=code,
+    ))
 
 
 @router.get("/me", response_model=SingleInstitutionResponse)
