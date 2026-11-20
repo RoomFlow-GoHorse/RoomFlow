@@ -4,6 +4,7 @@ from pathlib import Path
 
 from streamlit.testing.v1 import AppTest
 
+from application.services.institution_management_service import InstitutionUpdate
 from controllers.streamlit_runtime import get_streamlit_runtime
 from models.domain.entities.authorized_enrollment import AuthorizedEnrollment
 
@@ -40,6 +41,46 @@ class MemberSignupStreamlitTests(unittest.TestCase):
         self.assertTrue(any(tab.label == "Codigos e matriculas" for tab in app.tabs))
         user_selector = next(item for item in app.selectbox if item.key == "managed_user_select")
         self.assertTrue(any(member_email in option for option in user_selector.options))
+
+    def test_streamlit_institution_settings_load_and_save_backend_data(self):
+        runtime = get_streamlit_runtime()
+        admin = runtime.users.find_by_email("admin@gmail.com").user
+        login = runtime.authentication.login("admin@gmail.com", "admin123", "streamlit-settings")
+        original = runtime.institution_management.get_own(admin)
+        updated_name = f"Configuração salva {secrets.token_hex(3)}"
+
+        app = AppTest.from_file(str(Path(__file__).resolve().parents[1] / "main.py"))
+        app.query_params["page"] = "configuracoes_instituicao"
+        app.session_state["auth_token"] = login.access_token
+        app.run(timeout=15)
+        self.assertEqual(len(app.exception), 0)
+        self.assertEqual(app.text_input(key="cfg_nome").value, original.name)
+        app.text_input(key="cfg_nome").set_value(updated_name)
+        app.button(key="cfg_salvar").click().run(timeout=15)
+        self.assertEqual(len(app.exception), 0)
+        self.assertEqual(runtime.institution_management.get_own(admin).name, updated_name)
+
+        reopened = AppTest.from_file(str(Path(__file__).resolve().parents[1] / "main.py"))
+        reopened.query_params["page"] = "configuracoes_instituicao"
+        reopened.session_state["auth_token"] = login.access_token
+        reopened.run(timeout=15)
+        self.assertEqual(len(reopened.exception), 0)
+        self.assertEqual(reopened.text_input(key="cfg_nome").value, updated_name)
+
+        runtime.institution_management.update_own(
+            admin,
+            InstitutionUpdate(
+                name=original.name,
+                institution_type=original.institution_type,
+                city=original.city,
+                state=original.state,
+                phone=original.phone,
+                email=original.email,
+                address=original.address,
+                timezone=original.timezone,
+                preferences=original.preferences,
+            ),
+        )
 
     def test_streamlit_page_completes_simulated_email_confirmation(self):
         runtime = get_streamlit_runtime()

@@ -65,6 +65,121 @@ class AccountManagementApiTests(unittest.TestCase):
         self.assertEqual(own_institution.status_code, 200)
         self.assertEqual(own_institution.json()["data"]["id"], data["institution"]["id"])
 
+    def test_institution_settings_load_update_and_persist_in_memory(self) -> None:
+        initial = self.client.get("/institutions/me", headers=self.admin_headers)
+        self.assertEqual(initial.status_code, 200)
+        self.assertEqual(initial.json()["data"]["id"], "inst-demo")
+        self.assertEqual(initial.json()["data"]["preferences"]["reservations"]["min_advance"], 1)
+
+        payload = {
+            "name": "RoomFlow Campus Atualizado",
+            "address": "Rua Central, 100",
+            "city": "Cuiabá",
+            "state": "mt",
+            "email": "contato@campus.edu.br",
+            "phone": "+55 65 3000-0000",
+            "timezone": "America/Manaus",
+            "preferences": {
+                "reservations": {
+                    "min_advance": 2,
+                    "min_advance_unit": "horas",
+                    "max_advance": 30,
+                    "max_advance_unit": "dias",
+                    "allowed_start": "08:00",
+                    "allowed_end": "20:00",
+                    "automatic_approval": "no_conflict",
+                    "justification_required": False,
+                },
+                "conflicts": {
+                    "resolution_criterion": "fifo",
+                    "notification_timing": "one_hour",
+                    "suggest_alternatives": False,
+                },
+                "notifications": {
+                    "reservation_approved": True,
+                    "reservation_rejected": False,
+                    "conflict_detected": True,
+                    "space_changed": False,
+                    "reservation_cancelled": True,
+                    "reservation_reminder": False,
+                },
+            },
+        }
+        updated = self.client.patch(
+            "/institutions/me", headers=self.admin_headers, json=payload
+        )
+        reloaded = self.client.get("/institutions/me", headers=self.admin_headers)
+        self.assertEqual(updated.status_code, 200)
+        self.assertEqual(reloaded.status_code, 200)
+        saved = reloaded.json()["data"]
+        self.assertEqual(saved["name"], payload["name"])
+        self.assertEqual(saved["state"], "MT")
+        self.assertEqual(saved["timezone"], "America/Manaus")
+        self.assertEqual(saved["preferences"], payload["preferences"])
+
+    def test_institution_settings_reject_invalid_values(self) -> None:
+        invalid_email = self.client.patch(
+            "/institutions/me", headers=self.admin_headers,
+            json={"name": "Instituição", "email": "email-invalido"},
+        )
+        invalid_hours = self.client.patch(
+            "/institutions/me", headers=self.admin_headers,
+            json={"name": "Instituição", "preferences": {
+                "reservations": {
+                    "min_advance": 1, "min_advance_unit": "dias",
+                    "max_advance": 10, "max_advance_unit": "dias",
+                    "allowed_start": "21:00", "allowed_end": "07:00",
+                    "automatic_approval": "disabled", "justification_required": True,
+                },
+                "conflicts": {
+                    "resolution_criterion": "manual", "notification_timing": "immediate",
+                    "suggest_alternatives": True,
+                },
+                "notifications": {
+                    "reservation_approved": True, "reservation_rejected": True,
+                    "conflict_detected": True, "space_changed": True,
+                    "reservation_cancelled": True, "reservation_reminder": True,
+                },
+            }},
+        )
+        self.assertEqual(invalid_email.status_code, 422)
+        self.assertEqual(invalid_hours.status_code, 422)
+
+    def test_only_admin_can_access_institution_settings(self) -> None:
+        manager_token = login(self.client, "gerente@gmail.com", "gerente123")
+        response = self.client.get(
+            "/institutions/me", headers={"Authorization": f"Bearer {manager_token}"}
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_institution_settings_are_scoped_to_authenticated_admin(self) -> None:
+        registered = self.client.post(
+            "/institutions/signup",
+            json=institution_signup_payload(
+                responsible_email="second-owner@example.edu",
+                name="Second Institution",
+                cnpj="98.765.432/0001-10",
+            ),
+        )
+        self.assertEqual(registered.status_code, 201)
+        second_token = login(self.client, "second-owner@example.edu", "senha-segura")
+        second_headers = {"Authorization": f"Bearer {second_token}"}
+        second_id = registered.json()["data"]["institution"]["id"]
+        original_name = self.client.get(
+            "/institutions/me", headers=self.admin_headers
+        ).json()["data"]["name"]
+
+        changed = self.client.patch(
+            "/institutions/me?institution_id=inst-demo",
+            headers=second_headers,
+            json={"name": "Second Institution Updated"},
+        )
+        second_own = self.client.get("/institutions/me", headers=second_headers)
+        original_own = self.client.get("/institutions/me", headers=self.admin_headers)
+        self.assertEqual(changed.status_code, 200)
+        self.assertEqual(second_own.json()["data"]["id"], second_id)
+        self.assertEqual(original_own.json()["data"]["name"], original_name)
+
     def test_in_memory_registration_routes_are_local_only(self) -> None:
         with TestClient(create_app(environment="production")) as production_client:
             response = production_client.post(

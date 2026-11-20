@@ -1,10 +1,11 @@
 import secrets
+import re
 from dataclasses import dataclass, replace
 
 from application.ports.institution_repository import InstitutionRepository
 from application.ports.password_hasher import PasswordHasher
 from application.ports.user_repository import UserRepository
-from models.domain.entities.institution import Institution
+from models.domain.entities.institution import Institution, InstitutionPreferences
 from models.domain.entities.permission import Permission
 from models.domain.entities.profile import Profile
 from models.domain.entities.user import User, UserStatus
@@ -35,6 +36,9 @@ class InstitutionUpdate:
     state: str | None = None
     phone: str | None = None
     email: str | None = None
+    address: str | None = None
+    timezone: str | None = None
+    preferences: InstitutionPreferences | None = None
 
 
 class InstitutionManagementService:
@@ -103,14 +107,30 @@ class InstitutionManagementService:
 
     def update_own(self, actor: User, data: InstitutionUpdate) -> Institution:
         current = self.get_own(actor)
+        name = data.name.strip()
+        if not name:
+            raise ValueError("O nome da instituição é obrigatório.")
+        if data.email is not None:
+            email = data.email.strip().lower()
+            if email and not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
+                raise ValueError("Informe um e-mail institucional válido.")
+        phone = data.phone.strip() if data.phone is not None else current.phone
+        if phone and len(phone) > 30:
+            raise ValueError("O telefone deve ter no máximo 30 caracteres.")
+        state = data.state.strip().upper() if data.state is not None else current.state
+        if state and len(state) != 2:
+            raise ValueError("A sigla do estado deve conter 2 caracteres.")
         updated = replace(
             current,
-            name=data.name.strip(),
+            name=name,
             institution_type=(data.institution_type if data.institution_type is not None else current.institution_type),
-            city=data.city if data.city is not None else current.city,
-            state=data.state.upper() if data.state is not None else current.state,
-            phone=data.phone if data.phone is not None else current.phone,
+            city=data.city.strip() if data.city is not None else current.city,
+            state=state,
+            phone=phone,
             email=(data.email.strip().lower() if data.email is not None else current.email),
+            address=data.address.strip() if data.address is not None else current.address,
+            timezone=data.timezone if data.timezone is not None else current.timezone,
+            preferences=data.preferences if data.preferences is not None else current.preferences,
         )
         self._institutions.save(updated)
         return updated
