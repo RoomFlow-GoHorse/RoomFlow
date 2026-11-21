@@ -97,8 +97,6 @@ def _validate_step_two():
 
     if not instituicao:
         return "Informe o nome da instituição."
-    if not cnpj:
-        return "Informe o CNPJ da instituição."
     if not tipo:
         return "Selecione o tipo da instituição."
     return None
@@ -135,7 +133,7 @@ def _submit():
         created = get_streamlit_runtime().institution_management.register(
             InstitutionRegistration(
                 name=state.signup_inst_instituicao,
-                cnpj=state.signup_inst_cnpj,
+                cnpj=state.signup_inst_cnpj.strip() or None,
                 institution_type=state.signup_inst_tipo,
                 city=state.signup_inst_cidade,
                 state=state.signup_inst_estado,
@@ -257,7 +255,7 @@ def _render_form():
 
             c1, c2 = st.columns(2)
             with c1:
-                st.text_input("CNPJ *", key="signup_inst_cnpj", placeholder="00.000.000/0000-00")
+                st.text_input("CNPJ (opcional)", key="signup_inst_cnpj", placeholder="00.000.000/0000-00")
             with c2:
                 st.selectbox("Tipo de instituição *", ["Selecione..."] + INSTITUTION_TYPES, key="signup_inst_tipo_select")
                 st.session_state.signup_inst_tipo = (

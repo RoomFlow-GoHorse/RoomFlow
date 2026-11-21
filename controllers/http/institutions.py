@@ -36,7 +36,7 @@ class InstitutionRegistrationRequest(BaseModel):
     responsible_email: str = Field(min_length=5, max_length=255, pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
     password: str = Field(min_length=8, max_length=1024)
     name: str = Field(min_length=1, max_length=180)
-    cnpj: str = Field(min_length=11, max_length=18)
+    cnpj: str | None = Field(default=None, max_length=18)
     institution_type: str = Field(min_length=1, max_length=80)
     city: str = Field(default="", max_length=100)
     state: str = Field(default="", max_length=2)

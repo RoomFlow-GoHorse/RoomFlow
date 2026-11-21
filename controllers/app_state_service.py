@@ -73,7 +73,7 @@ def current_user():
         "id": actor.id,
         "name": actor.name,
         "email": actor.email,
-        "phone": actor.phone,
+        "phone": getattr(actor, "phone", None),
         "role": actor.profile.value,
         "status": actor.status.value,
         "institution_id": actor.institution_id,

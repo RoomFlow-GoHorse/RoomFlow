@@ -23,7 +23,8 @@ def _to_institution(row: Instituicao, settings) -> Institution:
         notifications=NotificationPreferences(**data.get("notifications", {})),
     )
     return Institution(
-        id=str(row.id), name=row.name, cnpj=normalize_cnpj(row.cnpj),
+        id=str(row.id), name=row.name,
+        cnpj=normalize_cnpj(row.cnpj) if row.cnpj else None,
         institution_type=row.institution_type, city=row.city, state=row.state,
         phone=row.phone, email=row.email,
         address=settings.endereco if settings is not None else None,
@@ -57,12 +58,12 @@ class PostgresInstitutionRepository:
 
     def add(self, institution: Institution) -> Institution:
         cnpj = normalize_cnpj(institution.cnpj or "")
-        if len(cnpj) != 14 or not cnpj.isascii():
+        if cnpj and (len(cnpj) != 14 or not cnpj.isascii()):
             raise ValueError("Informe um CNPJ com 14 dígitos de 0 a 9.")
         with self._transaction.atomic(), self._transaction.session() as session:
-            if self.find_by_cnpj(cnpj) is not None:
+            if cnpj and self.find_by_cnpj(cnpj) is not None:
                 raise DuplicateResource("Já existe uma instituição com este CNPJ.")
-            row = Instituicao(cnpj=cnpj)
+            row = Instituicao(cnpj=cnpj or None)
             self._update_fields(row, institution)
             session.add(row)
             session.flush()

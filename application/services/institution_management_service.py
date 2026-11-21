@@ -23,7 +23,6 @@ from models.domain.policies.permission_policy import PermissionPolicy
 @dataclass(frozen=True, slots=True)
 class InstitutionRegistration:
     name: str
-    cnpj: str
     institution_type: str
     city: str
     state: str
@@ -32,6 +31,7 @@ class InstitutionRegistration:
     responsible_name: str
     responsible_email: str
     password: str
+    cnpj: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -79,10 +79,10 @@ class InstitutionManagementService:
             return institution, owner, code
 
     def _register(self, data: InstitutionRegistration) -> tuple[Institution, User]:
-        cnpj = normalize_cnpj(data.cnpj)
-        if len(cnpj) != 14:
+        cnpj = normalize_cnpj(data.cnpj or "")
+        if cnpj and len(cnpj) != 14:
             raise ValueError("O CNPJ deve conter 14 dígitos.")
-        if self._institutions.find_by_cnpj(cnpj):
+        if cnpj and self._institutions.find_by_cnpj(cnpj):
             raise DuplicateResource("Já existe uma instituição com este CNPJ.")
         email = normalize_email(data.responsible_email)
         if len(email) > 255 or not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
@@ -99,7 +99,7 @@ class InstitutionManagementService:
         institution = Institution(
             id=f"inst-{secrets.token_urlsafe(12)}",
             name=data.name.strip(),
-            cnpj=cnpj,
+            cnpj=cnpj or None,
             institution_type=data.institution_type.strip(),
             city=data.city.strip(),
             state=data.state.strip().upper(),

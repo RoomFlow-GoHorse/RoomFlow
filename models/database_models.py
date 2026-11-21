@@ -68,8 +68,8 @@ class Instituicao(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(150), nullable=False)
-    cnpj: Mapped[str] = mapped_column(
-        String(18), unique=True, nullable=False
+    cnpj: Mapped[str | None] = mapped_column(
+        String(18), unique=True, nullable=True
     )
     institution_type: Mapped[str] = mapped_column(
         String(60), nullable=False
