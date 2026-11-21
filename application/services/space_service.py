@@ -276,7 +276,9 @@ class SpaceService:
                 raise ValueError("Ative o prédio e o andar antes de reativar a sala.")
         if current.active:
             return current
-        updated = replace(current, active=True, status="disponivel")
+        # Operational activation does not resolve a recorded block.
+        keep_block = actor.profile is Profile.MANAGER and current.block_reason is not None
+        updated = replace(current, active=True, status="bloqueado" if keep_block else "disponivel")
         self._repository.save_space(updated)
         self._record(actor, AdminAuditAction.SPACE_ACTIVATED, "space", updated.id)
         return updated

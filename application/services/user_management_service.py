@@ -156,25 +156,30 @@ class UserManagementService:
         )
 
     @audited_mutation
-    def update_own_profile(self, actor: User, name: str, email: str) -> User:
+    def update_own_profile(self, actor: User, name: str, email: str, phone: str | None = None) -> User:
         self._permissions.authorize_own_account(actor, actor.id)
         account = self._users.find_by_id(actor.id, actor.institution_id)
         if account is None:
             raise ResourceNotFound("Usuário não encontrado.")
-        return self._update_identity(actor, account, name, email)
+        return self._update_identity(actor, account, name, email, phone)
 
-    def _update_identity(self, actor: User, account: UserAccount, name: str, email: str) -> User:
+    def _update_identity(
+        self, actor: User, account: UserAccount, name: str, email: str, phone: str | None = None,
+    ) -> User:
         name = name.strip()
         normalized_email = normalize_email(email)
         if not name or len(name) > 150 or len(normalized_email) > 255:
             raise ValueError("Informe nome e e-mail dentro dos limites permitidos.")
         if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", normalized_email):
             raise ValueError("Informe um e-mail válido.")
+        normalized_phone = account.user.phone if phone is None else phone.strip() or None
+        if normalized_phone is not None and len(normalized_phone) > 20:
+            raise ValueError("O telefone deve ter até 20 caracteres.")
         existing = self._users.find_by_email(normalized_email)
         if existing is not None and existing.user.id != account.user.id:
             raise DuplicateResource("Já existe uma conta com este e-mail.")
         updated = replace(
-            account.user, name=name.strip(), email=normalized_email
+            account.user, name=name.strip(), email=normalized_email, phone=normalized_phone,
         )
         self._users.save(replace(account, user=updated))
         if actor.institution_id and actor.profile is Profile.ADMIN and updated != account.user:

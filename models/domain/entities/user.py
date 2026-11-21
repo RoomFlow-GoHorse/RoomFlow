@@ -25,6 +25,7 @@ class User:
     institution_id: str | None
     status: UserStatus = UserStatus.ACTIVE
     created_at: datetime | None = None
+    phone: str | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.profile, Profile):

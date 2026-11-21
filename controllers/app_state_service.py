@@ -5,11 +5,12 @@ from models import mock_data
 from controllers.streamlit_runtime import get_streamlit_actor, uses_roomflow_api
 
 
-def _clear_occupancy_modal_state():
-    """Ensure modal state for the occupancy page does not leak across navigation."""
-    st.session_state.pop("occupancy_detail_id", None)
-    st.session_state.pop("occupancy_edit_id", None)
-    st.session_state.pop("occupancy_reservation_selector", None)
+def clear_operational_dialogs():
+    for key in (
+        "occupancy_detail_id", "occupancy_reservation_selector", "reservation_dialog",
+        "edit_space_id", "block_space_id", "resolve_conflict_id",
+    ):
+        st.session_state.pop(key, None)
 
 
 def boot_state():
@@ -45,7 +46,7 @@ def boot_state():
 def go(page):
     """Navega imediatamente para uma rota pública ou interna."""
     st.session_state.page = page
-    _clear_occupancy_modal_state()
+    clear_operational_dialogs()
     st.query_params["page"] = page
     st.rerun()
 
@@ -54,7 +55,7 @@ def go_authenticated(page, user):
     """Navigate after authentication without putting identity in the URL."""
     del user
     st.session_state.page = page
-    _clear_occupancy_modal_state()
+    clear_operational_dialogs()
     st.query_params["page"] = page
     if "uid" in st.query_params:
         del st.query_params["uid"]
@@ -72,6 +73,7 @@ def current_user():
         "id": actor.id,
         "name": actor.name,
         "email": actor.email,
+        "phone": actor.phone,
         "role": actor.profile.value,
         "status": actor.status.value,
         "institution_id": actor.institution_id,

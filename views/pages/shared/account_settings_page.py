@@ -2,6 +2,7 @@ import streamlit as st
 
 from config.constants import ROLE_LABELS
 from controllers import auth_service
+from controllers.app_state_service import go
 from views.components.ui_components import page_header
 from application.services.authentication_service import InvalidCredentials
 from controllers.streamlit_runtime import get_streamlit_actor, get_streamlit_runtime
@@ -27,8 +28,8 @@ SECTION_HEADERS = {
         ":material/shield:",
     ),
     "preferencias": (
-        "Preferências de notificação",
-        "Escolha quais notificações e alertas deseja receber.",
+        "Notificações da conta",
+        "Acesse sua caixa de entrada e consulte como os avisos são definidos.",
         ":material/notifications:",
     ),
     "sessao": (
@@ -37,34 +38,6 @@ SECTION_HEADERS = {
         ":material/logout:",
     ),
 }
-
-PREFERENCES = {
-    "reservas": (
-        "Reservas",
-        "Aprovações, rejeições e novas solicitações",
-    ),
-    "alteracoes": (
-        "Alterações de espaço",
-        "Quando uma sala ou horário for alterado",
-    ),
-    "conflitos": (
-        "Conflitos",
-        "Quando houver sobreposição de reservas",
-    ),
-    "cancelamentos": (
-        "Cancelamentos",
-        "Quando uma reserva for cancelada",
-    ),
-    "lembretes": (
-        "Lembretes",
-        "Notificação 1 hora antes de cada atividade",
-    ),
-    "sistema": (
-        "Atualizações do sistema",
-        "Manutenção, novidades e avisos gerais",
-    ),
-}
-
 
 def _load_css():
     st.markdown(
@@ -126,7 +99,7 @@ def _load_css():
     )
 
 
-def _state(user):
+def _state():
     st.session_state.setdefault(
         "account_section",
         "perfil",
@@ -141,34 +114,6 @@ def _state(user):
         "account_logout_confirm",
         False,
     )
-
-    st.session_state.setdefault(
-        "account_phone",
-        "(11) 98765-4321",
-    )
-
-    st.session_state.setdefault(
-        "account_preferences",
-        {
-            "reservas": True,
-            "alteracoes": True,
-            "conflitos": True,
-            "cancelamentos": True,
-            "lembretes": False,
-            "sistema": True,
-        },
-    )
-
-    st.session_state.setdefault(
-        "account_name",
-        user["name"],
-    )
-
-    st.session_state.setdefault(
-        "account_email",
-        user["email"],
-    )
-
 
 def _avatar(initials, size=64):
     st.markdown(
@@ -313,18 +258,19 @@ def _profile(user):
             with left:
                 name = st.text_input(
                     "Nome completo",
-                    value=st.session_state.account_name,
+                    value=user["name"],
                 )
 
                 phone = st.text_input(
                     "Telefone",
-                    value=st.session_state.account_phone,
+                    value=user.get("phone") or "",
+                    max_chars=20,
                 )
 
             with right:
                 email = st.text_input(
                     "E-mail",
-                    value=st.session_state.account_email,
+                    value=user["email"],
                 )
 
                 st.text_input(
@@ -373,16 +319,13 @@ def _profile(user):
                 st.error("Sua sessão expirou. Entre novamente.")
                 return
             try:
-                updated = get_streamlit_runtime().user_management.update_own_profile(
-                    actor, name, email
+                get_streamlit_runtime().user_management.update_own_profile(
+                    actor, name, email, phone,
                 )
             except (DomainAuthorizationError, DuplicateResource, ResourceNotFound, ValueError) as exc:
                 st.error(str(exc))
                 return
 
-            st.session_state.account_name = updated.name
-            st.session_state.account_email = updated.email
-            st.session_state.account_phone = phone
             st.session_state.account_editing = False
 
             st.toast(
@@ -404,7 +347,7 @@ def _profile(user):
 
             st.text_input(
                 "Telefone",
-                value=st.session_state.account_phone,
+                value=user.get("phone") or "",
                 disabled=True,
             )
 
@@ -473,67 +416,15 @@ def _security(user):
     st.success("Senha alterada com sucesso.", icon=":material/check_circle:")
 
 
-def _preferences():
+def _preferences(user):
     _section_header("preferencias")
 
-    preferences = st.session_state.account_preferences
-
-    enabled = sum(
-        preferences.values()
-    )
-
-    total = len(PREFERENCES)
-
     with st.container(border=True):
-        left, right = st.columns(
-            [5, 1],
-            vertical_alignment="center",
-        )
-
-        with left:
-            st.markdown("**Notificações ativas**")
-            st.caption(
-                f"Você recebe {enabled} de {total} tipos de alerta."
-            )
-
-        with right:
-            st.metric(
-                "Ativos",
-                f"{enabled}/{total}",
-            )
-
-    st.write("")
-
-    for key, (label, description) in PREFERENCES.items():
-        with st.container(border=True):
-            text, toggle = st.columns(
-                [6, 1],
-                vertical_alignment="center",
-            )
-
-            with text:
-                st.markdown(f"**{label}**")
-                st.caption(description)
-
-            with toggle:
-                preferences[key] = st.toggle(
-                    label,
-                    value=preferences[key],
-                    key=f"account_preference_{key}",
-                    label_visibility="collapsed",
-                )
-
-    st.divider()
-
-    if st.button(
-        "Salvar preferências",
-        type="primary",
-        icon=":material/save:",
-    ):
-        st.toast(
-            "Preferências salvas.",
-            icon=":material/check_circle:",
-        )
+        st.write("Os avisos operacionais seguem a política de notificações da sua instituição.")
+        if st.button("Abrir caixa de entrada", icon=":material/notifications:"):
+            go("notificacoes")
+        if user["role"] == "admin" and st.button("Gerenciar notificações institucionais", icon=":material/settings:"):
+            go("configuracoes_instituicao")
 
 
 def _session(user):
@@ -544,22 +435,6 @@ def _session(user):
             "Sua conta está conectada neste dispositivo.",
             icon=":material/check_circle:",
         )
-
-        st.write("")
-
-        device, browser, location = st.columns(3)
-
-        with device:
-            st.caption("Dispositivo")
-            st.markdown("**Computador**")
-
-        with browser:
-            st.caption("Navegador")
-            st.markdown("**Chrome**")
-
-        with location:
-            st.caption("Localização")
-            st.markdown("**São Paulo, SP**")
 
         st.divider()
 
@@ -614,7 +489,7 @@ def _session(user):
 
 def account(user):
     _load_css()
-    _state(user)
+    _state()
 
     _header(user)
 
@@ -637,7 +512,7 @@ def account(user):
                 _security(user)
 
             elif section == "preferencias":
-                _preferences()
+                _preferences(user)
 
             elif section == "sessao":
                 _session(user)

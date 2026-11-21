@@ -1,7 +1,7 @@
 import streamlit as st
 
 from config.constants import ROLE_NAV
-from controllers.app_state_service import boot_state, current_user
+from controllers.app_state_service import boot_state, clear_operational_dialogs, current_user
 from controllers.roomflow_api import ApiUnavailable
 from controllers.streamlit_runtime import API_PAGES, render_api_error, uses_roomflow_api
 from views.components.app_shell import shell_end, shell_start
@@ -130,7 +130,8 @@ def sync_page_from_query():
 
     valid_routes = PUBLIC_ROUTES.keys() | APP_ROUTES.keys()
 
-    if page in valid_routes:
+    if page in valid_routes and page != st.session_state.page:
+        clear_operational_dialogs()
         st.session_state.page = page
 
 
@@ -167,6 +168,8 @@ def ensure_allowed_internal_page(page, user):
         return page
 
     dashboard = get_dashboard_by_role(user)
+    if dashboard != st.session_state.page:
+        clear_operational_dialogs()
     st.session_state.page = dashboard
     st.query_params["page"] = dashboard
     return dashboard

@@ -40,7 +40,11 @@ def _room_header(space: Space) -> None:
     st.caption(f"{space.location} · {space.type}")
 
 
-@st.dialog("Bloquear sala", width="medium")
+def _dismiss_space_dialog(key):
+    st.session_state.pop(key, None)
+
+
+@st.dialog("Bloquear sala", width="medium", on_dismiss=lambda: _dismiss_space_dialog("block_space_id"))
 def block_space_dialog(space: Space):
     _room_header(space)
     st.warning("A sala ficará bloqueada no catálogo.", icon=":material/warning:")
@@ -68,7 +72,7 @@ def block_space_dialog(space: Space):
         st.rerun()
 
 
-@st.dialog("Editar espaço", width="medium")
+@st.dialog("Editar espaço", width="medium", on_dismiss=lambda: _dismiss_space_dialog("edit_space_id"))
 def edit_space_dialog(space: Space):
     _room_header(space)
     actor = get_streamlit_actor()

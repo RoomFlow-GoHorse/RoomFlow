@@ -41,6 +41,7 @@ class AuthenticatedUserResponse(BaseModel):
     email: str
     profile: Profile
     institution_id: str | None
+    phone: str | None = None
 
 
 class LoginData(BaseModel):
@@ -65,6 +66,7 @@ class LogoutResponse(BaseModel):
 class AccountUpdateRequest(BaseModel):
     name: str = Field(min_length=1, max_length=150)
     email: str = Field(min_length=5, max_length=255)
+    phone: str | None = Field(default=None, max_length=20)
 
 
 class PasswordChangeRequest(BaseModel):
@@ -116,7 +118,7 @@ def update_account(
     service: UserManagementService = Depends(get_user_management_service),
 ) -> UserResponse:
     try:
-        user = service.update_own_profile(actor, payload.name, payload.email)
+        user = service.update_own_profile(actor, payload.name, payload.email, payload.phone)
     except DomainAuthorizationError as exc:
         raise HTTPException(status_code=403, detail=str(exc)) from None
     except DuplicateResource as exc:
@@ -164,4 +166,5 @@ def _user_response(user: User) -> AuthenticatedUserResponse:
         email=user.email,
         profile=user.profile,
         institution_id=user.institution_id,
+        phone=user.phone,
     )

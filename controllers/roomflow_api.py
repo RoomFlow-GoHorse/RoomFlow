@@ -174,8 +174,8 @@ class ApiUserManagement:
         return User(**self._api.request("PATCH", f"/admin/users/{quote(user_id, safe='')}/status",
             payload={"status": status.value}, conflict=LastActiveAdministrator))
 
-    def update_own_profile(self, actor, name, email):
-        return User(**self._api.request("PATCH", "/auth/me", payload={"name": name, "email": email}))
+    def update_own_profile(self, actor, name, email, phone=None):
+        return User(**self._api.request("PATCH", "/auth/me", payload={"name": name, "email": email, "phone": phone}))
 
 
 class ApiInstitutionManagement:

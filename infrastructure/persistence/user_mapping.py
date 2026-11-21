@@ -42,6 +42,7 @@ def to_user_account(
             institution_id=str(institution.id),
             status=status,
             created_at=user.criado_em,
+            phone=user.phone,
         ),
         password_hash=user.password_hash,
     )

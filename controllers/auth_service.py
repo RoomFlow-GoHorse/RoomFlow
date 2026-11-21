@@ -6,6 +6,7 @@ from application.services.authentication_service import (
     InvalidSession,
     TooManyLoginAttempts,
 )
+from controllers.app_state_service import clear_operational_dialogs
 from controllers.roomflow_api import ApiUnavailable
 from controllers.streamlit_runtime import get_streamlit_runtime
 from models.domain.identity_normalization import normalize_email
@@ -57,6 +58,7 @@ def logout():
             return
     st.session_state.auth_token = None
     st.session_state.user = None
+    clear_operational_dialogs()
     st.session_state.page = "landing"
     st.query_params.clear()
     st.query_params["page"] = "landing"

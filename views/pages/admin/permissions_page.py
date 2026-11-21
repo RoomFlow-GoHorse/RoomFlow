@@ -17,6 +17,7 @@ EFFECTIVE_PERMISSIONS = [
     ("Gerenciar planta da instituição", {Permission.MANAGE_FLOOR_PLAN}),
     ("Configurações da instituição", {Permission.EDIT_INSTITUTION_SETTINGS}),
     ("Gerenciar salas e recursos", {Permission.MANAGE_FLOOR_PLAN, Permission.MANAGE_SPACES}),
+    ("Bloquear e desbloquear salas", {Permission.MANAGE_FLOOR_PLAN, Permission.MANAGE_SPACES}),
     ("Criar reservas", {Permission.CREATE_RESERVATION}),
     ("Consultar, aprovar e rejeitar solicitações", {Permission.REVIEW_RESERVATIONS}),
     ("Consultar as próprias reservas", {Permission.VIEW_OWN_RESERVATIONS}),
@@ -29,7 +30,6 @@ EFFECTIVE_PERMISSIONS = [
 PENDING_PERMISSIONS = [
     ("Acessar dashboard do solicitante", "none", "none", "pending", "none"),
     ("Acessar dashboard do participante", "none", "none", "none", "pending"),
-    ("Bloquear espaços", "none", "pending", "none", "none"),
     ("Consultar agenda", "none", "none", "pending", "pending"),
     ("Localizar espaços", "none", "none", "none", "pending"),
 ]

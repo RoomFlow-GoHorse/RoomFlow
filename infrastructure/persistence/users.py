@@ -76,7 +76,7 @@ class PostgresUserRepository:
                 profile_id = session.scalar(select(TipoUsuario.id).where(TipoUsuario.name == profile))
             user = Usuario(
                 name=candidate.name, email=email, password_hash=account.password_hash,
-                status="ativo", role=candidate.profile.value, tipo_usuario_id=profile_id,
+                status="ativo", role=candidate.profile.value, tipo_usuario_id=profile_id, phone=candidate.phone,
             )
             session.add(user)
             session.flush()
@@ -119,6 +119,7 @@ class PostgresUserRepository:
                 self._check_email(session, email, user_id)
                 user.email = email
             user.name = candidate.name
+            user.phone = candidate.phone
             user.password_hash = account.password_hash
 
     def save_preserving_active_admin(self, account: UserAccount, institution_id: str) -> None:

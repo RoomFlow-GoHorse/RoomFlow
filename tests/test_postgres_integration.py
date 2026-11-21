@@ -1,5 +1,6 @@
 import hashlib
 import io
+import json
 import os
 import secrets
 import socket
@@ -12,6 +13,7 @@ from contextlib import contextmanager
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from textwrap import dedent
 from threading import Barrier
 from unittest.mock import patch
 from zoneinfo import ZoneInfo
@@ -944,6 +946,31 @@ class PostgresIntegrationTests(unittest.TestCase):
             self.assertEqual(entry.responsavel_id, int(login.json()["data"]["user"]["id"]))
             self.assertIsNotNone(entry.desbloqueado_em)
 
+    def test_manager_reactivation_preserves_an_open_block_and_admin_behavior(self):
+        payload, _ = self.register()
+        admin = self.headers(self.login(payload["responsible_email"]))
+        manager = self.headers(self._manager_login(admin))
+        requester = self.headers(self._requester_login(admin))
+        room = self._structure_room(admin, "Sala de reativação")
+        path = f"/structure/spaces/{room['id']}"
+        reason = "Manutenção em andamento"
+        self.assertEqual(self.client.post(path + "/block", headers=manager, json={"reason": reason}).status_code, 200)
+        self.assertEqual(self.client.patch(path + "/status", headers=manager, json={"active": False}).status_code, 200)
+        restored = self.client.patch(path + "/status", headers=manager, json={"active": True})
+        self.assertEqual(restored.status_code, 200, restored.text)
+        self.assertEqual(restored.json()["data"]["status"], "bloqueado")
+        self.assertEqual(restored.json()["data"]["block_reason"], reason)
+        request = self._reservation_payload(room)
+        self.assertEqual(self.client.post("/reservations", headers=requester, json=request).status_code, 409)
+        self.assertEqual(self.client.delete(path + "/block", headers=manager).status_code, 200)
+        self.assertEqual(self.client.post("/reservations", headers=requester, json=request).status_code, 201)
+
+        self.assertEqual(self.client.post(path + "/block", headers=admin, json={"reason": reason}).status_code, 200)
+        self.assertEqual(self.client.patch(path + "/status", headers=admin, json={"active": False}).status_code, 200)
+        restored = self.client.patch(path + "/status", headers=admin, json={"active": True})
+        self.assertEqual(restored.status_code, 200, restored.text)
+        self.assertEqual(restored.json()["data"]["status"], "disponivel")
+
     def test_registration_session_settings_and_audit_survive_runtime_restart(self):
         payload, registration = self.register()
         login = self.login(payload["responsible_email"].upper())
@@ -1267,6 +1294,126 @@ class PostgresIntegrationTests(unittest.TestCase):
             app.button(key="btn_action_unblock_space").click().run()
             self.assertFalse(app.exception)
             self.assertEqual(self.client.get(path, headers=manager).json()["data"]["status"], "disponivel")
+            app.button(key="btn_action_edit_space").click().run()
+            self.assertEqual(app.text_input(key="space_edit_name").value, "Sala Atualizada")
+            app.button(key="rf_nav_gerente_dashboard").click().run()
+            app.button(key="rf_nav_espacos").click().run()
+            self.assertFalse(any(item.key == "space_edit_name" for item in app.text_input))
+            self.assertNotIn("edit_space_id", app.session_state.filtered_state)
+
+            app.button(key="btn_action_block_space").click().run()
+            app.query_params["page"] = "gerente_dashboard"
+            app.run()
+            app.query_params["page"] = "espacos"
+            app.run()
+            self.assertFalse(any(item.label == "Motivo do bloqueio *" for item in app.text_area))
+            self.assertNotIn("block_space_id", app.session_state.filtered_state)
+
+    def test_manager_workflow_is_shared_across_streamlit_and_api_restarts(self):
+        institution, _ = self.register()
+        admin = self.headers(self.login(institution["responsible_email"]))
+        requester_login = self._requester_login(admin)
+        manager_login = self._manager_login(admin)
+        requester = self.headers(requester_login)
+        manager = self.headers(manager_login)
+        room = self._structure_room(admin, "Sala de dois processos")
+        resource = self.client.post("/structure/resources", headers=admin, json={"name": "Projetor da auditoria"})
+        self.assertEqual(resource.status_code, 201, resource.text)
+        title = "Reserva criada em outro processo"
+        reason = "Aprovada após consulta à instituição"
+        fixture = {"password": PASSWORD, "room": room["id"], "title": title, "reason": reason,
+                   "resource": resource.json()["data"]["id"], "phone": "(65) 90000-0000"}
+
+        def run_streamlit(url, role, login, steps):
+            script = dedent("""
+                import json
+                import sys
+
+                from streamlit.testing.v1 import AppTest
+
+                fixture = json.load(sys.stdin)
+                app = AppTest.from_file("main.py", default_timeout=30)
+                app.query_params["page"] = "login"
+                app.run()
+                app.text_input(key="login_email").input(fixture["email"])
+                app.text_input(key="login_password").input(fixture["password"])
+                app.button(key="login_submit").click().run()
+                assert not app.exception
+                assert app.session_state["user"]["role"] == fixture["role"]
+                assert not {"spaces", "resources", "reservations", "conflicts", "notifications"} & app.session_state.filtered_state.keys()
+            """) + dedent(steps)
+            result = subprocess.run(
+                [sys.executable, "-B", "-c", script],
+                input=json.dumps({**fixture, "role": role, "email": login.json()["data"]["user"]["email"]}),
+                encoding="utf-8", capture_output=True, timeout=90,
+                cwd=PROJECT, env={**os.environ, "ROOMFLOW_API_URL": url, "PYTHONIOENCODING": "utf-8"},
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+
+        with self.api_process() as requester_api, self.api_process() as manager_api:
+            run_streamlit(requester_api, "solicitante", requester_login, """
+                app.button(key="rf_nav_nova_reserva").click().run()
+                app.selectbox(key="new_reservation_room").select(fixture["room"])
+                app.text_input(key="new_reservation_title").set_value(fixture["title"])
+                app.text_input(key="new_reservation_activity").set_value("Aula")
+                app.text_area(key="new_reservation_reason").set_value("Solicitação de teste")
+                next(button for button in app.button if button.label == "Solicitar reserva").click().run()
+                assert not app.exception and app.success
+            """)
+            run_streamlit(manager_api, "gerente", manager_login, """
+                assert app.query_params["page"] == ["gerente_dashboard"]
+                app.query_params["page"] = "usuarios"
+                app.run()
+                assert app.query_params["page"] == ["gerente_dashboard"]
+                app.button(key="rf_nav_gerente_reservas").click().run()
+                assert fixture["title"] in app.dataframe[0].value["Solicitação"].tolist()
+                next(button for button in app.button if button.label == "Analisar solicitação").click().run()
+                app.selectbox(key="reservation_decision").select("aprovada")
+                app.text_area[0].set_value(fixture["reason"])
+                next(button for button in app.button if button.label == "Confirmar decisão").click().run()
+                assert "Aprovada" in app.dataframe[0].value["Status"].tolist()
+                app.button(key="rf_nav_espacos").click().run()
+                app.button(key="btn_action_edit_space").click().run()
+                app.number_input(key="space_edit_capacity").set_value(25)
+                app.multiselect(key="space_edit_resources").set_value([fixture["resource"]])
+                next(button for button in app.button if button.label == "Salvar alterações").click().run()
+                assert not app.exception and "25 pessoas" in app.dataframe[0].value["Capacidade"].tolist()
+                app.button(key="rf_account").click().run()
+                assert next(field for field in app.text_input if field.label == "Telefone").value == ""
+                next(button for button in app.button if button.label == "Editar perfil").click().run()
+                next(field for field in app.text_input if field.label == "Telefone").set_value(fixture["phone"])
+                next(button for button in app.button if button.label == "Salvar alterações").click().run()
+                assert not app.exception
+                assert next(field for field in app.text_input if field.label == "Telefone").value == fixture["phone"]
+            """)
+            with httpx2.Client(base_url=manager_api, headers=manager, trust_env=False) as client:
+                self.assertEqual(client.get("/admin/users").status_code, 403)
+                self.assertEqual(client.get("/structure/buildings").status_code, 403)
+                self.assertEqual(client.get("/reservations/institution").json()["data"][0]["status"], "aprovada")
+
+        with self.api_process() as restarted_api:
+            run_streamlit(restarted_api, "solicitante", requester_login, """
+                assert fixture["title"] in [item.value for item in app.subheader]
+                next(button for button in app.button if button.label == "Ver histórico").click().run()
+                assert fixture["reason"] in [item.value for item in app.text]
+                app.button(key="rf_nav_notificacoes").click().run()
+                assert "Reserva aprovada" in [item.value for item in app.subheader]
+                next(button for button in app.button if button.label == "Marcar como lida").click().run()
+                assert not app.exception
+            """)
+            with httpx2.Client(base_url=restarted_api, trust_env=False) as client:
+                available = client.get(f"/structure/spaces/{room['id']}", headers=manager).json()["data"]
+                self.assertEqual((available["capacity"], available["resource_ids"]), (25, [fixture["resource"]]))
+                account = client.get("/auth/me", headers=manager).json()["data"]
+                self.assertEqual(account["phone"], fixture["phone"])
+                update = client.patch("/auth/me", headers=manager,
+                                      json={"name": account["name"], "email": account["email"]})
+                self.assertEqual(update.status_code, 200, update.text)
+                self.assertEqual(update.json()["data"]["phone"], fixture["phone"])
+                report, = client.get("/reservations/mine", headers=requester).json()["data"]
+                self.assertEqual((report["title"], report["status"]), (title, "aprovada"))
+                notification, = client.get("/notifications", headers=requester).json()["data"]["items"]
+                self.assertIsNotNone(notification["read_at"])
 
     def test_streamlit_uses_separate_api_process(self):
         payload, _ = self.register()
@@ -1292,3 +1439,9 @@ class PostgresIntegrationTests(unittest.TestCase):
             token = app.session_state["auth_token"]
             result = httpx2.get(url + "/institutions/me", headers={"Authorization": f"Bearer {token}"})
             self.assertEqual(result.json()["data"]["address"], "Endereço salvo pelo Streamlit")
+            app.query_params["page"] = "permissoes"
+            app.run()
+            matrix = app.dataframe[0].value.set_index("Funcionalidade")
+            block = matrix.loc["Bloquear e desbloquear salas"]
+            self.assertEqual((block["Administrador"], block["Gerente"], block["Solicitante"]),
+                             ("Instituição do vínculo", "Instituição do vínculo", "—"))
