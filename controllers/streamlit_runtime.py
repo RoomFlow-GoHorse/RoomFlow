@@ -37,6 +37,12 @@ def get_streamlit_runtime() -> InMemoryApplicationRuntime | ApiRuntime:
 get_streamlit_runtime.clear = _get_local_runtime.clear
 
 
+def render_api_error(error: ApiUnavailable) -> None:
+    st.error(str(error))
+    if st.button("Tentar novamente", key="roomflow_api_retry"):
+        st.rerun()
+
+
 def get_streamlit_actor(user_view: dict | None = None):
     """Resolve the current page user against server-side account state."""
     del user_view
@@ -48,5 +54,5 @@ def get_streamlit_actor(user_view: dict | None = None):
     except InvalidSession:
         return None
     except ApiUnavailable as exc:
-        st.error(str(exc))
+        render_api_error(exc)
         st.stop()

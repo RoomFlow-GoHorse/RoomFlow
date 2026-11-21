@@ -63,7 +63,7 @@ do frontend, da API, do banco e dos testes:
 python -m pip install -r requirements.txt
 ```
 
-## Executando o projeto
+## Executando a demonstração em memória
 
 Com o ambiente virtual ativado, execute:
 
@@ -81,7 +81,10 @@ http://localhost:8501
 
 ## Executando com PostgreSQL
 
-Preencha o `.env` local conforme `.env.example`. O banco deve existir. Para
+Preencha o `.env` local conforme `.env.example`. Configure os cinco campos
+`DB_*` ou uma `DATABASE_URL` PostgreSQL. Se as duas formas estiverem presentes,
+`DATABASE_URL` tem precedência. Em uma URL, codifique caracteres especiais da
+senha. O banco deve existir. Para
 aplicar as revisões somente ao banco de desenvolvimento escolhido, confirme
 `DB_HOST` e `DB_NAME` antes de executar:
 
@@ -89,18 +92,31 @@ aplicar as revisões somente ao banco de desenvolvimento escolhido, confirme
 python -m alembic upgrade head
 ```
 
-Em um terminal, inicie a API:
+No Windows, na pasta `RoomFlow`, inicie ambos os processos com o Python do
+ambiente virtual. O comando aguarda a API confirmar a conexão e o esquema
+PostgreSQL em `/ready` antes de iniciar o Streamlit. Ele usa as portas 8000
+e 8501 e não aplica migrations.
+
+```powershell
+.\.venv\Scripts\python.exe -m scripts.start_local
+```
+
+Abra `http://127.0.0.1:8501`. Use `--api-port` e `--streamlit-port` para
+escolher portas livres se já houver outro processo usando as padrões.
+
+Para iniciar separadamente, mantenha a API rodando no primeiro terminal:
 
 ```powershell
 $env:ROOMFLOW_PERSISTENCE = "postgres"
-python -m uvicorn api.main:app --host 127.0.0.1 --port 8000
+.\.venv\Scripts\python.exe -m uvicorn api.main:app --host 127.0.0.1 --port 8000
 ```
 
-Em outro, aponte o Streamlit para essa API:
+Em outro, confirme que `Invoke-RestMethod http://127.0.0.1:8000/ready` retorna
+`ready` e `postgres`. Depois aponte o Streamlit para essa API:
 
 ```powershell
 $env:ROOMFLOW_API_URL = "http://127.0.0.1:8000"
-python -m streamlit run main.py
+.\.venv\Scripts\python.exe -m streamlit run main.py
 ```
 
 Use **Criar conta → Cadastrar instituição** para criar a primeira instituição e

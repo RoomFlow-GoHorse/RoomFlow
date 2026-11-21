@@ -2,7 +2,8 @@ import streamlit as st
 
 from config.constants import ROLE_NAV
 from controllers.app_state_service import boot_state, current_user
-from controllers.streamlit_runtime import API_PAGES, uses_roomflow_api
+from controllers.roomflow_api import ApiUnavailable
+from controllers.streamlit_runtime import API_PAGES, render_api_error, uses_roomflow_api
 from views.components.app_shell import shell_end, shell_start
 from views.components.ui_components import load_auth_css, load_css, toast
 
@@ -231,4 +232,7 @@ def main():
 # EXECUÇÃO
 # =========================================================
 
-main()
+try:
+    main()
+except ApiUnavailable as exc:
+    render_api_error(exc)

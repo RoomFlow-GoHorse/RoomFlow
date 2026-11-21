@@ -341,7 +341,7 @@ class PostgresIntegrationTests(unittest.TestCase):
             listener.bind(("127.0.0.1", 0))
             port = listener.getsockname()[1]
         url = f"http://127.0.0.1:{port}"
-        env = {**os.environ, **self.database_config, "ROOMFLOW_PERSISTENCE": "postgres"}
+        env = {**os.environ, **self.database_config, "DATABASE_URL": "", "ROOMFLOW_PERSISTENCE": "postgres"}
         process = subprocess.Popen([
             sys.executable, "-B", "-m", "uvicorn", "api.main:app",
             "--host", "127.0.0.1", "--port", str(port), "--log-level", "error",
@@ -351,7 +351,7 @@ class PostgresIntegrationTests(unittest.TestCase):
                 if process.poll() is not None:
                     break
                 try:
-                    if httpx2.get(url + "/health", timeout=0.5, trust_env=False).is_success:
+                    if httpx2.get(url + "/ready", timeout=1, trust_env=False).is_success:
                         yield url
                         return
                 except httpx2.HTTPError:
@@ -365,6 +365,8 @@ class PostgresIntegrationTests(unittest.TestCase):
     def test_streamlit_uses_separate_api_process(self):
         payload, _ = self.register()
         with self.api_process() as url, patch.dict(os.environ, {"ROOMFLOW_API_URL": url}):
+            status = httpx2.get(url + "/ready", trust_env=False)
+            self.assertEqual(status.json()["data"], {"status": "ready", "persistence": "postgres"})
             app = AppTest.from_file(str(PROJECT / "main.py"), default_timeout=20)
             app.query_params["page"] = "login"
             app.run()

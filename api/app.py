@@ -43,12 +43,14 @@ def create_app(
         environment or os.getenv("APP_ENV", "production")
     ).strip().lower()
     app.state.environment = active_environment
+    app.state.persistence = "memory"
     app.include_router(health_router)
     app.include_router(auth_router)
     app.add_exception_handler(StarletteHTTPException, http_exception_handler)
     app.add_exception_handler(RequestValidationError, validation_exception_handler)
     app.add_exception_handler(Exception, unhandled_exception_handler)
     if postgres_session_factory is not None or os.getenv("ROOMFLOW_PERSISTENCE", "memory") == "postgres":
+        from infrastructure.persistence.readiness import check_postgres_readiness
         from infrastructure.persistence.runtime import build_postgres_runtime
 
         if postgres_session_factory is None:
@@ -56,6 +58,8 @@ def create_app(
 
             postgres_session_factory = SessionLocal
         runtime = build_postgres_runtime(postgres_session_factory, postgres_email_sender)
+        app.state.persistence = "postgres"
+        app.state.readiness = lambda: check_postgres_readiness(postgres_session_factory)
         app.state.authentication_service = runtime.authentication
         app.state.user_management_service = runtime.user_management
         app.state.institution_management_service = runtime.institution_management

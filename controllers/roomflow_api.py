@@ -1,7 +1,7 @@
 from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from datetime import datetime
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 
 import httpx2
 
@@ -31,12 +31,32 @@ class ApiUnavailable(DomainAuthorizationError):
     pass
 
 
+class ApiTimeout(ApiUnavailable):
+    pass
+
+
+class ApiResponseError(ApiUnavailable):
+    pass
+
+
 class ApiSessionExpired(InvalidSession, DomainAuthorizationError):
     pass
 
 
 class RoomFlowApi:
     def __init__(self, base_url: str, token: Callable[[], str | None]):
+        try:
+            url = urlsplit(base_url)
+            valid = (
+                url.scheme in {"http", "https"} and bool(url.hostname)
+                and url.username is None and url.password is None
+                and not url.query and not url.fragment
+                and url.port != 0
+            )
+        except ValueError:
+            valid = False
+        if not valid:
+            raise ApiUnavailable("Configure ROOMFLOW_API_URL com um endereço HTTP ou HTTPS válido da API.")
         self._client = httpx2.Client(base_url=base_url, timeout=6.0, trust_env=False)
         self._token = token
 
@@ -49,16 +69,30 @@ class RoomFlowApi:
         headers = {"Authorization": f"Bearer {credential}"} if credential else {}
         try:
             response = self._client.request(method, path, json=payload, params=params, headers=headers, files=files)
-            if response.status_code == 204:
-                return None
-            if response.is_success and binary:
-                return response.content
+        except httpx2.TimeoutException:
+            raise ApiTimeout("A API do RoomFlow demorou para responder. Tente novamente.") from None
+        except httpx2.RequestError:
+            raise ApiUnavailable(
+                "Não foi possível conectar à API do RoomFlow. Verifique se o FastAPI está rodando e confira ROOMFLOW_API_URL."
+            ) from None
+        if response.status_code == 204:
+            return None
+        if response.is_success and binary:
+            return response.content
+        unexpected = f"Resposta inesperada da API do RoomFlow (HTTP {response.status_code}). Confira ROOMFLOW_API_URL."
+        try:
             body = response.json()
-        except (httpx2.HTTPError, ValueError):
-            raise ApiUnavailable("A API do RoomFlow está indisponível.") from None
+        except ValueError:
+            raise ApiResponseError(unexpected) from None
+        if not isinstance(body, dict):
+            raise ApiResponseError(unexpected)
         if response.is_success:
+            if enveloped and "data" not in body:
+                raise ApiResponseError(unexpected)
             return body["data"] if enveloped else body
-        error = body.get("error", {})
+        error = body.get("error")
+        if not isinstance(error, dict):
+            raise ApiResponseError(unexpected)
         message = error.get("message", "A solicitação não pode ser concluída.")
         if error.get("code") == "institution_selection_required":
             raise InstitutionSelectionRequired(tuple(item["institution_id"] for item in error["details"]))
@@ -76,7 +110,9 @@ class RoomFlowApi:
             raise ResourceNotFound(message)
         if response.status_code == 403:
             raise DomainAuthorizationError(message)
-        raise ApiUnavailable(message)
+        if response.status_code == 503:
+            raise ApiResponseError(f"{message} (HTTP 503)")
+        raise ApiResponseError(f"A API do RoomFlow retornou um erro (HTTP {response.status_code}). Consulte o terminal do FastAPI.")
 
 
 class ApiAuthentication:
