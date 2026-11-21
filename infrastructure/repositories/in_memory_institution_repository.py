@@ -4,6 +4,7 @@ from collections.abc import Iterable
 from infrastructure.in_memory_admin_transaction import InMemoryAdminTransaction
 from models.domain.entities.institution import Institution
 from models.domain.exceptions import DuplicateResource
+from models.domain.identity_normalization import normalize_cnpj
 
 
 class InMemoryInstitutionRepository:
@@ -56,4 +57,4 @@ class InMemoryInstitutionRepository:
 
     @staticmethod
     def normalize_cnpj(cnpj: str) -> str:
-        return "".join(character for character in cnpj if character.isdigit())
+        return normalize_cnpj(cnpj)

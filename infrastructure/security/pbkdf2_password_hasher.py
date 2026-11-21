@@ -23,15 +23,24 @@ class Pbkdf2PasswordHasher:
         ))
 
     def verify_password(self, password: str, encoded_hash: str) -> bool:
+        if not isinstance(encoded_hash, str):
+            return False
         try:
             scheme, iterations, salt_text, digest_text = encoded_hash.split("$", 3)
             if scheme != "pbkdf2_sha256":
                 return False
-            salt = base64.urlsafe_b64decode(salt_text.encode("ascii"))
-            expected = base64.urlsafe_b64decode(digest_text.encode("ascii"))
+            # The database seed stores hexadecimal values. New hashes use Base64.
+            if len(salt_text) == self.SALT_BYTES * 2 and len(digest_text) == 64:
+                salt = bytes.fromhex(salt_text)
+                expected = bytes.fromhex(digest_text)
+            else:
+                salt = base64.b64decode(salt_text, altchars=b"-_", validate=True)
+                expected = base64.b64decode(digest_text, altchars=b"-_", validate=True)
+            if len(salt) != self.SALT_BYTES or len(expected) != 32:
+                return False
             actual = hashlib.pbkdf2_hmac(
                 "sha256", password.encode("utf-8"), salt, int(iterations)
             )
-        except (ValueError, TypeError, UnicodeError):
+        except (ValueError, TypeError, OverflowError):
             return False
         return hmac.compare_digest(actual, expected)

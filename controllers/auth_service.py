@@ -6,10 +6,11 @@ from application.services.authentication_service import (
     TooManyLoginAttempts,
 )
 from controllers.streamlit_runtime import get_streamlit_runtime
+from models.domain.identity_normalization import normalize_email
 
 
 def login(email, password):
-    email = (email or "").strip().lower()
+    email = normalize_email(email or "")
     if not email or not password:
         return None, "E-mail ou senha incorretos. Verifique seus dados e tente novamente."
     try:

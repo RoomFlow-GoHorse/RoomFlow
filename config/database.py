@@ -3,14 +3,12 @@ import os
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.engine import URL
-from sqlalchemy.orm import DeclarativeBase, sessionmaker
+from sqlalchemy.orm import sessionmaker
+
+from infrastructure.persistence.base import Base
 
 
 load_dotenv()
-
-
-class Base(DeclarativeBase):
-    pass
 
 
 def database_url():

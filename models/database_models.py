@@ -19,7 +19,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import ExcludeConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from config.database import Base
+from infrastructure.persistence.base import Base
 
 
 class Usuario(Base):

@@ -24,6 +24,7 @@ from models.domain.entities.pending_member_signup import PendingMemberSignup
 from models.domain.entities.profile import Profile
 from models.domain.entities.user import User, UserStatus
 from models.domain.entities.user_account import UserAccount
+from models.domain.identity_normalization import normalize_email
 from models.domain.exceptions import DuplicateResource, ResourceNotFound
 
 
@@ -74,7 +75,7 @@ class MemberSignupService:
     ) -> MemberSignupStarted:
         if len(password) < 8:
             raise ValueError("A senha deve possuir pelo menos 8 caracteres.")
-        normalized_email = email.strip().lower()
+        normalized_email = normalize_email(email)
         now = self._clock.now()
         email_key = f"signup-email:{normalized_email}"
         if (

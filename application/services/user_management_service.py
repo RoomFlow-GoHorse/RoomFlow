@@ -16,6 +16,7 @@ from models.domain.entities.profile import Profile
 from models.domain.entities.user import User, UserStatus
 from models.domain.entities.user_account import UserAccount
 from models.domain.exceptions import DuplicateResource, ResourceNotFound
+from models.domain.identity_normalization import normalize_email
 from models.domain.policies.permission_policy import PermissionPolicy
 
 
@@ -83,7 +84,7 @@ class UserManagementService:
             actor, Permission.MANAGE_USERS
         )
         clean_name = name.strip()
-        normalized_email = email.strip().lower()
+        normalized_email = normalize_email(email)
         if not clean_name:
             raise ValueError("Informe o nome do usuário.")
         if len(clean_name) > 150 or len(normalized_email) > 255:
@@ -169,7 +170,7 @@ class UserManagementService:
 
     def _update_identity(self, actor: User, account: UserAccount, name: str, email: str) -> User:
         name = name.strip()
-        normalized_email = email.strip().lower()
+        normalized_email = normalize_email(email)
         if not name or len(name) > 150 or len(normalized_email) > 255:
             raise ValueError("Informe nome e e-mail dentro dos limites permitidos.")
         if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", normalized_email):

@@ -11,6 +11,7 @@ from application.ports.user_repository import UserRepository
 from application.services.login_attempt_limiter import LoginAttemptLimiter
 from models.domain.entities.user import User
 from models.domain.entities.user_session import UserSession
+from models.domain.identity_normalization import normalize_email
 
 
 GENERIC_LOGIN_ERROR = "E-mail ou senha incorretos."
@@ -69,7 +70,7 @@ class AuthenticationService:
         if self._login_limiter and not self._login_limiter.register_attempt(attempt_key, now):
             raise TooManyLoginAttempts
 
-        account = self._users.find_by_email(email)
+        account = self._users.find_by_email(normalize_email(email))
         valid_password = self._password_hasher.verify_password(
             password, account.password_hash if account else self._dummy_password_hash
         )

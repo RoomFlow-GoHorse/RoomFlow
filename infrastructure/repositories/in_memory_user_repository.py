@@ -6,6 +6,7 @@ from models.domain.exceptions import DuplicateResource, LastActiveAdministrator,
 from models.domain.entities.user_account import UserAccount
 from models.domain.entities.profile import Profile
 from models.domain.entities.user import UserStatus
+from models.domain.identity_normalization import normalize_email
 
 
 class InMemoryUserRepository:
@@ -18,12 +19,12 @@ class InMemoryUserRepository:
         if transaction is not None:
             transaction.register(self._by_email, self._by_id)
         for account in accounts:
-            self._by_email[account.user.email.strip().lower()] = account
+            self._by_email[normalize_email(account.user.email)] = account
             self._by_id[account.user.id] = account
 
     def find_by_email(self, email: str) -> UserAccount | None:
         with self._lock:
-            return self._by_email.get(email.strip().lower())
+            return self._by_email.get(normalize_email(email))
 
     def find_by_id(self, user_id: str) -> UserAccount | None:
         with self._lock:
@@ -37,7 +38,7 @@ class InMemoryUserRepository:
             )
 
     def add(self, account: UserAccount) -> None:
-        email = account.user.email.strip().lower()
+        email = normalize_email(account.user.email)
         with self._lock:
             if email in self._by_email:
                 raise DuplicateResource("Já existe uma conta com este e-mail.")
@@ -83,10 +84,10 @@ class InMemoryUserRepository:
         current = self._by_id.get(account.user.id)
         if current is None:
             raise ResourceNotFound("Usu\u00e1rio n\u00e3o encontrado.")
-        normalized_email = account.user.email.strip().lower()
+        normalized_email = normalize_email(account.user.email)
         existing = self._by_email.get(normalized_email)
         if existing is not None and existing.user.id != account.user.id:
             raise DuplicateResource("J\u00e1 existe uma conta com este e-mail.")
-        self._by_email.pop(current.user.email.strip().lower(), None)
+        self._by_email.pop(normalize_email(current.user.email), None)
         self._by_email[normalized_email] = account
         self._by_id[account.user.id] = account

@@ -15,6 +15,7 @@ from models.domain.entities.profile import Profile
 from models.domain.entities.user import User, UserStatus
 from models.domain.entities.user_account import UserAccount
 from models.domain.exceptions import DuplicateResource, ResourceNotFound
+from models.domain.identity_normalization import normalize_cnpj, normalize_email
 from models.domain.policies.permission_policy import PermissionPolicy
 
 
@@ -69,12 +70,12 @@ class InstitutionManagementService:
             return self._register(data)
 
     def _register(self, data: InstitutionRegistration) -> tuple[Institution, User]:
-        cnpj = "".join(character for character in data.cnpj if character.isdigit())
+        cnpj = normalize_cnpj(data.cnpj)
         if len(cnpj) != 14:
             raise ValueError("O CNPJ deve conter 14 dígitos.")
         if self._institutions.find_by_cnpj(cnpj):
             raise DuplicateResource("Já existe uma instituição com este CNPJ.")
-        email = data.responsible_email.strip().lower()
+        email = normalize_email(data.responsible_email)
         if len(email) > 255 or not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
             raise ValueError("Informe um e-mail válido para o administrador.")
         if not 8 <= len(data.password) <= 1024:
@@ -94,7 +95,7 @@ class InstitutionManagementService:
             city=data.city.strip(),
             state=data.state.strip().upper(),
             phone=data.phone.strip(),
-            email=data.email.strip().lower(),
+            email=normalize_email(data.email),
         )
         owner = User(
             id=f"u-{secrets.token_urlsafe(12)}",
@@ -135,10 +136,9 @@ class InstitutionManagementService:
         name = data.name.strip()
         if not name:
             raise ValueError("O nome da instituição é obrigatório.")
-        if data.email is not None:
-            email = data.email.strip().lower()
-            if email and not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
-                raise ValueError("Informe um e-mail institucional válido.")
+        email = normalize_email(data.email) if data.email is not None else current.email
+        if data.email is not None and email and not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
+            raise ValueError("Informe um e-mail institucional válido.")
         phone = data.phone.strip() if data.phone is not None else current.phone
         if phone and len(phone) > 30:
             raise ValueError("O telefone deve ter no máximo 30 caracteres.")
@@ -152,7 +152,7 @@ class InstitutionManagementService:
             city=data.city.strip() if data.city is not None else current.city,
             state=state,
             phone=phone,
-            email=(data.email.strip().lower() if data.email is not None else current.email),
+            email=email,
             address=data.address.strip() if data.address is not None else current.address,
             timezone=data.timezone if data.timezone is not None else current.timezone,
             preferences=data.preferences if data.preferences is not None else current.preferences,
