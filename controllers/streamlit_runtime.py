@@ -1,3 +1,4 @@
+import logging
 import os
 
 import streamlit as st
@@ -13,6 +14,8 @@ API_PAGES = frozenset({
     "nova_reserva", "minhas_reservas", "gerente_reservas", "gerente_conflitos",
     "gerente_dashboard", "ocupacao", "notificacoes",
 })
+
+LOGGER = logging.getLogger(__name__)
 
 
 def uses_roomflow_api() -> bool:
@@ -40,7 +43,8 @@ get_streamlit_runtime.clear = _get_local_runtime.clear
 
 
 def render_api_error(error: ApiUnavailable) -> None:
-    st.error(str(error))
+    LOGGER.error("RoomFlow API request failed: %s", error)
+    st.error("Não foi possível conectar ao RoomFlow. Tente novamente.")
     if st.button("Tentar novamente", key="roomflow_api_retry"):
         st.rerun()
 

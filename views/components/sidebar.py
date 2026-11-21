@@ -1,10 +1,12 @@
+import logging
+
 import streamlit as st
 
 from config.constants import ROLE_NAV
 from controllers import auth_service
 from controllers.app_state_service import go
-from controllers.mock_data_service import notifications_for
 from controllers.streamlit_runtime import API_PAGES, get_streamlit_runtime, uses_roomflow_api
+from controllers.roomflow_api import ApiUnavailable
 from models.domain.exceptions import DomainAuthorizationError
 from views.components.ui_components import is_dark_theme, logo, role_label
 
@@ -45,6 +47,8 @@ NAV_LABEL_OVERRIDES = {
     "localizar": "Localizar espaço",
 }
 
+LOGGER = logging.getLogger(__name__)
+
 
 def _sidebar_items(role):
     for label, page in ROLE_NAV.get(role, []):
@@ -72,14 +76,21 @@ def render_sidebar(user):
     current_page = st.session_state.get("page", "landing")
     role = user.get("role", "participante")
     allowed_pages = {page for _, page in ROLE_NAV.get(role, [])}
+    notifications_unavailable = not uses_roomflow_api()
     if uses_roomflow_api():
         allowed_pages &= API_PAGES
         try:
-            unread = get_streamlit_runtime().notifications.unread_count()
-        except DomainAuthorizationError:
+            inbox = get_streamlit_runtime().notifications.inbox(
+                unread_only=True, limit=1, offset=0,
+            )
+            unread = inbox["unread_count"]
+            notifications_unavailable = False
+        except (DomainAuthorizationError, ApiUnavailable) as error:
+            LOGGER.warning("Could not load the sidebar notification count: %s", error)
             unread = 0
+            notifications_unavailable = True
     else:
-        unread = sum(not item["read"] for item in notifications_for(role) if item.get("category") != "sistema")
+        unread = 0
 
     with st.sidebar:
         with st.container(key="rf_sidebar_logo"):
@@ -104,6 +115,8 @@ def render_sidebar(user):
                 width="stretch",
             ):
                 _navigate(page)
+            if page == "notificacoes" and notifications_unavailable:
+                st.caption("Notificações indisponíveis no momento.")
 
         with st.container(key="rf_sidebar_footer"):
             avatar_column, profile_column = st.columns(

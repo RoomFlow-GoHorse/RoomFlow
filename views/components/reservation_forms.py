@@ -12,7 +12,7 @@ RESERVATION_ERRORS = (DomainAuthorizationError, DuplicateResource, ResourceNotFo
 
 def reservation_api():
     if not uses_roomflow_api():
-        st.info("Abra o RoomFlow conectado à API PostgreSQL para usar as reservas.")
+        st.info("Não foi possível carregar as reservas. Tente novamente.")
         return None
     return get_streamlit_runtime().reservation_service
 

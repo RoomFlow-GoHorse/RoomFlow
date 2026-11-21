@@ -1,4 +1,3 @@
-import os
 import secrets
 from html import escape
 
@@ -289,23 +288,18 @@ def _render_confirm():
 
 
 def _render_email_pending():
+    if not uses_roomflow_api():
+        st.error("A confirmação de cadastro não está disponível neste ambiente. Tente novamente mais tarde.")
+        if st.button("Voltar ao cadastro", key="signup_member_back_from_email"):
+            st.session_state.signup_member_screen = "form"
+            st.rerun()
+        return
     st.info(
         f"Enviamos uma confirma\u00e7\u00e3o para {st.session_state.signup_member_email}. "
         "Confirme o e-mail para ativar sua conta.",
         icon=":material/mark_email_unread:",
     )
-    environment = os.getenv("APP_ENV", "development").strip().lower()
-    token = ""
-    if uses_roomflow_api():
-        token = st.text_input("Código recebido por e-mail", type="password", max_chars=200).strip()
-    elif environment in {"development", "test"}:
-        message = get_streamlit_runtime().simulated_email_sender.latest_for(
-            st.session_state.signup_member_email
-        )
-        if message:
-            st.caption("Caixa de e-mail simulada para desenvolvimento:")
-            st.code(message.verification_token)
-            token = message.verification_token
+    token = st.text_input("Código recebido por e-mail", type="password", max_chars=200).strip()
     if not st.button("Confirmar e-mail", type="primary", key="signup_member_verify_email", disabled=not token):
         return
     try:

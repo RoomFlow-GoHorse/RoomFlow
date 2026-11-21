@@ -121,6 +121,9 @@ def _render_notifications_section(notifications: list[dict]):
 
         st.divider()
 
+        if notifications is None:
+            st.info("Não foi possível carregar suas notificações. Tente novamente.")
+            return
         if not notifications:
             st.success("Tudo em dia!", icon=":material/check_circle:")
             st.caption("Você não possui novas notificações no momento.")
@@ -164,10 +167,10 @@ def dashboard(user: dict):
     pending = [r for r in reservations if r.get("status") in {"pendente", "em_analise"}]
     conflicts = [r for r in reservations if r.get("status") == "conflito"]
 
-    user_role = user.get("role", "solicitante")
-    all_notifications = mock_data_service.notifications_for(user_role)
-    notifications = [n for n in all_notifications if n.get("category") != "sistema"]
-    unread_count = sum(not n.get("read", False) for n in notifications)
+    # The in-memory runtime's notification fixtures are demonstrations, not a
+    # user's persisted inbox. Never present them as real account activity.
+    notifications = None
+    unread_count = "—"
 
     # Métricas
     _render_metrics(

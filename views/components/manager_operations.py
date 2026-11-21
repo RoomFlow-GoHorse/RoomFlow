@@ -15,7 +15,7 @@ ROOM_STATUS_LABELS = {
 
 def operations_api():
     if not uses_roomflow_api():
-        st.info("Abra o RoomFlow conectado à API PostgreSQL para consultar a operação.")
+        st.info("Esta área está indisponível no momento.")
         return None
     return get_streamlit_runtime().manager_operations
 

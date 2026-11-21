@@ -82,7 +82,7 @@ class MemberSignupStreamlitTests(unittest.TestCase):
             ),
         )
 
-    def test_streamlit_page_completes_simulated_email_confirmation(self):
+    def test_streamlit_page_does_not_expose_simulated_email_token(self):
         runtime = get_streamlit_runtime()
         admin = runtime.users.find_by_email("admin@gmail.com").user
         registration_number = f"UI-{secrets.token_hex(5)}"
@@ -118,14 +118,10 @@ class MemberSignupStreamlitTests(unittest.TestCase):
         self.assertEqual(app.session_state["signup_member_screen"], "email_pending")
         sent = runtime.simulated_email_sender.latest_for(email)
         self.assertIsNotNone(sent)
-
-        app.button(key="signup_member_verify_email").click().run(timeout=15)
-        self.assertEqual(len(app.exception), 0)
-        self.assertEqual(app.session_state["signup_member_screen"], "success")
-        self.assertIsNotNone(runtime.users.find_by_email(email))
-        app.button(key="signup_member_login").click().run(timeout=15)
-        self.assertEqual(len(app.exception), 0)
-        self.assertIn(app.query_params["page"], ("login", ["login"]))
+        self.assertFalse(any(sent.verification_token in element.value for element in app.code))
+        self.assertFalse(any("simulada" in element.value.lower() for element in app.caption))
+        self.assertTrue(any("confirmação de cadastro não está disponível" in element.value.lower() for element in app.error))
+        self.assertIsNone(runtime.users.find_by_email(email))
 
 
 if __name__ == "__main__":

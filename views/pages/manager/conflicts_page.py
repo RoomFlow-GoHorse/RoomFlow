@@ -116,7 +116,7 @@ def _resolution_form(api, conflict):
 def conflicts(user=None):
     page_header("Conflitos", "Analise sobreposições de horários e aplique uma decisão às reservas.")
     if not uses_roomflow_api():
-        st.info("Abra o RoomFlow conectado à API PostgreSQL para gerenciar conflitos.")
+        st.info("Esta área está indisponível no momento.")
         return
     api = get_streamlit_runtime().conflict_service
     search, status_column, detect_column = st.columns([3, 2, 2], vertical_alignment="bottom")

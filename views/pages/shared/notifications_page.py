@@ -1,9 +1,11 @@
+import logging
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
 import streamlit as st
 
 from controllers.streamlit_runtime import get_streamlit_runtime, uses_roomflow_api
+from controllers.roomflow_api import ApiUnavailable
 from views.components.reservation_forms import RESERVATION_ERRORS
 from views.components.ui_components import page_header
 
@@ -14,6 +16,7 @@ FILTERS = {
 }
 CATEGORY_LABELS = {"reserva": "Reserva", "alteracao": "Alteração", "conflito": "Conflito"}
 PAGE_SIZE = 25
+LOGGER = logging.getLogger(__name__)
 
 
 def _render_styles():
@@ -52,20 +55,27 @@ def _render_notification_card(item, api, zone):
                                 icon=":material/check_circle:"):
             try:
                 api.mark_read(notification_id)
-            except RESERVATION_ERRORS as error:
-                st.error(str(error))
+            except (*RESERVATION_ERRORS, ApiUnavailable) as error:
+                LOGGER.warning("Could not mark notification %s as read: %s", notification_id, error)
+                st.error("Não foi possível atualizar a notificação. Tente novamente.")
             else:
                 st.rerun()
 
 
 def notifications(user=None):
     if not uses_roomflow_api():
-        page_header("Notificações", "Consulte as notificações do seu vínculo institucional.")
-        st.info("Abra o RoomFlow conectado à API PostgreSQL para acessar a caixa de notificações.")
+        page_header("Notificações", "Consulte as atualizações da sua instituição.")
+        st.error("Não foi possível carregar suas notificações. Tente novamente.")
         return
 
     _render_styles()
-    api = get_streamlit_runtime().notifications
+    try:
+        api = get_streamlit_runtime().notifications
+    except ApiUnavailable as error:
+        LOGGER.warning("Could not connect to the notification service: %s", error)
+        page_header("Notificações", "Consulte as atualizações da sua instituição.")
+        st.error("Não foi possível carregar suas notificações. Tente novamente.")
+        return
     header = st.container()
     selection = st.segmented_control(
         "Filtrar notificações", list(FILTERS), default="unread", format_func=FILTERS.__getitem__,
@@ -77,10 +87,9 @@ def notifications(user=None):
             unread_only=selection == "unread", category=selection if selection in CATEGORY_LABELS else None,
             limit=PAGE_SIZE, offset=offset,
         )
-    except RESERVATION_ERRORS as error:
-        with header:
-            page_header("Notificações", "Consulte as notificações do seu vínculo institucional.")
-        st.error(str(error))
+    except (*RESERVATION_ERRORS, ApiUnavailable) as error:
+        LOGGER.warning("Could not load the authenticated user's notifications: %s", error)
+        st.error("Não foi possível carregar suas notificações. Tente novamente.")
         return
 
     unread = result["unread_count"]
@@ -93,8 +102,9 @@ def notifications(user=None):
                                     icon=":material/done_all:", width="stretch"):
             try:
                 api.mark_all_read()
-            except RESERVATION_ERRORS as error:
-                st.error(str(error))
+            except (*RESERVATION_ERRORS, ApiUnavailable) as error:
+                LOGGER.warning("Could not mark all notifications as read: %s", error)
+                st.error("Não foi possível atualizar as notificações. Tente novamente.")
             else:
                 _set_offset(0)
                 st.rerun()
@@ -104,7 +114,13 @@ def notifications(user=None):
         st.rerun()
 
     if not result["items"]:
-        st.info("Nenhuma notificação para o filtro selecionado.", icon=":material/notifications_off:")
+        if selection == "unread":
+            empty_message = "Você não possui notificações não lidas no momento."
+        elif selection == "all":
+            empty_message = "Você não possui notificações no momento."
+        else:
+            empty_message = "Não há notificações nessa categoria."
+        st.info(empty_message, icon=":material/notifications_off:")
         return
     zone = ZoneInfo(result["timezone"])
     for item in result["items"]:

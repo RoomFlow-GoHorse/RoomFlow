@@ -251,7 +251,7 @@ def spaces(user=None):
     if rooms and all(room.occupancy_verified for room in rooms):
         st.caption("Disponibilidade atual calculada pelas reservas aprovadas em andamento e pelos bloqueios.")
     elif rooms:
-        st.caption("Catálogo de demonstração. A disponibilidade real depende das reservas no PostgreSQL.")
+        st.caption("A disponibilidade será confirmada ao consultar as reservas do espaço.")
 
     if visible:
         _space_table_and_actions(visible, actor)
