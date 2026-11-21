@@ -17,6 +17,7 @@ class Permission(str, Enum):
 
     VIEW_REQUESTER_DASHBOARD = "requester.dashboard.view"
     CREATE_RESERVATION = "reservations.create"
+    VIEW_OWN_RESERVATIONS = "reservations.view.own"
     CANCEL_OWN_RESERVATION = "reservations.cancel.own"
     VIEW_AGENDA = "agenda.view"
     VIEW_NOTIFICATIONS = "notifications.view"

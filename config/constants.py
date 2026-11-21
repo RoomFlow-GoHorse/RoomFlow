@@ -53,6 +53,7 @@ STATUS_LABELS = {
     "aprovada": "Aprovada",
     "pendente": "Pendente",
     "rejeitada": "Rejeitada",
+    "cancelada": "Cancelada",
     "conflito": "Conflito",
     "em_analise": "Em analise",
     "nao_resolvido": "Não resolvido",

@@ -15,6 +15,7 @@ from application.services.enrollment_management_service import (
 from application.services.member_signup_service import InvalidEmailVerification, MemberSignupStarted, RegisteredMember
 from application.services.password_recovery_service import InvalidRecoveryToken
 from controllers.structure_api import ApiAdminDashboard, ApiFloorPlans, ApiResourceManagement, ApiSpaceManagement
+from controllers.reservation_api import ApiReservations
 from models.domain.entities.admin_audit_event import AdminAuditAction, AdminAuditEvent
 from models.domain.entities.authorized_enrollment import AuthorizedEnrollment
 from models.domain.entities.institution import (
@@ -323,6 +324,7 @@ class ApiRuntime:
         self.floor_plan_management = ApiFloorPlans(api)
         self.admin_dashboard = ApiAdminDashboard(api)
         self.password_recovery = ApiPasswordRecovery(api)
+        self.reservation_service = ApiReservations(api)
 
 
 class ApiPasswordRecovery:

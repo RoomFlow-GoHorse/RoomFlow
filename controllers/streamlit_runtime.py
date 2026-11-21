@@ -10,6 +10,7 @@ from infrastructure.authentication_factory import InMemoryApplicationRuntime, bu
 API_PAGES = frozenset({
     "admin_dashboard", "usuarios", "historico_admin", "configuracoes_instituicao",
     "permissoes", "planta_instituicao", "espacos", "conta",
+    "nova_reserva", "minhas_reservas", "gerente_reservas",
 })
 
 

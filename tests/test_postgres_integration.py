@@ -12,6 +12,7 @@ from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import patch
+from zoneinfo import ZoneInfo
 
 import httpx2
 from dotenv import dotenv_values
@@ -101,6 +102,131 @@ class PostgresIntegrationTests(unittest.TestCase):
         })
         self.assertEqual(created.status_code, 201, created.text)
         return self.login(email)
+
+    def _requester_login(self, admin):
+        email = f"{secrets.token_hex(5)}@example.test"
+        created = self.client.post("/admin/users", headers=admin, json={
+            "name": "Solicitante Teste", "email": email, "password": PASSWORD, "profile": "solicitante",
+        })
+        self.assertEqual(created.status_code, 201, created.text)
+        return self.login(email)
+
+    def test_reservations_are_scoped_validated_and_persisted(self):
+        own, _ = self.register()
+        other, _ = self.register()
+        admin = self.headers(self.login(own["responsible_email"]))
+        foreign_admin = self.headers(self.login(other["responsible_email"]))
+        manager = self.headers(self._manager_login(admin))
+        foreign_manager = self.headers(self._manager_login(foreign_admin))
+        requester = self.headers(self._requester_login(admin))
+        colleague = self.headers(self._requester_login(admin))
+        foreign_requester = self.headers(self._requester_login(foreign_admin))
+        room = self._structure_room(admin, "Sala Reserva")
+        foreign_room = self._structure_room(foreign_admin, "Sala Externa")
+        start = (datetime.now(ZoneInfo("America/Sao_Paulo")) + timedelta(days=3)).replace(
+            hour=10, minute=0, second=0, microsecond=0,
+        )
+        end = start + timedelta(hours=1)
+        data = {
+            "space_id": room["id"], "title": "Oficina", "activity_type": "Aula",
+            "start": start.isoformat(), "end": end.isoformat(), "participants": 20,
+            "justification": "Atividade com a turma",
+        }
+        base = "/reservations"
+        for attrs, code in (
+            ({"participants": 21}, 422), ({"end": start.isoformat()}, 422),
+            ({"start": start.replace(tzinfo=None).isoformat()}, 422), ({"justification": " "}, 422),
+            ({"start": start.replace(hour=6).isoformat()}, 422), ({"institution_id": "1"}, 422),
+            ({"requester_id": "1"}, 422), ({"status": "aprovada"}, 422), ({"space_id": foreign_room["id"]}, 404),
+        ):
+            response = self.client.post(base, headers=requester, json={**data, **attrs})
+            self.assertEqual(response.status_code, code, response.text)
+        self.assertEqual(self.client.post(base, headers=foreign_requester, json=data).status_code, 404)
+        self.assertEqual(self.client.post(base, headers=manager, json=data).status_code, 403)
+        self.assertEqual(self.client.get(base + "/institution", headers=requester).status_code, 403)
+        self.assertEqual(self.client.get(base + "/institution", headers=admin).status_code, 403)
+        block = f"/structure/spaces/{room['id']}"
+        self.assertEqual(self.client.post(block + "/block", headers=manager, json={"reason": "Manutenção"}).status_code, 200)
+        self.assertEqual(self.client.post(base, headers=requester, json=data).status_code, 409)
+        self.assertEqual(self.client.delete(block + "/block", headers=manager).status_code, 200)
+
+        first = self.client.post(base, headers=requester, json=data)
+        self.assertEqual(first.status_code, 201, first.text)
+        reservation_id = first.json()["data"]["id"]
+        self.assertEqual(first.json()["data"]["status"], "pendente")
+        self.assertEqual(self.client.post(base, headers=requester, json=data).status_code, 409)
+        second = self.client.post(base, headers=colleague, json={**data, "title": "Reunião"})
+        self.assertEqual(second.status_code, 201, second.text)
+        second_id = second.json()["data"]["id"]
+        self.assertTrue(second.json()["data"]["has_overlap"])
+        with TestClient(create_app(postgres_session_factory=self.factory)) as restarted:
+            mine = restarted.get(base + "/mine", headers=requester).json()["data"]
+            self.assertEqual([item["id"] for item in mine], [reservation_id])
+            self.assertTrue(mine[0]["has_overlap"])
+            all_items = restarted.get(base + "/institution", headers=manager).json()["data"]
+            self.assertEqual({item["id"] for item in all_items}, {reservation_id, second_id})
+            self.assertEqual(restarted.get(base + "/institution", headers=foreign_manager).json()["data"], [])
+        path = f"{base}/{reservation_id}"
+        self.assertEqual(self.client.post(path + "/cancel", headers=colleague).status_code, 404)
+        self.assertEqual(self.client.put(path, headers=colleague, json=data).status_code, 404)
+        self.assertEqual(self.client.patch(path + "/decision", headers=foreign_manager,
+                                           json={"status": "aprovada"}).status_code, 404)
+        edited = self.client.put(path, headers=requester, json={**data, "title": "Oficina atualizada"})
+        self.assertEqual(edited.status_code, 200, edited.text)
+        self.assertEqual(edited.json()["data"]["status"], "em_analise")
+        approved = self.client.patch(path + "/decision", headers=manager, json={"status": "aprovada"})
+        self.assertEqual(approved.status_code, 200, approved.text)
+        self.assertEqual(approved.json()["data"]["status"], "aprovada")
+        second_decision = f"{base}/{second_id}/decision"
+        self.assertEqual(self.client.patch(second_decision, headers=manager,
+                                           json={"status": "aprovada"}).status_code, 409)
+        self.assertEqual(self.client.post(base, headers=colleague, json=data).status_code, 409)
+        catalog = self.client.get(base + "/spaces", headers=requester, params={"start": data["start"], "end": data["end"]})
+        self.assertEqual(catalog.json()["data"]["spaces"], [])
+        adjacent = self.client.post(base, headers=requester, json={
+            **data, "start": end.isoformat(), "end": (end + timedelta(hours=1)).isoformat(),
+        })
+        self.assertEqual(adjacent.status_code, 201, adjacent.text)
+        self.assertEqual(self.client.patch(second_decision, headers=manager,
+                                           json={"status": "rejeitada"}).status_code, 422)
+        rejected = self.client.patch(second_decision, headers=manager,
+                                     json={"status": "rejeitada", "reason": "Horário ocupado"})
+        self.assertEqual(rejected.json()["data"]["status"], "rejeitada")
+        self.assertEqual(rejected.json()["data"]["decision_reason"], "Horário ocupado")
+        cancelled = self.client.post(path + "/cancel", headers=requester)
+        self.assertEqual(cancelled.json()["data"]["status"], "cancelada")
+        self.assertEqual(self.client.post(path + "/cancel", headers=requester).status_code, 409)
+
+    def test_reservation_streamlit_submission_reaches_manager_via_http(self):
+        own, _ = self.register()
+        admin = self.headers(self.login(own["responsible_email"]))
+        requester = self._requester_login(admin)
+        manager = self._manager_login(admin)
+        room = self._structure_room(admin, "Sala Streamlit Reserva")
+        with self.api_process() as url, patch.dict(os.environ, {"ROOMFLOW_API_URL": url}):
+            def open_page(login, page):
+                app = AppTest.from_file(str(PROJECT / "main.py"), default_timeout=20)
+                app.query_params["page"] = page
+                app.session_state["auth_token"] = login.json()["data"]["access_token"]
+                app.run()
+                self.assertFalse(app.exception)
+                return app
+
+            title = "Oficina criada pelo Streamlit"
+            app = open_page(requester, "nova_reserva")
+            app.selectbox(key="new_reservation_room").select(room["id"])
+            app.text_input(key="new_reservation_title").set_value(title)
+            app.text_input(key="new_reservation_activity").set_value("Oficina")
+            app.text_area(key="new_reservation_reason").set_value("Atividade em grupo")
+            next(button for button in app.button if button.label == "Solicitar reserva").click().run()
+            self.assertFalse(app.exception)
+            self.assertTrue(app.success, [item.value for item in app.error])
+            mine = open_page(requester, "minhas_reservas")
+            self.assertIn(title, [item.value for item in mine.subheader])
+            self.assertNotIn("reservations", mine.session_state.filtered_state)
+            institution = open_page(manager, "gerente_reservas")
+            self.assertIn(title, institution.dataframe[0].value["Solicitação"].tolist())
+            self.assertNotIn("reservations", institution.session_state.filtered_state)
 
     def test_manager_persists_room_changes_blocks_and_reports_real_availability(self):
         own, registration = self.register()

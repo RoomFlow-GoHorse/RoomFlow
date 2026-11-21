@@ -14,6 +14,7 @@ from application.services.password_recovery_service import PasswordRecoveryServi
 from application.services.floor_plan_service import FloorPlanService
 from application.services.resource_management_service import ResourceManagementService
 from application.services.space_service import SpaceService
+from application.services.reservation_service import ReservationService
 from application.services.login_attempt_limiter import LoginAttemptLimiter
 from application.services.user_management_service import UserManagementService
 from infrastructure.persistence.audit_repository import PostgresAdminAuditRepository
@@ -25,6 +26,7 @@ from infrastructure.persistence.pending_signup_repository import PostgresPending
 from infrastructure.persistence.password_recovery_repository import PostgresPasswordRecoveryRepository
 from infrastructure.persistence.plant_repository import PostgresFloorPlanRepository, PostgresPlantFileStorage
 from infrastructure.persistence.structure_repository import PostgresStructureRepository
+from infrastructure.persistence.reservation_repository import PostgresReservationRepository
 from infrastructure.persistence.session_repository import PostgresSessionRepository
 from infrastructure.persistence.transaction import PostgresTransaction
 from infrastructure.persistence.users import PostgresUserRepository
@@ -48,6 +50,7 @@ class PostgresRuntime:
     floor_plan_management: FloorPlanService
     admin_dashboard: AdminDashboardService
     password_recovery: PasswordRecoveryService
+    reservation_service: ReservationService
 
 
 def build_postgres_runtime(
@@ -86,6 +89,9 @@ def build_postgres_runtime(
         invite_codes=invites,
         enrollment_management=enrollment_management,
         space_management=SpaceService(structure, audit=audit),
+        reservation_service=ReservationService(
+            PostgresReservationRepository(transaction), structure, institutions, clock, transaction.atomic, audit.current_actor,
+        ),
         resource_management=ResourceManagementService(structure, structure, audit=audit),
         floor_plan_management=FloorPlanService(
             PostgresFloorPlanRepository(transaction, structure), PostgresPlantFileStorage(transaction), audit=audit,

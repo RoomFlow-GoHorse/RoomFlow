@@ -21,7 +21,10 @@ class PermissionPolicy:
                 Permission.EDIT_INSTITUTION_SETTINGS,
             }
         ) | _COMMON_PERMISSIONS,
-        Profile.MANAGER: frozenset({Permission.MANAGE_SPACES}) | _COMMON_PERMISSIONS,
+        Profile.MANAGER: frozenset({Permission.MANAGE_SPACES, Permission.REVIEW_RESERVATIONS}) | _COMMON_PERMISSIONS,
+        Profile.REQUESTER: frozenset({
+            Permission.CREATE_RESERVATION, Permission.VIEW_OWN_RESERVATIONS, Permission.CANCEL_OWN_RESERVATION,
+        }) | _COMMON_PERMISSIONS,
     }
 
     def __init__(self, institution_access: InstitutionAccessPolicy | None = None):

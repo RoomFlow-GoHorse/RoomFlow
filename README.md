@@ -130,9 +130,14 @@ Configure `ROOMFLOW_SMTP_HOST`, `ROOMFLOW_SMTP_PORT` (padrão 465),
 
 O modo PostgreSQL inclui autenticação, usuários, instituições, convites,
 matrículas, estrutura física, recursos, plantas, painel e histórico administrativos.
-Os fluxos operacionais de reservas, conflitos e notificações permanecem no modo
-de demonstração. Com `ROOMFLOW_API_URL` configurado, o Streamlit usa a API para
-os fluxos liberados. O modo em memória continua disponível sem as duas variáveis.
+Com `ROOMFLOW_API_URL` configurado, solicitantes podem criar, acompanhar, alterar
+e cancelar suas reservas. Gerentes podem consultar e avaliar as solicitações da
+própria instituição. A disponibilidade considera salas ativas e desbloqueadas
+e reservas aprovadas no PostgreSQL. Solicitações abertas com horários
+sobrepostos aparecem sinalizadas na lista do gerente.
+
+As telas de agenda, ocupação, conflitos e notificações continuam no modo de
+demonstração. O modo em memória continua disponível sem as duas variáveis.
 
 ### Arquitetura
 * **Views:** responsáveis pela interface da aplicação.

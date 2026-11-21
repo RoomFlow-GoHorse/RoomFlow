@@ -13,22 +13,6 @@ def reservations(status=None, requester_id=None):
     return items
 
 
-def update_reservation_status(reservation_id, status):
-    for item in st.session_state.reservations:
-        if item["id"] == reservation_id:
-            item["status"] = status
-            return item
-    return None
-
-
-def create_reservation(data):
-    data["id"] = f"r{len(st.session_state.reservations) + 1}"
-    data.setdefault("status", "pendente")
-    data.setdefault("priority", "media")
-    st.session_state.reservations.append(data)
-    return data
-
-
 def buildings():
     return st.session_state.get("buildings", [])
 

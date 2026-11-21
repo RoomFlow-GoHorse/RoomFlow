@@ -59,13 +59,15 @@ class UserPermissionTests(unittest.TestCase):
                 institution_id=None,
             )
 
-    def test_other_profiles_have_no_effective_grants_until_scope_is_decided(self) -> None:
-        for profile in (Profile.REQUESTER, Profile.PARTICIPANT):
-            with self.subTest(profile=profile):
-                self.assertEqual(
-                    self.permission_policy.effective_permissions(profile),
-                    frozenset({Permission.MANAGE_OWN_ACCOUNT}),
-                )
+    def test_requester_has_own_reservation_grants_and_participant_only_manages_account(self) -> None:
+        self.assertEqual(self.permission_policy.effective_permissions(Profile.REQUESTER), frozenset({
+            Permission.MANAGE_OWN_ACCOUNT, Permission.CREATE_RESERVATION,
+            Permission.VIEW_OWN_RESERVATIONS, Permission.CANCEL_OWN_RESERVATION,
+        }))
+        self.assertEqual(
+            self.permission_policy.effective_permissions(Profile.PARTICIPANT),
+            frozenset({Permission.MANAGE_OWN_ACCOUNT}),
+        )
 
     def test_manager_can_manage_rooms_but_not_institution_structure(self) -> None:
         grants = self.permission_policy.effective_permissions(Profile.MANAGER)

@@ -18,7 +18,7 @@ class InstitutionAccessPolicy:
             and requested_institution_id != institution_id
         ):
             raise InstitutionAccessDenied(
-                "O administrador não pode acessar outra instituição."
+                "O usuário não pode acessar outra instituição."
             )
         return institution_id
 
@@ -35,7 +35,7 @@ class InstitutionAccessPolicy:
 
     @staticmethod
     def _institution_id(user: User) -> str:
-        if user.profile not in {Profile.ADMIN, Profile.MANAGER}:
+        if user.profile not in {Profile.ADMIN, Profile.MANAGER, Profile.REQUESTER}:
             raise InstitutionAccessDenied(
                 "O escopo institucional deste perfil ainda não foi definido."
             )

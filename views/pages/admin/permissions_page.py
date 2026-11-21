@@ -17,20 +17,20 @@ EFFECTIVE_PERMISSIONS = [
     ("Gerenciar planta da instituição", {Permission.MANAGE_FLOOR_PLAN}),
     ("Configurações da instituição", {Permission.EDIT_INSTITUTION_SETTINGS}),
     ("Gerenciar salas e recursos", {Permission.MANAGE_FLOOR_PLAN, Permission.MANAGE_SPACES}),
+    ("Criar reservas", {Permission.CREATE_RESERVATION}),
+    ("Consultar, aprovar e rejeitar solicitações", {Permission.REVIEW_RESERVATIONS}),
+    ("Consultar as próprias reservas", {Permission.VIEW_OWN_RESERVATIONS}),
+    ("Cancelar as próprias reservas", {Permission.CANCEL_OWN_RESERVATION}),
 ]
 
 PENDING_PERMISSIONS = [
     ("Acessar dashboard do gerente", "none", "pending", "none", "none"),
     ("Acessar dashboard do solicitante", "none", "none", "pending", "none"),
     ("Acessar dashboard do participante", "none", "none", "none", "pending"),
-    ("Criar reservas", "none", "none", "pending", "none"),
-    ("Aprovar / rejeitar reservas", "none", "pending", "none", "none"),
-    ("Cancelar próprias reservas", "none", "none", "own_pending", "none"),
     ("Resolver conflitos", "none", "pending", "none", "none"),
     ("Bloquear espaços", "none", "pending", "none", "none"),
     ("Consultar agenda", "none", "none", "pending", "pending"),
     ("Localizar espaços", "none", "none", "none", "pending"),
-    ("Histórico de reservas", "none", "pending", "own_pending", "none"),
     ("Consultar notificações", "none", "none", "pending", "pending"),
     ("Relatórios de ocupação", "none", "pending", "none", "none"),
 ]
@@ -38,7 +38,6 @@ PENDING_PERMISSIONS = [
 ACCESS_LABELS = {
     "institution": "Instituição do vínculo",
     "own": "Próprio usuário",
-    "own_pending": "Próprio*",
     "pending": "A validar",
     "none": "—",
 }
@@ -50,7 +49,8 @@ def _permission_dataframe() -> pd.DataFrame:
     grants = [policy.effective_permissions(profile) for profile in profiles]
     effective_rows = []
     for action, permissions in EFFECTIVE_PERMISSIONS:
-        scope = "own" if Permission.MANAGE_OWN_ACCOUNT in permissions else "institution"
+        own = {Permission.MANAGE_OWN_ACCOUNT, Permission.VIEW_OWN_RESERVATIONS, Permission.CANCEL_OWN_RESERVATION}
+        scope = "own" if permissions & own else "institution"
         effective_rows.append((action, *(scope if permissions & values else "none" for values in grants)))
     return pd.DataFrame(
         [
@@ -77,8 +77,7 @@ def permissions(user):
     with st.container(border=True):
         st.caption(
             ":material/info: Instituição do vínculo: escopo da instituição do usuário autenticado · "
-            "Próprio usuário: apenas a própria conta · "
-            "Próprio*: somente registros do solicitante, escopo institucional pendente · "
+            "Próprio usuário: conta ou reservas do usuário autenticado · "
             "A validar: não concede acesso efetivo pela API"
         )
 
