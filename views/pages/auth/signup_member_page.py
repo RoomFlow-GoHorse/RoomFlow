@@ -422,14 +422,6 @@ def signup_member():
                 color: var(--brand, #6D28D9) !important;
             }
 
-            .rf-choice-logo {
-                display: flex;
-                align-items: center;
-                justify-content: flex-end;
-                gap: 8px;
-                font-weight: 700;
-            }
-
             :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] [data-testid="stVerticalBlock"]:has(div.rf-member-form-card) {
                 background-color: #FFFFFF !important;
                 border: 1px solid #E4E4E7 !important;

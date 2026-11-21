@@ -378,15 +378,6 @@ def signup_institution():
                 color: var(--brand, #6D28D9) !important;
             }
 
-            /* LOGO TOPBAR */
-            .rf-choice-logo {
-                display: flex;
-                align-items: center;
-                justify-content: flex-end;
-                gap: 8px;
-                font-weight: 700;
-            }
-
             /* CONTAINER CARD DE FORMULÁRIO (FUNDO BRANCO, BORDA #E4E4E7, RADIUS 16PX) */
             :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] [data-testid="stVerticalBlock"]:has(div.rf-inst-form-card) {
                 background-color: #FFFFFF !important;

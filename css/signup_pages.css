@@ -4,6 +4,14 @@
 ========================================================= */
 
 /* CARDS DE ESCOLHA (signup_choice_page) */
+.rf-choice-logo {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    font-weight: 700;
+}
+
 .rf-choice-card {
     background-color: #FFFFFF;
     border: 2px solid #E4E4E7;

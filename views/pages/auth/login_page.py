@@ -397,7 +397,7 @@ def _render_art_panel():
     st.html(
         f"""
         <aside class="rf-login-art">
-            <div class="rf-public-art-logo">{logo(variant="dark")}</div>
+            <div class="rf-public-art-logo rf-public-art-logo--login">{logo(variant="light")}</div>
             <div class="rf-login-art-copy">
                 <div class="rf-login-gold-line"></div>
                 <h2>Gestão de espaços<br><span>simples e inteligente.</span></h2>

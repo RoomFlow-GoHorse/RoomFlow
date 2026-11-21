@@ -47,14 +47,6 @@ def signup_choice():
                 padding: 0 !important;
             }
 
-            .rf-choice-logo {
-                display: flex;
-                align-items: center;
-                justify-content: flex-end;
-                gap: 8px;
-                font-weight: 700;
-            }
-
             :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] .stButton > button {
                 background: transparent !important;
                 background-color: transparent !important;

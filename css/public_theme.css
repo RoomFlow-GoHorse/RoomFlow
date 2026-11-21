@@ -74,6 +74,13 @@ html:has(#rf-public-theme) .rf-public-art-logo {
     box-shadow: 0 0 0 8px var(--surface-card);
 }
 
+/* A marca branca fica sem placa apenas no painel roxo do login. */
+html:has(#rf-public-theme[data-page="login"]) .rf-public-art-logo--login {
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+}
+
 html:has(#rf-public-theme) .rf-public-mobile-logo {
     display: none;
 }
