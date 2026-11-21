@@ -146,8 +146,17 @@ utilizável das salas ativas no horário institucional, descontando bloqueios
 registrados. O filtro de status restringe a linha do tempo. A disponibilidade
 continua considerando todas as aprovações do período selecionado.
 
-As telas de agenda e notificações continuam no modo de
-demonstração. O modo em memória continua disponível sem as duas variáveis.
+As notificações operacionais são gravadas no PostgreSQL com a reserva e seu
+histórico. Novas solicitações chegam aos gerentes ativos com permissão de
+análise.
+Conforme as preferências, aprovação e rejeição avisam o solicitante,
+cancelamentos avisam solicitante e gerência, e alterações operacionais avisam
+as demais partes envolvidas.
+A leitura é individual por vínculo, e o solicitante pode consultar o histórico
+em **Minhas reservas**.
+
+A tela de agenda continua no modo de demonstração. O modo em memória continua
+disponível sem as duas variáveis.
 
 ### Arquitetura
 * **Views:** responsáveis pela interface da aplicação.

@@ -12,6 +12,7 @@ from application.services.institution_invite_code_service import InstitutionInvi
 from application.services.enrollment_management_service import EnrollmentManagementService
 from application.services.member_signup_service import MemberSignupService
 from application.services.manager_operations_service import ManagerOperationsService
+from application.services.notification_service import NotificationService
 from application.services.password_recovery_service import PasswordRecoveryService
 from application.services.floor_plan_service import FloorPlanService
 from application.services.resource_management_service import ResourceManagementService
@@ -24,6 +25,7 @@ from infrastructure.persistence.conflict_repository import PostgresConflictRepos
 from infrastructure.persistence.enrollment_repository import PostgresAuthorizedEnrollmentRepository
 from infrastructure.persistence.enrollment_preview_repository import PostgresEnrollmentPreviewRepository
 from infrastructure.persistence.institutions import PostgresInstitutionRepository
+from infrastructure.persistence.notification_repository import PostgresNotificationRepository
 from infrastructure.persistence.invite_repository import PostgresInviteCodeRepository
 from infrastructure.persistence.pending_signup_repository import PostgresPendingSignupRepository
 from infrastructure.persistence.password_recovery_repository import PostgresPasswordRecoveryRepository
@@ -56,6 +58,7 @@ class PostgresRuntime:
     reservation_service: ReservationService
     conflict_service: ConflictService
     manager_operations: ManagerOperationsService
+    notifications: NotificationService
 
 
 def build_postgres_runtime(
@@ -76,8 +79,11 @@ def build_postgres_runtime(
     structure = PostgresStructureRepository(transaction)
     conflicts = PostgresConflictRepository(transaction)
     reservations = PostgresReservationRepository(transaction)
+    notifications = NotificationService(
+        PostgresNotificationRepository(transaction), institutions, users, clock, transaction.snapshot,
+    )
     reservation_service = ReservationService(
-        reservations, structure, institutions, clock, transaction.atomic, audit.current_actor, conflicts,
+        reservations, structure, institutions, clock, transaction.atomic, audit.current_actor, conflicts, notifications,
     )
     enrollment_management = EnrollmentManagementService(
         enrollments, institutions, invites, OpenpyxlEnrollmentSpreadsheetParser(),
@@ -106,6 +112,7 @@ def build_postgres_runtime(
         manager_operations=ManagerOperationsService(
             institutions, structure, reservation_service, reservations, structure, clock, transaction.snapshot,
         ),
+        notifications=notifications,
         resource_management=ResourceManagementService(structure, structure, audit=audit),
         floor_plan_management=FloorPlanService(
             PostgresFloorPlanRepository(transaction, structure), PostgresPlantFileStorage(transaction), audit=audit,

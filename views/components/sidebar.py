@@ -4,7 +4,8 @@ from config.constants import ROLE_NAV
 from controllers import auth_service
 from controllers.app_state_service import go
 from controllers.mock_data_service import notifications_for
-from controllers.streamlit_runtime import API_PAGES, uses_roomflow_api
+from controllers.streamlit_runtime import API_PAGES, get_streamlit_runtime, uses_roomflow_api
+from models.domain.exceptions import DomainAuthorizationError
 from views.components.ui_components import is_dark_theme, logo, role_label
 
 
@@ -73,7 +74,10 @@ def render_sidebar(user):
     allowed_pages = {page for _, page in ROLE_NAV.get(role, [])}
     if uses_roomflow_api():
         allowed_pages &= API_PAGES
-        unread = 0
+        try:
+            unread = get_streamlit_runtime().notifications.unread_count()
+        except DomainAuthorizationError:
+            unread = 0
     else:
         unread = sum(not item["read"] for item in notifications_for(role) if item.get("category") != "sistema")
 

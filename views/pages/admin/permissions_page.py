@@ -23,6 +23,7 @@ EFFECTIVE_PERMISSIONS = [
     ("Cancelar as próprias reservas", {Permission.CANCEL_OWN_RESERVATION}),
     ("Consultar e resolver conflitos", {Permission.RESOLVE_CONFLICTS}),
     ("Consultar painel do gerente e ocupação", {Permission.VIEW_MANAGER_DASHBOARD}),
+    ("Consultar e marcar as próprias notificações", {Permission.VIEW_NOTIFICATIONS}),
 ]
 
 PENDING_PERMISSIONS = [
@@ -31,7 +32,6 @@ PENDING_PERMISSIONS = [
     ("Bloquear espaços", "none", "pending", "none", "none"),
     ("Consultar agenda", "none", "none", "pending", "pending"),
     ("Localizar espaços", "none", "none", "none", "pending"),
-    ("Consultar notificações", "none", "none", "pending", "pending"),
 ]
 
 ACCESS_LABELS = {
@@ -48,7 +48,10 @@ def _permission_dataframe() -> pd.DataFrame:
     grants = [policy.effective_permissions(profile) for profile in profiles]
     effective_rows = []
     for action, permissions in EFFECTIVE_PERMISSIONS:
-        own = {Permission.MANAGE_OWN_ACCOUNT, Permission.VIEW_OWN_RESERVATIONS, Permission.CANCEL_OWN_RESERVATION}
+        own = {
+            Permission.MANAGE_OWN_ACCOUNT, Permission.VIEW_OWN_RESERVATIONS,
+            Permission.CANCEL_OWN_RESERVATION, Permission.VIEW_NOTIFICATIONS,
+        }
         scope = "own" if permissions & own else "institution"
         effective_rows.append((action, *(scope if permissions & values else "none" for values in grants)))
     return pd.DataFrame(

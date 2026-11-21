@@ -26,6 +26,7 @@ from controllers.http.password_recovery import router as password_recovery_route
 from controllers.http.reservations import router as reservations_router
 from controllers.http.conflicts import router as conflicts_router
 from controllers.http.manager_operations import router as manager_operations_router
+from controllers.http.notifications import router as notifications_router
 from controllers.http.spaces import router as spaces_router
 from controllers.http.structure import router as structure_router
 from application.ports.space_repository import SpaceRepository
@@ -78,6 +79,7 @@ def create_app(
         app.state.reservation_service = runtime.reservation_service
         app.state.conflict_service = runtime.conflict_service
         app.state.manager_operations_service = runtime.manager_operations
+        app.state.notification_service = runtime.notifications
         app.include_router(admin_users_router)
         app.include_router(admin_audit_router)
         app.include_router(institutions_router)
@@ -91,6 +93,7 @@ def create_app(
         app.include_router(reservations_router)
         app.include_router(conflicts_router)
         app.include_router(manager_operations_router)
+        app.include_router(notifications_router)
         return app
 
     runtime = build_application_runtime(active_environment)

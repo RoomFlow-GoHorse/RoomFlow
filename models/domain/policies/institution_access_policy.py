@@ -1,5 +1,4 @@
 from models.domain.entities.institution import Institution
-from models.domain.entities.profile import Profile
 from models.domain.entities.user import User
 from models.domain.exceptions import InstitutionAccessDenied
 
@@ -35,10 +34,6 @@ class InstitutionAccessPolicy:
 
     @staticmethod
     def _institution_id(user: User) -> str:
-        if user.profile not in {Profile.ADMIN, Profile.MANAGER, Profile.REQUESTER}:
-            raise InstitutionAccessDenied(
-                "O escopo institucional deste perfil ainda não foi definido."
-            )
         if not user.institution_id:
             raise InstitutionAccessDenied(
                 "O usuário autenticado não possui vínculo institucional."

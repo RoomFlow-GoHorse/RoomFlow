@@ -41,6 +41,16 @@ class DecisionPayload(BaseModel):
     reason: str | None = Field(default=None, max_length=600)
 
 
+class ReservationEditPayload(ReservationPayload):
+    reason: str | None = Field(default=None, max_length=600)
+
+
+class CancellationPayload(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    reason: str | None = Field(default=None, max_length=600)
+
+
 def get_service(request: Request) -> ReservationService:
     return request.app.state.reservation_service
 
@@ -88,6 +98,16 @@ def list_institution(actor: User = Depends(get_current_user), service: Reservati
     return {"data": [reservation_response(item) for item in run_reservation_action(lambda: service.list_institution(actor))]}
 
 
+@router.get("/mine/{reservation_id}")
+def detail_own(
+    reservation_id: str, response: Response,
+    actor: User = Depends(get_current_user), service: ReservationService = Depends(get_service),
+):
+    item, history = run_reservation_action(lambda: service.detail_own(actor, reservation_id))
+    response.headers["Cache-Control"] = "private, no-store"
+    return {"data": {**reservation_response(item), "history": [asdict(event) for event in history]}}
+
+
 @router.get("/{reservation_id}")
 def detail(
     reservation_id: str, response: Response,
@@ -106,17 +126,22 @@ def detail(
 
 @router.put("/{reservation_id}")
 def edit(
-    reservation_id: str, payload: ReservationPayload,
+    reservation_id: str, payload: ReservationEditPayload,
     actor: User = Depends(get_current_user), service: ReservationService = Depends(get_service),
 ):
-    return {"data": reservation_response(run_reservation_action(lambda: service.edit(actor, reservation_id, payload.to_request())))}
+    return {"data": reservation_response(run_reservation_action(
+        lambda: service.edit(actor, reservation_id, payload.to_request(), payload.reason),
+    ))}
 
 
 @router.post("/{reservation_id}/cancel")
 def cancel(
-    reservation_id: str, actor: User = Depends(get_current_user), service: ReservationService = Depends(get_service),
+    reservation_id: str, payload: CancellationPayload | None = None,
+    actor: User = Depends(get_current_user), service: ReservationService = Depends(get_service),
 ):
-    return {"data": reservation_response(run_reservation_action(lambda: service.cancel(actor, reservation_id)))}
+    return {"data": reservation_response(run_reservation_action(
+        lambda: service.cancel(actor, reservation_id, payload.reason if payload else None),
+    ))}
 
 
 @router.patch("/{reservation_id}/decision")

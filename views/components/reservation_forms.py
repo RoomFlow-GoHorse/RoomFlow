@@ -75,6 +75,7 @@ def edit_reservation(item):
         with st.form("edit_reservation"):
             start, end = period_inputs(catalog["timezone"], "edit", item)
             payload = request_fields(catalog["spaces"], start, end, "edit", item, catalog["justification_required"])
+            payload["reason"] = st.text_area("Motivo da alteração (opcional)", max_chars=600, key="edit_change_reason")
             submitted = st.form_submit_button("Salvar alterações", type="primary")
         if submitted:
             api.edit(item["id"], payload)

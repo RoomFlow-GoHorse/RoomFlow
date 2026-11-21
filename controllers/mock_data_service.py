@@ -67,14 +67,6 @@ def notifications_for(role):
     return [item for item in st.session_state.notifications if role in item["audiences"]]
 
 
-def mark_notification_read(notification_id=None, role=None):
-    for item in st.session_state.notifications:
-        matches_notification = notification_id is None or item["id"] == notification_id
-        matches_role = role is None or role in item["audiences"]
-        if matches_notification and matches_role:
-            item["read"] = True
-
-
 def users():
     return st.session_state.users
 

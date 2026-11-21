@@ -24,6 +24,7 @@ def review_decisions(status: ReservationStatus) -> tuple[ReservationStatus, ...]
 
 
 class ReservationHistoryAction(StrEnum):
+    CREATE = "criacao"
     REVIEW = "avaliacao"
     EDIT = "edicao"
     CANCEL = "cancelamento"

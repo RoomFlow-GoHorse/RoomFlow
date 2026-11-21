@@ -13,6 +13,7 @@ ROLE_NAV = {
         ("Permissoes", "permissoes"),
         ("Planta da instituição", "planta_instituicao"),
         ("Configuracoes da instituicao", "configuracoes_instituicao"),
+        ("Notificações", "notificacoes"),
         ("Conta", "conta"),
     ],
     "gerente": [
@@ -21,6 +22,7 @@ ROLE_NAV = {
         ("Espaços", "espacos"),
         ("Ocupação", "ocupacao"),
         ("Conflitos", "gerente_conflitos"),
+        ("Notificações", "notificacoes"),
         ("Conta", "conta"),
     ],
     "solicitante": [

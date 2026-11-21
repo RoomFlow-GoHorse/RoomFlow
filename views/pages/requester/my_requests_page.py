@@ -5,23 +5,44 @@ import streamlit as st
 from config.constants import STATUS_LABELS
 from controllers.app_state_service import go
 from models.domain.entities.reservation import EDITABLE
-from views.components.reservation_forms import RESERVATION_ERRORS, edit_reservation, local_times, reservation_api
+from views.components.reservation_forms import (
+    RESERVATION_ERRORS, close_reservation_dialog, edit_reservation, local_times, reservation_api,
+)
+from views.components.reservation_history import render_reservation_history
 from views.components.ui_components import badge, page_header
 
 
-@st.dialog("Cancelar solicitação")
+@st.dialog("Cancelar solicitação", on_dismiss=close_reservation_dialog)
 def _cancel_dialog(item):
-    st.write(f"Cancelar {item['title']}?")
-    if st.button("Confirmar cancelamento", type="primary"):
+    st.text(f"Cancelar {item['title']}?")
+    with st.form(f"cancel_reservation_{item['id']}"):
+        reason = st.text_area("Motivo do cancelamento (opcional)", max_chars=600)
+        confirm = st.form_submit_button("Confirmar cancelamento", type="primary")
+    if confirm:
         api = reservation_api()
         if api is None:
             return
         try:
-            api.cancel(item["id"])
+            api.cancel(item["id"], reason)
         except RESERVATION_ERRORS as error:
             st.error(str(error))
         else:
+            close_reservation_dialog()
             st.rerun()
+
+
+@st.dialog("Histórico da solicitação", on_dismiss=close_reservation_dialog)
+def _history_dialog(item, timezone):
+    api = reservation_api()
+    if api is None:
+        return
+    try:
+        detail = api.detail_own(item["id"])
+    except RESERVATION_ERRORS as error:
+        st.error(str(error))
+        return
+    st.subheader(detail["title"])
+    render_reservation_history(detail["history"], timezone)
 
 
 def minhas_reservas(user):
@@ -57,9 +78,23 @@ def minhas_reservas(user):
                 st.write("Motivo da decisão", item["decision_reason"])
             if item["has_overlap"]:
                 st.info("Existe uma sobreposição no período solicitado.")
-            if item["status"] in EDITABLE and start > now:
-                change, cancel = st.columns(2)
+            editable = item["status"] in EDITABLE and start > now
+            history, change, cancel = st.columns(3)
+            if history.button("Ver histórico", key=f"history_{item['id']}"):
+                st.session_state["reservation_dialog"] = (item["id"], "history")
+            if editable:
                 if change.button("Solicitar alteração", key=f"alter_{item['id']}"):
-                    edit_reservation(item)
+                    st.session_state["reservation_dialog"] = (item["id"], "edit")
                 if cancel.button("Cancelar", key=f"cancel_{item['id']}"):
-                    _cancel_dialog(item)
+                    st.session_state["reservation_dialog"] = (item["id"], "cancel")
+    by_id = {item["id"]: item for item in visible}
+    opened = st.session_state.get("reservation_dialog")
+    if opened and opened[0] in by_id:
+        item = by_id[opened[0]]
+        if opened[1] == "history":
+            _history_dialog(item, timezone)
+        elif item["status"] in EDITABLE and local_times(item, timezone)[0] > now:
+            if opened[1] == "cancel":
+                _cancel_dialog(item)
+            elif opened[1] == "edit":
+                edit_reservation(item)

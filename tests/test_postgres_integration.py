@@ -29,10 +29,11 @@ from streamlit.testing.v1 import AppTest
 
 from api.app import create_app
 from infrastructure.email.in_memory_email_sender import InMemoryEmailSender
+from infrastructure.persistence.notification_repository import PostgresNotificationRepository
 from infrastructure.persistence.records import institution_invites, pending_signups, sessions
 from infrastructure.persistence.reservation_repository import PostgresReservationRepository
 from infrastructure.persistence.structure_records import bloqueios_espaco
-from models.database_models import Espaco, Reserva, UsuarioInstituicao
+from models.database_models import DestinatarioNotificacao, Espaco, Notificacao, Reserva, UsuarioInstituicao
 
 
 TEST_DATABASE = os.getenv("ROOMFLOW_TEST_DATABASE", "")
@@ -242,16 +243,18 @@ class PostgresIntegrationTests(unittest.TestCase):
             self.assertEqual(detail["available_decisions"], [])
             events = detail["history"]
             self.assertEqual([(item["action"], item["previous_status"], item["status"]) for item in events], [
+                ("criacao", None, "pendente"),
                 ("avaliacao", "pendente", "em_analise"), ("edicao", "em_analise", "em_analise"),
                 ("avaliacao", "em_analise", "aprovada"), ("edicao", "aprovada", "em_analise"),
                 ("avaliacao", "em_analise", "aprovada"), ("cancelamento", "aprovada", "cancelada"),
             ])
-            self.assertEqual(events[2]["actor_name"], "Gerente Teste")
-            self.assertEqual(events[2]["reason"], "Confirmada")
-            self.assertEqual(events[4]["occurred_at"], detail["reviewed_at"])
-            self.assertEqual(events[5]["actor_name"], "Solicitante Teste")
+            self.assertEqual(events[3]["actor_name"], "Gerente Teste")
+            self.assertEqual(events[3]["reason"], "Confirmada")
+            self.assertEqual(events[5]["occurred_at"], detail["reviewed_at"])
+            self.assertEqual(events[6]["actor_name"], "Solicitante Teste")
             rejection = restarted.get(f"{base}/{second_id}", headers=manager).json()["data"]["history"]
-            self.assertEqual([(item["status"], item["reason"]) for item in rejection], [("rejeitada", "Horário ocupado")])
+            self.assertEqual(rejection[-1]["reason"], "Horário ocupado")
+            self.assertEqual([item["status"] for item in rejection], ["pendente", "rejeitada"])
             catalog = restarted.get(base + "/spaces", headers=requester,
                                     params={"start": data["start"], "end": data["end"]})
             self.assertEqual([space["id"] for space in catalog.json()["data"]["spaces"]], [room["id"]])
@@ -286,10 +289,10 @@ class PostgresIntegrationTests(unittest.TestCase):
             detail = self.client.get(path, headers=managers[0]).json()["data"]
             if response.status_code == 200:
                 self.assertEqual(detail["status"], "aprovada")
-                self.assertEqual([event["status"] for event in detail["history"]], ["aprovada"])
+                self.assertEqual([event["status"] for event in detail["history"]], ["pendente", "aprovada"])
             else:
                 self.assertEqual(detail["status"], "pendente")
-                self.assertEqual(detail["history"], [])
+                self.assertEqual([event["action"] for event in detail["history"]], ["criacao"])
                 service = self.client.app.state.reservation_service
                 with patch.object(service, "_overlap", return_value=False):
                     database_conflict = self.client.patch(path + "/decision", headers=managers[0],
@@ -297,7 +300,8 @@ class PostgresIntegrationTests(unittest.TestCase):
                 self.assertEqual(database_conflict.status_code, 409, database_conflict.text)
                 self.assertNotIn("ex_reservas_aprovadas_periodo", database_conflict.text)
                 detail = self.client.get(path, headers=managers[0]).json()["data"]
-                self.assertEqual((detail["status"], detail["history"]), ("pendente", []))
+                self.assertEqual(detail["status"], "pendente")
+                self.assertEqual([event["action"] for event in detail["history"]], ["criacao"])
 
     def test_reservation_decision_rolls_back_when_history_insert_fails(self):
         own, _ = self.register()
@@ -319,7 +323,8 @@ class PostgresIntegrationTests(unittest.TestCase):
         self.assertEqual(response.status_code, 409, response.text)
         self.assertNotIn("fk_historico_reserva_ator", response.text)
         data = self.client.get(path, headers=manager).json()["data"]
-        self.assertEqual((data["status"], data["history"], data["reviewed_by"]), ("pendente", [], None))
+        self.assertEqual((data["status"], data["reviewed_by"]), ("pendente", None))
+        self.assertEqual([event["action"] for event in data["history"]], ["criacao"])
         catalog = self.client.get("/reservations/spaces", headers=requester,
                                   params={"start": payload["start"], "end": payload["end"]})
         self.assertEqual([space["id"] for space in catalog.json()["data"]["spaces"]], [room["id"]])
@@ -432,7 +437,7 @@ class PostgresIntegrationTests(unittest.TestCase):
         for reservation in rolled_back["reservations"]:
             self.assertEqual(reservation["status"], "pendente")
             stored = self.client.get(f"/reservations/{reservation['id']}", headers=managers[0]).json()["data"]
-            self.assertEqual(stored["history"], [])
+            self.assertEqual([event["action"] for event in stored["history"]], ["criacao"])
         self.assertEqual(self.client.delete(block, headers=managers[0]).status_code, 200)
 
         ready = Barrier(2)
@@ -526,6 +531,201 @@ class PostgresIntegrationTests(unittest.TestCase):
         self.assertEqual((kept["space_id"], kept["status"]), (source["id"], "pendente"))
         history = self.client.get(f"/reservations/{a['id']}", headers=manager).json()["data"]["history"]
         self.assertEqual(history[-1]["reason"], "Realocada com projetores")
+
+    def test_notification_recipients_reads_and_history_are_scoped_to_the_membership(self):
+        own, _ = self.register()
+        other, other_info = self.register()
+        admin = self.headers(self.login(own["responsible_email"]))
+        outside_admin = self.headers(self.login(other["responsible_email"]))
+        manager_login = self._manager_login(admin)
+        manager = self.headers(manager_login)
+        coworker = self.headers(self._manager_login(admin))
+        inactive_login = self._manager_login(admin)
+        disabled = self.client.patch(f"/admin/users/{inactive_login.json()['data']['user']['id']}/status", headers=admin,
+                                     json={"status": "inativo"})
+        self.assertEqual(disabled.status_code, 200, disabled.text)
+        requester_login = self._requester_login(admin)
+        requester = self.headers(requester_login)
+        another_requester = self.headers(self._requester_login(admin))
+        user = manager_login.json()["data"]["user"]
+        outside_id = other_info["institution"]["id"]
+        with self.factory.begin() as session:
+            session.add(UsuarioInstituicao(user_id=int(user["id"]), institution_id=int(outside_id),
+                                          role="gerente", status="ativo"))
+        outside = self.headers(self.login(user["email"], outside_id))
+        room = self._structure_room(admin, "Sala de notificações")
+        data = self._reservation_payload(room)
+        self.assertEqual(self.client.get("/notifications").status_code, 401)
+
+        def inbox(headers, **params):
+            response = self.client.get("/notifications", headers=headers, params=params)
+            self.assertEqual(response.status_code, 200, response.text)
+            return response.json()["data"]
+
+        created = self.client.post("/reservations", headers=requester, json=data)
+        self.assertEqual(created.status_code, 201, created.text)
+        self.assertEqual(self.client.post("/reservations", headers=requester, json=data).status_code, 409)
+        reservation_id = created.json()["data"]["id"]
+        path = f"/reservations/{reservation_id}"
+        item, = inbox(manager)["items"]
+        self.assertEqual((item["title"], item["reservation_id"]), ("Nova solicitação de reserva", reservation_id))
+        self.assertEqual(inbox(coworker)["items"][0]["id"], item["id"])
+        with self.factory.begin() as session:
+            recipients = session.scalars(select(DestinatarioNotificacao.usuario_id).where(
+                DestinatarioNotificacao.notificacao_id == int(item["id"]),
+            )).all()
+        self.assertEqual(len(recipients), 2)
+        self.assertNotIn(int(inactive_login.json()["data"]["user"]["id"]), recipients)
+        for credential in (outside, outside_admin, admin, requester, another_requester):
+            self.assertEqual(inbox(credential)["items"], [])
+        read_path = f"/notifications/{item['id']}/read"
+        self.assertEqual(self.client.patch(read_path, headers=outside).status_code, 404)
+        self.assertEqual(self.client.patch(read_path, headers=requester).status_code, 404)
+        first_read = self.client.patch(read_path, headers=manager)
+        self.assertEqual(first_read.status_code, 200, first_read.text)
+        self.assertEqual(self.client.patch(read_path, headers=manager).json(), first_read.json())
+        self.assertEqual(inbox(manager, unread_only=True)["items"], [])
+        self.assertEqual(inbox(coworker)["unread_count"], 1)
+        self.assertEqual(self.client.patch("/notifications/read", headers=manager).json()["data"]["updated"], 0)
+        self.assertEqual(self.client.patch("/notifications/read", headers=coworker).json()["data"]["updated"], 1)
+
+        changes = {**data, "title": "Oficina atualizada", "reason": "Ajuste operacional"}
+        for _ in range(2):
+            edited = self.client.put(path, headers=manager, json=changes)
+            self.assertEqual(edited.status_code, 200, edited.text)
+        self.assertEqual(inbox(manager)["total"], 1)
+        self.assertEqual(inbox(coworker, category="alteracao")["total"], 1)
+        self.assertEqual(inbox(requester, category="alteracao")["total"], 1)
+        decision = self.client.patch(path + "/decision", headers=manager, json={"status": "aprovada"})
+        self.assertEqual(decision.status_code, 200, decision.text)
+        self.assertEqual(self.client.patch(path + "/decision", headers=coworker,
+                                           json={"status": "aprovada"}).status_code, 409)
+        cancelled = self.client.post(path + "/cancel", headers=requester, json={"reason": "Turma indisponível"})
+        self.assertEqual(cancelled.status_code, 200, cancelled.text)
+        self.assertEqual(self.client.post(path + "/cancel", headers=requester).status_code, 409)
+        events = inbox(requester)
+        self.assertCountEqual([item["title"] for item in events["items"]],
+                              ["Reserva alterada", "Reserva aprovada", "Reserva cancelada"])
+        self.assertEqual(inbox(requester, limit=1, offset=1)["items"][0]["id"], events["items"][1]["id"])
+        other_reservation = self.client.post("/reservations", headers=requester, json=data)
+        rejection = self.client.patch(f"/reservations/{other_reservation.json()['data']['id']}/decision",
+                                      headers=manager, json={"status": "rejeitada", "reason": "Fora da política"})
+        self.assertEqual(rejection.status_code, 200, rejection.text)
+        rejected = inbox(requester)["items"][0]
+        self.assertEqual(rejected["title"], "Reserva rejeitada")
+        self.assertIn("Fora da política", rejected["message"])
+        self.assertEqual(self.client.get(f"/reservations/mine/{reservation_id}", headers=another_requester).status_code,
+                         404)
+        with TestClient(create_app(postgres_session_factory=self.factory)) as restarted:
+            self.assertEqual(restarted.get("/notifications/unread-count", headers=requester).json()["data"],
+                             {"unread_count": 4})
+            history = restarted.get(f"/reservations/mine/{reservation_id}", headers=requester).json()["data"]["history"]
+        self.assertEqual([event["action"] for event in history], ["criacao", "edicao", "avaliacao", "cancelamento"])
+        self.assertEqual([event["reason"] for event in history],
+                         [data["justification"], "Ajuste operacional", None, "Turma indisponível"])
+        self.assertEqual(history[0]["actor_id"], requester_login.json()["data"]["user"]["id"])
+        self.assertEqual(history[1]["actor_id"], user["id"])
+
+    def test_notification_rollback_and_institutional_preferences(self):
+        own, info = self.register()
+        admin = self.headers(self.login(own["responsible_email"]))
+        manager = self.headers(self._manager_login(admin))
+        requester = self.headers(self._requester_login(admin))
+        room = self._structure_room(admin, "Sala para rollback de avisos")
+        data = self._reservation_payload(room)
+        add = PostgresNotificationRepository.add
+
+        def fail_recipient_constraint(repository, institution_id, item, recipients):
+            return add(repository, institution_id, item, recipients | {"-1"})
+
+        with patch.object(PostgresNotificationRepository, "add", fail_recipient_constraint):
+            failed_creation = self.client.post("/reservations", headers=requester, json=data)
+        self.assertEqual(failed_creation.status_code, 409, failed_creation.text)
+        self.assertEqual(self.client.get("/reservations/mine", headers=requester).json()["data"], [])
+        created = self.client.post("/reservations", headers=requester, json=data)
+        self.assertEqual(created.status_code, 201, created.text)
+        reservation_id = created.json()["data"]["id"]
+        path = f"/reservations/{reservation_id}"
+        with patch.object(PostgresNotificationRepository, "add", fail_recipient_constraint):
+            failed_approval = self.client.patch(path + "/decision", headers=manager, json={"status": "aprovada"})
+        self.assertEqual(failed_approval.status_code, 409, failed_approval.text)
+        self.assertNotIn("fk_notificacao_destinatarios_usuario", failed_approval.text)
+        record = self.client.get(path, headers=manager).json()["data"]
+        self.assertEqual(record["status"], "pendente")
+        self.assertEqual([event["action"] for event in record["history"]], ["criacao"])
+        institution = info["institution"]
+        with self.factory.begin() as session:
+            notifications = session.scalars(select(Notificacao.titulo).where(
+                Notificacao.instituicao_id == int(institution["id"]),
+            )).all()
+        self.assertEqual(notifications, ["Nova solicitação de reserva"])
+
+        preferences = institution["preferences"]
+        preferences["notifications"].update(reservation_approved=False, reservation_rejected=False,
+                                            reservation_cancelled=False, space_changed=False)
+        saved = self.client.patch("/institutions/me", headers=admin,
+                                  json={"name": institution["name"], "preferences": preferences})
+        self.assertEqual(saved.status_code, 200, saved.text)
+        self.assertEqual(self.client.put(path, headers=manager, json={**data, "title": "Atualizada"}).status_code, 200)
+        self.assertEqual(self.client.patch(path + "/decision", headers=manager, json={"status": "aprovada"}).status_code, 200)
+        self.assertEqual(self.client.post(path + "/cancel", headers=requester).status_code, 200)
+        new = self.client.post("/reservations", headers=requester, json=data)
+        self.assertEqual(new.status_code, 201, new.text)
+        self.assertEqual(self.client.patch(f"/reservations/{new.json()['data']['id']}/decision", headers=manager,
+                                         json={"status": "rejeitada", "reason": "Motivo"}).status_code, 200)
+        self.assertEqual(self.client.get("/notifications", headers=requester).json()["data"]["total"], 0)
+        self.assertEqual([item["title"] for item in self.client.get("/notifications", headers=manager)
+                          .json()["data"]["items"]], ["Nova solicitação de reserva"] * 2)
+        preferences["reservations"]["automatic_approval"] = "no_conflict"
+        preferences["notifications"]["reservation_approved"] = True
+        saved = self.client.patch("/institutions/me", headers=admin,
+                                  json={"name": institution["name"], "preferences": preferences})
+        self.assertEqual(saved.status_code, 200, saved.text)
+        automatic = self.client.post("/reservations", headers=requester, json=data)
+        self.assertEqual(automatic.status_code, 201, automatic.text)
+        reservation = automatic.json()["data"]
+        self.assertEqual(reservation["status"], "aprovada")
+        self.assertEqual(self.client.post("/reservations", headers=requester, json=data).status_code, 409)
+        item, = self.client.get("/notifications", headers=requester).json()["data"]["items"]
+        self.assertEqual((item["title"], item["reservation_id"]), ("Reserva aprovada", reservation["id"]))
+        history = self.client.get(f"/reservations/mine/{reservation['id']}", headers=requester).json()["data"]["history"]
+        self.assertEqual([event["action"] for event in history], ["criacao", "aprovacao_automatica"])
+        self.assertIsNone(history[1]["actor_id"])
+
+    def test_streamlit_reads_notifications_and_shows_requester_history(self):
+        own, _ = self.register()
+        admin = self.headers(self.login(own["responsible_email"]))
+        manager_login = self._manager_login(admin)
+        requester_login = self._requester_login(admin)
+        manager = self.headers(manager_login)
+        requester = self.headers(requester_login)
+        room = self._structure_room(admin, "Sala de histórico Streamlit")
+        payload = self._reservation_payload(room)
+        result = self.client.post("/reservations", headers=requester, json=payload)
+        self.assertEqual(result.status_code, 201, result.text)
+        reservation_id = result.json()["data"]["id"]
+        item, = self.client.get("/notifications", headers=manager).json()["data"]["items"]
+        with self.api_process() as url, patch.dict(os.environ, {"ROOMFLOW_API_URL": url}):
+            app = AppTest.from_file(str(PROJECT / "main.py"), default_timeout=20)
+            app.query_params["page"] = "notificacoes"
+            app.session_state["auth_token"] = manager_login.json()["data"]["access_token"]
+            app.run()
+            self.assertFalse(app.exception)
+            self.assertIn("Nova solicitação de reserva", [item.value for item in app.subheader])
+            self.assertNotIn("notifications", app.session_state.filtered_state)
+            app.button(key=f"btn_read_{item['id']}").click().run()
+            self.assertFalse(app.exception)
+            self.assertEqual(self.client.get("/notifications/unread-count", headers=manager).json()["data"],
+                             {"unread_count": 0})
+
+            app = AppTest.from_file(str(PROJECT / "main.py"), default_timeout=20)
+            app.query_params["page"] = "minhas_reservas"
+            app.session_state["auth_token"] = requester_login.json()["data"]["access_token"]
+            app.run()
+            app.button(key=f"history_{reservation_id}").click().run()
+            self.assertFalse(app.exception)
+            self.assertTrue(any("Solicitação criada" in item.value for item in app.caption))
+            self.assertIn(payload["justification"], [item.value for item in app.text])
 
     def test_manager_operations_filters_rates_and_refreshes_after_decisions(self):
         own, info = self.register()

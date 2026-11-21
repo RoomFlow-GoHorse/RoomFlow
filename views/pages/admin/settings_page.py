@@ -46,8 +46,8 @@ NOTIFICATION_OPTIONS = (
     ("reservation_approved", "Reserva aprovada", "Notificar o solicitante quando sua reserva for aprovada"),
     ("reservation_rejected", "Reserva rejeitada", "Notificar o solicitante quando sua reserva for rejeitada"),
     ("conflict_detected", "Conflito detectado", "Notificar administrador e solicitantes envolvidos"),
-    ("space_changed", "Alteração de espaço", "Notificar participantes quando um espaço for alterado"),
-    ("reservation_cancelled", "Cancelamento de reserva", "Notificar participantes sobre cancelamentos"),
+    ("space_changed", "Alteração de reserva", "Notificar solicitante e gerentes afetados por alterações operacionais"),
+    ("reservation_cancelled", "Cancelamento de reserva", "Notificar o solicitante e os gerentes responsáveis pela análise"),
     ("reservation_reminder", "Lembrete de reserva", "Enviar lembrete 1 hora antes da atividade"),
 )
 

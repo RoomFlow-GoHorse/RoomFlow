@@ -114,7 +114,7 @@ class PostgresReservationRepository:
             return {str(row[0].id): self._details(row) for row in session.execute(statement)}
 
     def find_with_history(
-        self, institution_id: str, reservation_id: str,
+        self, institution_id: str, reservation_id: str, requester_id: str | None = None,
     ) -> tuple[ReservationDetails, list[ReservationHistoryEvent]] | None:
         try:
             database_id = to_database_identity_id(reservation_id, bits=64)
@@ -122,7 +122,7 @@ class PostgresReservationRepository:
             return None
         columns = reservation_history.c
         statement = (
-            self._listing(institution_id)
+            self._listing(institution_id, requester_id)
             .add_columns(*columns)
             .outerjoin(reservation_history, (columns.reserva_id == Reserva.id)
                        & (columns.instituicao_id == Reserva.instituicao_id))

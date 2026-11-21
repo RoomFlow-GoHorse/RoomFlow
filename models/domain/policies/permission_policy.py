@@ -9,7 +9,7 @@ from models.domain.policies.institution_access_policy import InstitutionAccessPo
 class PermissionPolicy:
     """Returns effective grants only where both action and scope are confirmed."""
 
-    _COMMON_PERMISSIONS = frozenset({Permission.MANAGE_OWN_ACCOUNT})
+    _COMMON_PERMISSIONS = frozenset({Permission.MANAGE_OWN_ACCOUNT, Permission.VIEW_NOTIFICATIONS})
     _EFFECTIVE_PERMISSIONS = {
         Profile.ADMIN: frozenset(
             {

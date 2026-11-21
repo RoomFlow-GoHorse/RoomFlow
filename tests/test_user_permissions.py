@@ -59,14 +59,14 @@ class UserPermissionTests(unittest.TestCase):
                 institution_id=None,
             )
 
-    def test_requester_has_own_reservation_grants_and_participant_only_manages_account(self) -> None:
+    def test_requester_and_participant_have_personal_notification_permissions(self) -> None:
         self.assertEqual(self.permission_policy.effective_permissions(Profile.REQUESTER), frozenset({
             Permission.MANAGE_OWN_ACCOUNT, Permission.CREATE_RESERVATION,
-            Permission.VIEW_OWN_RESERVATIONS, Permission.CANCEL_OWN_RESERVATION,
+            Permission.VIEW_OWN_RESERVATIONS, Permission.CANCEL_OWN_RESERVATION, Permission.VIEW_NOTIFICATIONS,
         }))
         self.assertEqual(
             self.permission_policy.effective_permissions(Profile.PARTICIPANT),
-            frozenset({Permission.MANAGE_OWN_ACCOUNT}),
+            frozenset({Permission.MANAGE_OWN_ACCOUNT, Permission.VIEW_NOTIFICATIONS}),
         )
 
     def test_manager_can_manage_rooms_but_not_institution_structure(self) -> None:

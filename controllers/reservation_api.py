@@ -21,11 +21,16 @@ class ApiReservations:
     def detail(self, reservation_id):
         return self._api.request("GET", f"/reservations/{quote(reservation_id, safe='')}")
 
+    def detail_own(self, reservation_id):
+        return self._api.request("GET", f"/reservations/mine/{quote(reservation_id, safe='')}")
+
     def edit(self, reservation_id, payload):
         return self._api.request("PUT", f"/reservations/{quote(reservation_id, safe='')}", payload=payload)
 
-    def cancel(self, reservation_id):
-        return self._api.request("POST", f"/reservations/{quote(reservation_id, safe='')}/cancel")
+    def cancel(self, reservation_id, reason=None):
+        return self._api.request(
+            "POST", f"/reservations/{quote(reservation_id, safe='')}/cancel", payload={"reason": reason},
+        )
 
     def review(self, reservation_id, status, reason=None):
         return self._api.request(

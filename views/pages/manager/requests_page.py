@@ -9,13 +9,8 @@ from models.domain.entities.reservation import EDITABLE
 from views.components.reservation_forms import (
     RESERVATION_ERRORS, close_reservation_dialog, edit_reservation, local_times, reservation_api,
 )
+from views.components.reservation_history import render_reservation_history
 from views.components.ui_components import page_header
-
-
-HISTORY_LABELS = {
-    "avaliacao": "Avaliação", "edicao": "Edição", "cancelamento": "Cancelamento",
-    "aprovacao_automatica": "Aprovação automática",
-}
 
 
 @st.dialog("Analisar solicitação", width="medium", on_dismiss=close_reservation_dialog)
@@ -38,20 +33,6 @@ def _review_dialog(item):
             st.rerun()
         except RESERVATION_ERRORS as error:
             st.error(str(error))
-
-
-def _show_history(events, timezone):
-    with st.expander("Histórico da solicitação"):
-        for event in reversed(events):
-            at = datetime.fromisoformat(event["occurred_at"]).astimezone(ZoneInfo(timezone))
-            label = HISTORY_LABELS[event["action"]]
-            status = STATUS_LABELS[event["status"]]
-            previous = event["previous_status"]
-            change = f"{STATUS_LABELS[previous]} → {status}" if previous and previous != event["status"] else status
-            actor = event["actor_name"] or "Sistema"
-            st.caption(f"{at:%d/%m/%Y %H:%M} · {actor} · {label} · {change}")
-            if event["reason"]:
-                st.text(event["reason"])
 
 
 def manager_reservations(user=None):
@@ -107,7 +88,8 @@ def manager_reservations(user=None):
     if item["decision_reason"]:
         st.write("Motivo da decisão", item["decision_reason"])
     if item["history"]:
-        _show_history(item["history"], timezone)
+        with st.expander("Histórico da solicitação"):
+            render_reservation_history(item["history"], timezone)
     elif item["reviewed_at"]:
         reviewed_at = datetime.fromisoformat(item["reviewed_at"]).astimezone(ZoneInfo(timezone))
         reviewer = f" · Avaliador #{item['reviewed_by']}" if item["reviewed_by"] else ""

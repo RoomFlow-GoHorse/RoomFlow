@@ -18,6 +18,7 @@ from controllers.structure_api import ApiAdminDashboard, ApiFloorPlans, ApiResou
 from controllers.reservation_api import ApiReservations
 from controllers.conflict_api import ApiConflicts
 from controllers.manager_operations_api import ApiManagerOperations
+from controllers.notification_api import ApiNotifications
 from models.domain.entities.admin_audit_event import AdminAuditAction, AdminAuditEvent
 from models.domain.entities.authorized_enrollment import AuthorizedEnrollment
 from models.domain.entities.institution import (
@@ -329,6 +330,7 @@ class ApiRuntime:
         self.reservation_service = ApiReservations(api)
         self.conflict_service = ApiConflicts(api)
         self.manager_operations = ApiManagerOperations(api)
+        self.notifications = ApiNotifications(api)
 
 
 class ApiPasswordRecovery:
