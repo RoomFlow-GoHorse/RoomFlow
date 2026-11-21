@@ -125,7 +125,7 @@ class MemberSignupStreamlitTests(unittest.TestCase):
         self.assertIsNotNone(runtime.users.find_by_email(email))
         app.button(key="signup_member_login").click().run(timeout=15)
         self.assertEqual(len(app.exception), 0)
-        self.assertEqual(app.query_params["page"], ["login"])
+        self.assertIn(app.query_params["page"], ("login", ["login"]))
 
 
 if __name__ == "__main__":

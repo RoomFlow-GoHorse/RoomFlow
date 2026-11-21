@@ -313,4 +313,4 @@ class AdminAuditStreamlitTests(unittest.TestCase):
         app.query_params["page"] = "historico_admin"
         app.run()
         self.assertEqual(len(app.exception), 0)
-        self.assertEqual(app.query_params["page"], ["gerente_dashboard"])
+        self.assertIn(app.query_params["page"], ("gerente_dashboard", ["gerente_dashboard"]))

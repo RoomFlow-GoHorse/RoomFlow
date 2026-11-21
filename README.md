@@ -11,7 +11,7 @@ Sistema de gerenciamento e reserva de salas desenvolvido em **Python** com **Str
 
 Antes de executar o projeto, certifique-se de ter instalado:
 
-* [Python](https://www.python.org/downloads/) 3.10 ou superior
+* [Python](https://www.python.org/downloads/) 3.11 ou superior
 * Git
 
 ## Instalação
@@ -56,10 +56,11 @@ source .venv/bin/activate
 
 ### 4. Instale as dependências
 
-Com o ambiente virtual ativado:
+Na raiz do RoomFlow, com o ambiente virtual ativado, instale as dependências
+do frontend, da API, do banco e dos testes:
 
 ```bash
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
 ```
 
 ## Executando o projeto
@@ -112,12 +113,10 @@ python -m alembic revision --autogenerate -m "descreva a mudança"
 
 ## Desenvolvimento
 
-Sempre que uma nova biblioteca for adicionada ao projeto, atualize o arquivo `requirements.txt` para que outros desenvolvedores possam instalar as mesmas dependências.
-
-Para atualizar o arquivo com as dependências instaladas:
+Mantenha as dependências diretas em `requirements.txt`. Para executar a suíte:
 
 ```bash
-pip freeze > requirements.txt
+python -m unittest discover -s tests -v
 ```
 
 ## Status
