@@ -18,6 +18,9 @@ class ApiReservations:
     def list_institution(self):
         return self._api.request("GET", "/reservations/institution")
 
+    def detail(self, reservation_id):
+        return self._api.request("GET", f"/reservations/{quote(reservation_id, safe='')}")
+
     def edit(self, reservation_id, payload):
         return self._api.request("PUT", f"/reservations/{quote(reservation_id, safe='')}", payload=payload)
 

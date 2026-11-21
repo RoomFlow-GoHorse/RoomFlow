@@ -1,6 +1,6 @@
 from typing import Protocol
 
-from models.domain.entities.reservation import Reservation, ReservationDetails, ReservationPeriod
+from models.domain.entities.reservation import Reservation, ReservationDetails, ReservationHistoryEvent, ReservationPeriod
 
 
 class ReservationRepository(Protocol):
@@ -13,6 +13,12 @@ class ReservationRepository(Protocol):
     ) -> ReservationDetails | None: ...
 
     def list(self, institution_id: str, requester_id: str | None = None) -> list[ReservationDetails]: ...
+
+    def find_with_history(
+        self, institution_id: str, reservation_id: str,
+    ) -> tuple[ReservationDetails, list[ReservationHistoryEvent]] | None: ...
+
+    def append_history(self, reservation: Reservation, event: ReservationHistoryEvent) -> None: ...
 
     def overlapping_spaces(
         self, institution_id: str, period: ReservationPeriod, *,

@@ -1,11 +1,14 @@
+from dataclasses import asdict
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, ConfigDict, Field
 
 from application.services.reservation_service import ReservationService
 from controllers.http.dependencies import get_current_user
-from models.domain.entities.reservation import ReservationDetails, ReservationPeriod, ReservationRequest, ReservationStatus
+from models.domain.entities.reservation import (
+    ReservationDetails, ReservationPeriod, ReservationRequest, ReservationStatus, review_decisions,
+)
 from models.domain.entities.user import User
 from models.domain.exceptions import DomainAuthorizationError, DuplicateResource, ResourceNotFound
 
@@ -83,6 +86,21 @@ def list_own(actor: User = Depends(get_current_user), service: ReservationServic
 @router.get("/institution")
 def list_institution(actor: User = Depends(get_current_user), service: ReservationService = Depends(get_service)):
     return {"data": [_response(item) for item in _run(lambda: service.list_institution(actor))]}
+
+
+@router.get("/{reservation_id}")
+def detail(
+    reservation_id: str, response: Response,
+    actor: User = Depends(get_current_user), service: ReservationService = Depends(get_service),
+):
+    item, history = _run(lambda: service.detail(actor, reservation_id))
+    response.headers["Cache-Control"] = "private, no-store"
+    return {"data": {
+        **_response(item),
+        "reviewed_by": item.reservation.reviewed_by,
+        "available_decisions": review_decisions(item.reservation.status),
+        "history": [asdict(event) for event in history],
+    }}
 
 
 @router.put("/{reservation_id}")

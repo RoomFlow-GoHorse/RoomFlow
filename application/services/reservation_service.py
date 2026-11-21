@@ -12,7 +12,8 @@ from models.domain.entities.institution import Institution
 from models.domain.entities.permission import Permission
 from models.domain.entities.profile import Profile
 from models.domain.entities.reservation import (
-    EDITABLE, REVIEWABLE, Reservation, ReservationDetails, ReservationPeriod, ReservationRequest, ReservationStatus,
+    EDITABLE, REVIEW_DECISIONS, Reservation, ReservationDetails, ReservationHistoryAction,
+    ReservationHistoryEvent, ReservationPeriod, ReservationRequest, ReservationStatus, review_decisions,
 )
 from models.domain.entities.space import Space
 from models.domain.entities.user import User
@@ -79,6 +80,13 @@ class ReservationService:
         scope = self._permissions.authorize_listing(actor, Permission.REVIEW_RESERVATIONS)
         return self._repository.list(scope)
 
+    def detail(self, actor: User, reservation_id: str) -> tuple[ReservationDetails, list[ReservationHistoryEvent]]:
+        scope = self._permissions.authorize_listing(actor, Permission.REVIEW_RESERVATIONS)
+        result = self._repository.find_with_history(scope, reservation_id)
+        if result is None:
+            raise ResourceNotFound("Reserva não encontrada.")
+        return result
+
     def create(self, actor: User, request: ReservationRequest) -> ReservationDetails:
         with self._atomic():
             actor = self._current_actor(actor)
@@ -90,10 +98,15 @@ class ReservationService:
             if institution.preferences.reservations.automatic_approval == "no_conflict":
                 if not self._overlap(institution.id, request, approved_only=False):
                     status = ReservationStatus.APPROVED
-            return self._repository.add(Reservation(
+            result = self._repository.add(Reservation(
                 "", institution.id, actor.id, request, status, now,
                 reviewed_at=now if status is ReservationStatus.APPROVED else None,
             ))
+            if status is ReservationStatus.APPROVED:
+                self._repository.append_history(result.reservation, ReservationHistoryEvent(
+                    ReservationHistoryAction.AUTO_APPROVAL, None, status, now,
+                ))
+            return result
 
     def edit(self, actor: User, reservation_id: str, request: ReservationRequest) -> ReservationDetails:
         with self._atomic():
@@ -110,19 +123,22 @@ class ReservationService:
             if request == current.request:
                 return details
             self._validate(request, institution, now, current.requester_id, exclude_id=current.id)
-            return self._repository.save(replace(
+            updated = replace(
                 current, request=request, status=ReservationStatus.IN_REVIEW,
                 reviewed_by=None, reviewed_at=None, decision_reason=None,
-            ))
+            )
+            return self._save_change(actor, current, updated, ReservationHistoryAction.EDIT, now)
 
     def cancel(self, actor: User, reservation_id: str) -> ReservationDetails:
         with self._atomic():
             actor = self._current_actor(actor)
             scope = self._permissions.authorize_listing(actor, Permission.CANCEL_OWN_RESERVATION)
             current = self._find(scope, reservation_id, actor.id).reservation
-            if current.status not in EDITABLE or current.request.period.start <= self._clock.now():
+            now = self._clock.now()
+            if current.status not in EDITABLE or current.request.period.start <= now:
                 raise DuplicateResource("Esta reserva não pode ser cancelada.")
-            return self._repository.save(replace(current, status=ReservationStatus.CANCELLED))
+            updated = replace(current, status=ReservationStatus.CANCELLED)
+            return self._save_change(actor, current, updated, ReservationHistoryAction.CANCEL, now)
 
     def review(
         self, actor: User, reservation_id: str, status: ReservationStatus, reason: str | None,
@@ -132,21 +148,33 @@ class ReservationService:
             institution = self._institution(actor, Permission.REVIEW_RESERVATIONS)
             current = self._find(institution.id, reservation_id).reservation
             now = self._clock.now()
-            if current.status not in REVIEWABLE or current.status is status:
+            if status not in REVIEW_DECISIONS:
+                raise ValueError("Decisão de reserva inválida.")
+            if status not in review_decisions(current.status):
                 raise DuplicateResource("A transição solicitada não está disponível para esta reserva.")
             reason = (reason or "").strip()
+            if len(reason) > 600:
+                raise ValueError("O motivo da decisão deve ter até 600 caracteres.")
             if status is ReservationStatus.APPROVED:
                 if current.request.period.start <= now:
                     raise DuplicateResource("O período da reserva já começou.")
                 self._validate_room(current.request, institution.id, exclude_id=current.id)
-            elif status is ReservationStatus.REJECTED:
-                if not reason:
-                    raise ValueError("Informe o motivo da rejeição.")
-            elif status is not ReservationStatus.IN_REVIEW:
-                raise ValueError("Decisão de reserva inválida.")
-            return self._repository.save(replace(
+            elif status is ReservationStatus.REJECTED and not reason:
+                raise ValueError("Informe o motivo da rejeição.")
+            updated = replace(
                 current, status=status, reviewed_by=actor.id, reviewed_at=now, decision_reason=reason or None,
-            ))
+            )
+            return self._save_change(actor, current, updated, ReservationHistoryAction.REVIEW, now, reason or None)
+
+    def _save_change(
+        self, actor: User, previous: Reservation, updated: Reservation, action: ReservationHistoryAction,
+        occurred_at: datetime, reason: str | None = None,
+    ) -> ReservationDetails:
+        result = self._repository.save(updated)
+        self._repository.append_history(result.reservation, ReservationHistoryEvent(
+            action, previous.status, updated.status, occurred_at, actor.id, actor.name, reason,
+        ))
+        return result
 
     def _institution(self, actor: User, permission: Permission) -> Institution:
         scope = self._permissions.authorize_listing(actor, permission)

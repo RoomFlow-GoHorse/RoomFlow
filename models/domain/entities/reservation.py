@@ -14,6 +14,31 @@ class ReservationStatus(StrEnum):
 
 REVIEWABLE = frozenset({ReservationStatus.PENDING, ReservationStatus.IN_REVIEW, ReservationStatus.CONFLICT})
 EDITABLE = REVIEWABLE | {ReservationStatus.APPROVED}
+REVIEW_DECISIONS = (ReservationStatus.IN_REVIEW, ReservationStatus.APPROVED, ReservationStatus.REJECTED)
+
+
+def review_decisions(status: ReservationStatus) -> tuple[ReservationStatus, ...]:
+    if status not in REVIEWABLE:
+        return ()
+    return tuple(decision for decision in REVIEW_DECISIONS if decision != status)
+
+
+class ReservationHistoryAction(StrEnum):
+    REVIEW = "avaliacao"
+    EDIT = "edicao"
+    CANCEL = "cancelamento"
+    AUTO_APPROVAL = "aprovacao_automatica"
+
+
+@dataclass(frozen=True, slots=True)
+class ReservationHistoryEvent:
+    action: ReservationHistoryAction
+    previous_status: ReservationStatus | None
+    status: ReservationStatus
+    occurred_at: datetime
+    actor_id: str | None = None
+    actor_name: str | None = None
+    reason: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

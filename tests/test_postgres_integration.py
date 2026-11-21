@@ -9,8 +9,10 @@ import time
 import unittest
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
+from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from threading import Barrier
 from unittest.mock import patch
 from zoneinfo import ZoneInfo
 
@@ -28,6 +30,7 @@ from streamlit.testing.v1 import AppTest
 from api.app import create_app
 from infrastructure.email.in_memory_email_sender import InMemoryEmailSender
 from infrastructure.persistence.records import institution_invites, pending_signups, sessions
+from infrastructure.persistence.reservation_repository import PostgresReservationRepository
 from infrastructure.persistence.structure_records import bloqueios_espaco
 from models.database_models import Espaco, Reserva, UsuarioInstituicao
 
@@ -111,32 +114,38 @@ class PostgresIntegrationTests(unittest.TestCase):
         self.assertEqual(created.status_code, 201, created.text)
         return self.login(email)
 
+    @staticmethod
+    def _reservation_payload(room):
+        start = (datetime.now(ZoneInfo("America/Sao_Paulo")) + timedelta(days=3)).replace(
+            hour=10, minute=0, second=0, microsecond=0,
+        )
+        end = start + timedelta(hours=1)
+        return {
+            "space_id": room["id"], "title": "Oficina", "activity_type": "Aula",
+            "start": start.isoformat(), "end": end.isoformat(), "participants": 20,
+            "justification": "Atividade com a turma",
+        }
+
     def test_reservations_are_scoped_validated_and_persisted(self):
         own, _ = self.register()
         other, _ = self.register()
         admin = self.headers(self.login(own["responsible_email"]))
         foreign_admin = self.headers(self.login(other["responsible_email"]))
-        manager = self.headers(self._manager_login(admin))
+        manager_login = self._manager_login(admin)
+        manager = self.headers(manager_login)
         foreign_manager = self.headers(self._manager_login(foreign_admin))
         requester = self.headers(self._requester_login(admin))
         colleague = self.headers(self._requester_login(admin))
         foreign_requester = self.headers(self._requester_login(foreign_admin))
         room = self._structure_room(admin, "Sala Reserva")
         foreign_room = self._structure_room(foreign_admin, "Sala Externa")
-        start = (datetime.now(ZoneInfo("America/Sao_Paulo")) + timedelta(days=3)).replace(
-            hour=10, minute=0, second=0, microsecond=0,
-        )
-        end = start + timedelta(hours=1)
-        data = {
-            "space_id": room["id"], "title": "Oficina", "activity_type": "Aula",
-            "start": start.isoformat(), "end": end.isoformat(), "participants": 20,
-            "justification": "Atividade com a turma",
-        }
+        data = self._reservation_payload(room)
+        end = datetime.fromisoformat(data["end"])
         base = "/reservations"
         for attrs, code in (
-            ({"participants": 21}, 422), ({"end": start.isoformat()}, 422),
-            ({"start": start.replace(tzinfo=None).isoformat()}, 422), ({"justification": " "}, 422),
-            ({"start": start.replace(hour=6).isoformat()}, 422), ({"institution_id": "1"}, 422),
+            ({"participants": 21}, 422), ({"end": data["start"]}, 422),
+            ({"start": data["start"][:19]}, 422), ({"justification": " "}, 422),
+            ({"start": end.replace(hour=6).isoformat()}, 422), ({"institution_id": "1"}, 422),
             ({"requester_id": "1"}, 422), ({"status": "aprovada"}, 422), ({"space_id": foreign_room["id"]}, 404),
         ):
             response = self.client.post(base, headers=requester, json={**data, **attrs})
@@ -167,16 +176,36 @@ class PostgresIntegrationTests(unittest.TestCase):
             self.assertEqual({item["id"] for item in all_items}, {reservation_id, second_id})
             self.assertEqual(restarted.get(base + "/institution", headers=foreign_manager).json()["data"], [])
         path = f"{base}/{reservation_id}"
+        self.assertEqual(self.client.get(path, headers=foreign_manager).status_code, 404)
+        self.assertEqual(self.client.get(path, headers=requester).status_code, 403)
+        self.assertEqual(self.client.get(path, headers=admin).status_code, 403)
+        self.assertEqual(self.client.post(path + "/cancel", headers=manager).status_code, 403)
         self.assertEqual(self.client.post(path + "/cancel", headers=colleague).status_code, 404)
         self.assertEqual(self.client.put(path, headers=colleague, json=data).status_code, 404)
+        self.assertEqual(self.client.put(path, headers=foreign_manager, json=data).status_code, 404)
         self.assertEqual(self.client.patch(path + "/decision", headers=foreign_manager,
                                            json={"status": "aprovada"}).status_code, 404)
-        edited = self.client.put(path, headers=requester, json={**data, "title": "Oficina atualizada"})
+        decision = path + "/decision"
+        analyzed = self.client.patch(decision, headers=manager, json={"status": "em_analise"})
+        self.assertEqual(analyzed.status_code, 200, analyzed.text)
+        self.assertEqual(self.client.patch(decision, headers=manager, json={"status": "em_analise"}).status_code, 409)
+        self.assertEqual(self.client.patch(decision, headers=manager, json={"status": "cancelada"}).status_code, 422)
+        edited = self.client.put(path, headers=manager, json={**data, "title": "Oficina atualizada"})
         self.assertEqual(edited.status_code, 200, edited.text)
         self.assertEqual(edited.json()["data"]["status"], "em_analise")
-        approved = self.client.patch(path + "/decision", headers=manager, json={"status": "aprovada"})
+        self.assertEqual(self.client.post(block + "/block", headers=manager, json={"reason": "Obra"}).status_code, 200)
+        self.assertEqual(self.client.patch(decision, headers=manager, json={"status": "aprovada"}).status_code, 409)
+        self.assertEqual(self.client.delete(block + "/block", headers=manager).status_code, 200)
+        spaces = self.client.app.state.reservation_service._spaces
+        current_room = spaces.find_space(room["id"])
+        with patch.object(spaces, "find_space", return_value=replace(current_room, capacity=19)):
+            over_capacity = self.client.patch(decision, headers=manager, json={"status": "aprovada"})
+        self.assertEqual(over_capacity.status_code, 422, over_capacity.text)
+        approved = self.client.patch(decision, headers=manager, json={"status": "aprovada", "reason": "Confirmada"})
         self.assertEqual(approved.status_code, 200, approved.text)
         self.assertEqual(approved.json()["data"]["status"], "aprovada")
+        self.assertEqual(self.client.patch(decision, headers=manager,
+                                           json={"status": "rejeitada", "reason": "Outra decisão"}).status_code, 409)
         second_decision = f"{base}/{second_id}/decision"
         self.assertEqual(self.client.patch(second_decision, headers=manager,
                                            json={"status": "aprovada"}).status_code, 409)
@@ -193,9 +222,107 @@ class PostgresIntegrationTests(unittest.TestCase):
                                      json={"status": "rejeitada", "reason": "Horário ocupado"})
         self.assertEqual(rejected.json()["data"]["status"], "rejeitada")
         self.assertEqual(rejected.json()["data"]["decision_reason"], "Horário ocupado")
+        reopened = self.client.put(path, headers=manager, json={**data, "title": "Oficina reaberta"})
+        self.assertEqual(reopened.status_code, 200, reopened.text)
+        self.assertEqual(reopened.json()["data"]["status"], "em_analise")
+        self.assertIsNone(reopened.json()["data"]["decision_reason"])
+        catalog = self.client.get(base + "/spaces", headers=requester, params={"start": data["start"], "end": data["end"]})
+        self.assertEqual([space["id"] for space in catalog.json()["data"]["spaces"]], [room["id"]])
+        reapplied = self.client.patch(decision, headers=manager, json={"status": "aprovada", "reason": "Reavaliada"})
+        self.assertEqual(reapplied.status_code, 200, reapplied.text)
         cancelled = self.client.post(path + "/cancel", headers=requester)
         self.assertEqual(cancelled.json()["data"]["status"], "cancelada")
         self.assertEqual(self.client.post(path + "/cancel", headers=requester).status_code, 409)
+        with TestClient(create_app(postgres_session_factory=self.factory)) as restarted:
+            response = restarted.get(path, headers=manager)
+            self.assertEqual(response.status_code, 200, response.text)
+            detail = response.json()["data"]
+            self.assertEqual(detail["reviewed_by"], manager_login.json()["data"]["user"]["id"])
+            self.assertEqual(detail["decision_reason"], "Reavaliada")
+            self.assertEqual(detail["available_decisions"], [])
+            events = detail["history"]
+            self.assertEqual([(item["action"], item["previous_status"], item["status"]) for item in events], [
+                ("avaliacao", "pendente", "em_analise"), ("edicao", "em_analise", "em_analise"),
+                ("avaliacao", "em_analise", "aprovada"), ("edicao", "aprovada", "em_analise"),
+                ("avaliacao", "em_analise", "aprovada"), ("cancelamento", "aprovada", "cancelada"),
+            ])
+            self.assertEqual(events[2]["actor_name"], "Gerente Teste")
+            self.assertEqual(events[2]["reason"], "Confirmada")
+            self.assertEqual(events[4]["occurred_at"], detail["reviewed_at"])
+            self.assertEqual(events[5]["actor_name"], "Solicitante Teste")
+            rejection = restarted.get(f"{base}/{second_id}", headers=manager).json()["data"]["history"]
+            self.assertEqual([(item["status"], item["reason"]) for item in rejection], [("rejeitada", "Horário ocupado")])
+            catalog = restarted.get(base + "/spaces", headers=requester,
+                                    params={"start": data["start"], "end": data["end"]})
+            self.assertEqual([space["id"] for space in catalog.json()["data"]["spaces"]], [room["id"]])
+
+    def test_concurrent_reservation_approvals_record_only_the_winner(self):
+        own, _ = self.register()
+        admin = self.headers(self.login(own["responsible_email"]))
+        managers = [self.headers(self._manager_login(admin)) for _ in range(2)]
+        room = self._structure_room(admin, "Sala de decisões concorrentes")
+        data = self._reservation_payload(room)
+        reservations = []
+        for _ in range(2):
+            owner = self.headers(self._requester_login(admin))
+            created = self.client.post("/reservations", headers=owner, json=data)
+            self.assertEqual(created.status_code, 201, created.text)
+            reservations.append(created.json()["data"]["id"])
+        ready = Barrier(2)
+
+        def approve(pair):
+            reservation_id, headers = pair
+            with TestClient(create_app(postgres_session_factory=self.factory)) as api:
+                ready.wait(timeout=10)
+                return api.patch(f"/reservations/{reservation_id}/decision", headers=headers,
+                                 json={"status": "aprovada"})
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            responses = list(pool.map(approve, zip(reservations, managers, strict=True)))
+        self.assertCountEqual([response.status_code for response in responses], [200, 409])
+
+        for reservation_id, response in zip(reservations, responses, strict=True):
+            path = f"/reservations/{reservation_id}"
+            detail = self.client.get(path, headers=managers[0]).json()["data"]
+            if response.status_code == 200:
+                self.assertEqual(detail["status"], "aprovada")
+                self.assertEqual([event["status"] for event in detail["history"]], ["aprovada"])
+            else:
+                self.assertEqual(detail["status"], "pendente")
+                self.assertEqual(detail["history"], [])
+                service = self.client.app.state.reservation_service
+                with patch.object(service, "_overlap", return_value=False):
+                    database_conflict = self.client.patch(path + "/decision", headers=managers[0],
+                                                          json={"status": "aprovada"})
+                self.assertEqual(database_conflict.status_code, 409, database_conflict.text)
+                self.assertNotIn("ex_reservas_aprovadas_periodo", database_conflict.text)
+                detail = self.client.get(path, headers=managers[0]).json()["data"]
+                self.assertEqual((detail["status"], detail["history"]), ("pendente", []))
+
+    def test_reservation_decision_rolls_back_when_history_insert_fails(self):
+        own, _ = self.register()
+        admin = self.headers(self.login(own["responsible_email"]))
+        manager = self.headers(self._manager_login(admin))
+        requester = self.headers(self._requester_login(admin))
+        room = self._structure_room(admin, "Sala com histórico atômico")
+        payload = self._reservation_payload(room)
+        created = self.client.post("/reservations", headers=requester, json=payload)
+        self.assertEqual(created.status_code, 201, created.text)
+        path = f"/reservations/{created.json()['data']['id']}"
+        append = PostgresReservationRepository.append_history
+
+        def fail_actor_constraint(repository, reservation, event):
+            return append(repository, reservation, replace(event, actor_id="-1"))
+
+        with patch.object(PostgresReservationRepository, "append_history", fail_actor_constraint):
+            response = self.client.patch(path + "/decision", headers=manager, json={"status": "aprovada"})
+        self.assertEqual(response.status_code, 409, response.text)
+        self.assertNotIn("fk_historico_reserva_ator", response.text)
+        data = self.client.get(path, headers=manager).json()["data"]
+        self.assertEqual((data["status"], data["history"], data["reviewed_by"]), ("pendente", [], None))
+        catalog = self.client.get("/reservations/spaces", headers=requester,
+                                  params={"start": payload["start"], "end": payload["end"]})
+        self.assertEqual([space["id"] for space in catalog.json()["data"]["spaces"]], [room["id"]])
 
     def test_reservation_streamlit_submission_reaches_manager_via_http(self):
         own, _ = self.register()
@@ -227,6 +354,13 @@ class PostgresIntegrationTests(unittest.TestCase):
             institution = open_page(manager, "gerente_reservas")
             self.assertIn(title, institution.dataframe[0].value["Solicitação"].tolist())
             self.assertNotIn("reservations", institution.session_state.filtered_state)
+            next(button for button in institution.button if button.label == "Analisar solicitação").click().run()
+            institution.selectbox(key="reservation_decision").select("aprovada")
+            institution.text_area[0].set_value("Aprovada pelo Streamlit")
+            next(button for button in institution.button if button.label == "Confirmar decisão").click().run()
+            self.assertFalse(institution.exception)
+            self.assertIn("Aprovada", institution.dataframe[0].value["Status"].tolist())
+            self.assertIn("Aprovada pelo Streamlit", [item.value for item in institution.text])
 
     def test_manager_persists_room_changes_blocks_and_reports_real_availability(self):
         own, registration = self.register()

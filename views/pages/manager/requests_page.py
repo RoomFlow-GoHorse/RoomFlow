@@ -1,22 +1,31 @@
-from datetime import datetime, timezone as utc
+from datetime import UTC, datetime
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 import streamlit as st
 
 from config.constants import STATUS_LABELS
-from models.domain.entities.reservation import EDITABLE, REVIEWABLE
-from views.components.reservation_forms import RESERVATION_ERRORS, edit_reservation, local_times, reservation_api
+from models.domain.entities.reservation import EDITABLE
+from views.components.reservation_forms import (
+    RESERVATION_ERRORS, close_reservation_dialog, edit_reservation, local_times, reservation_api,
+)
 from views.components.ui_components import page_header
 
 
-@st.dialog("Analisar solicitação", width="medium")
+HISTORY_LABELS = {
+    "avaliacao": "Avaliação", "edicao": "Edição", "cancelamento": "Cancelamento",
+    "aprovacao_automatica": "Aprovação automática",
+}
+
+
+@st.dialog("Analisar solicitação", width="medium", on_dismiss=close_reservation_dialog)
 def _review_dialog(item):
     decisions = {
         "em_analise": "Colocar em análise", "aprovada": "Aprovar", "rejeitada": "Rejeitar",
     }
     with st.form("review_reservation"):
-        status = st.selectbox("Decisão", [key for key in decisions if key != item["status"]],
-                              format_func=decisions.__getitem__)
+        status = st.selectbox("Decisão", item["available_decisions"], format_func=decisions.__getitem__,
+                              key="reservation_decision")
         reason = st.text_area("Motivo da decisão (obrigatório na rejeição)", max_chars=600)
         saved = st.form_submit_button("Confirmar decisão", type="primary")
     if saved:
@@ -25,9 +34,24 @@ def _review_dialog(item):
             return
         try:
             api.review(item["id"], status, reason)
+            close_reservation_dialog()
             st.rerun()
         except RESERVATION_ERRORS as error:
             st.error(str(error))
+
+
+def _show_history(events, timezone):
+    with st.expander("Histórico da solicitação"):
+        for event in reversed(events):
+            at = datetime.fromisoformat(event["occurred_at"]).astimezone(ZoneInfo(timezone))
+            label = HISTORY_LABELS[event["action"]]
+            status = STATUS_LABELS[event["status"]]
+            previous = event["previous_status"]
+            change = f"{STATUS_LABELS[previous]} → {status}" if previous and previous != event["status"] else status
+            actor = event["actor_name"] or "Sistema"
+            st.caption(f"{at:%d/%m/%Y %H:%M} · {actor} · {label} · {change}")
+            if event["reason"]:
+                st.text(event["reason"])
 
 
 def manager_reservations(user=None):
@@ -70,7 +94,11 @@ def manager_reservations(user=None):
     by_id = {item["id"]: item for item in visible}
     selected_id = st.selectbox("Solicitação", list(by_id),
                                format_func=lambda key: f"#{key} · {by_id[key]['title']}")
-    item = by_id[selected_id]
+    try:
+        item = api.detail(selected_id)
+    except RESERVATION_ERRORS as error:
+        st.error(str(error))
+        return
     st.caption(f"{item['activity_type']} · {item['participants']} participantes")
     if item["has_overlap"]:
         st.warning("Há reservas ou solicitações abertas para a mesma sala em horários sobrepostos.")
@@ -78,13 +106,26 @@ def manager_reservations(user=None):
         st.write("Justificativa", item["justification"])
     if item["decision_reason"]:
         st.write("Motivo da decisão", item["decision_reason"])
+    if item["history"]:
+        _show_history(item["history"], timezone)
+    elif item["reviewed_at"]:
+        reviewed_at = datetime.fromisoformat(item["reviewed_at"]).astimezone(ZoneInfo(timezone))
+        reviewer = f" · Avaliador #{item['reviewed_by']}" if item["reviewed_by"] else ""
+        st.caption(f"Avaliada em {reviewed_at:%d/%m/%Y %H:%M}{reviewer}")
     start, _ = local_times(item, timezone)
     edit, review = st.columns(2)
-    if item["status"] in EDITABLE and start > datetime.now(utc.utc):
-        if edit.button("Editar solicitação"):
-            edit_reservation(item)
-    if item["status"] in REVIEWABLE and review.button("Analisar solicitação", type="primary"):
+    editable = item["status"] in EDITABLE and start > datetime.now(UTC)
+    if editable and edit.button("Editar solicitação"):
+        st.session_state["reservation_dialog"] = (selected_id, "edit")
+    if item["available_decisions"] and review.button("Analisar solicitação", type="primary"):
+        st.session_state["reservation_dialog"] = (selected_id, "review")
+    opened = st.session_state.get("reservation_dialog")
+    if opened == (selected_id, "edit") and editable:
+        edit_reservation(item)
+    elif opened == (selected_id, "review") and item["available_decisions"]:
         _review_dialog(item)
+    elif opened:
+        close_reservation_dialog()
 
 
 reservations_admin = manager_reservations

@@ -61,7 +61,11 @@ def request_fields(rooms, start, end, key, item=None, justification_required=Tru
     }
 
 
-@st.dialog("Alterar solicitação", width="large")
+def close_reservation_dialog():
+    st.session_state.pop("reservation_dialog", None)
+
+
+@st.dialog("Alterar solicitação", width="large", on_dismiss=close_reservation_dialog)
 def edit_reservation(item):
     api = reservation_api()
     if api is None:
@@ -74,6 +78,7 @@ def edit_reservation(item):
             submitted = st.form_submit_button("Salvar alterações", type="primary")
         if submitted:
             api.edit(item["id"], payload)
+            close_reservation_dialog()
             st.rerun()
     except RESERVATION_ERRORS as error:
         st.error(str(error))

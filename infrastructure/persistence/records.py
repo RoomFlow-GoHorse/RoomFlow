@@ -1,5 +1,5 @@
 from sqlalchemy import (
-    CheckConstraint, Column, DateTime, ForeignKey, ForeignKeyConstraint, Index,
+    BigInteger, CheckConstraint, Column, DateTime, ForeignKey, ForeignKeyConstraint, Index,
     Integer, String, Table, Text, UniqueConstraint, text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
@@ -33,6 +33,29 @@ audit_events = Table(
     Column("recurso_id", String(100), nullable=False),
     Column("ocorreu_em", DateTime(timezone=True), nullable=False),
     Index("ix_auditoria_administrativa_instituicao_data", "instituicao_id", "ocorreu_em"),
+)
+
+reservation_history = Table(
+    "historico_reservas", Base.metadata,
+    Column("id", BigInteger, primary_key=True),
+    Column("instituicao_id", Integer, nullable=False),
+    Column("reserva_id", BigInteger, nullable=False),
+    Column("acao", String(24), nullable=False),
+    Column("status_anterior", String(12)),
+    Column("status", String(12), nullable=False),
+    Column("ocorreu_em", DateTime(timezone=True), nullable=False),
+    Column("ator_id", Integer),
+    Column("ator_nome", String(150)),
+    Column("motivo", String(600)),
+    ForeignKeyConstraint(
+        ["instituicao_id", "reserva_id"], ["reservas.instituicao_id", "reservas.id"],
+        name="fk_historico_reserva",
+    ),
+    ForeignKeyConstraint(
+        ["ator_id", "instituicao_id"], ["usuario_instituicao.user_id", "usuario_instituicao.institution_id"],
+        name="fk_historico_reserva_ator",
+    ),
+    Index("ix_historico_reservas_reserva", "instituicao_id", "reserva_id", "id"),
 )
 
 institution_settings = Table(

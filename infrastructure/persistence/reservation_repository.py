@@ -2,11 +2,13 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import aliased
 
+from infrastructure.persistence.records import reservation_history
 from infrastructure.persistence.transaction import PostgresTransaction
 from infrastructure.persistence.user_mapping import to_database_identity_id
 from models.database_models import Espaco, Reserva, Usuario
 from models.domain.entities.reservation import (
-    EDITABLE, Reservation, ReservationDetails, ReservationPeriod, ReservationRequest, ReservationStatus,
+    EDITABLE, Reservation, ReservationDetails, ReservationHistoryAction, ReservationHistoryEvent,
+    ReservationPeriod, ReservationRequest, ReservationStatus,
 )
 from models.domain.exceptions import DuplicateResource, ResourceNotFound
 
@@ -51,6 +53,47 @@ class PostgresReservationRepository:
             statement = self._listing(institution_id, requester_id).order_by(Reserva.inicio.desc(), Reserva.id.desc())
             return [self._details(row) for row in session.execute(statement)]
 
+    def find_with_history(
+        self, institution_id: str, reservation_id: str,
+    ) -> tuple[ReservationDetails, list[ReservationHistoryEvent]] | None:
+        try:
+            database_id = to_database_identity_id(reservation_id, bits=64)
+        except ValueError:
+            return None
+        columns = reservation_history.c
+        statement = (
+            self._listing(institution_id)
+            .add_columns(*columns)
+            .outerjoin(reservation_history, (columns.reserva_id == Reserva.id)
+                       & (columns.instituicao_id == Reserva.instituicao_id))
+            .where(Reserva.id == database_id)
+            .order_by(columns.id)
+        )
+        with self._transaction.session() as session:
+            rows = session.execute(statement).all()
+            if not rows:
+                return None
+            return self._details(rows[0][:4]), [
+                self._history_event(row._mapping) for row in rows if row._mapping[columns.id] is not None
+            ]
+
+    def append_history(self, reservation: Reservation, event: ReservationHistoryEvent) -> None:
+        with self._transaction.session() as session:
+            try:
+                session.execute(reservation_history.insert().values(
+                    instituicao_id=to_database_identity_id(reservation.institution_id),
+                    reserva_id=to_database_identity_id(reservation.id, bits=64),
+                    acao=event.action.value,
+                    status_anterior=event.previous_status.value if event.previous_status else None,
+                    status=event.status.value,
+                    ocorreu_em=event.occurred_at,
+                    ator_id=to_database_identity_id(event.actor_id) if event.actor_id is not None else None,
+                    ator_nome=event.actor_name,
+                    motivo=event.reason,
+                ))
+            except IntegrityError as exc:
+                raise DuplicateResource("Não foi possível registrar o histórico da reserva.") from exc
+
     def overlapping_spaces(
         self, institution_id: str, period: ReservationPeriod, *,
         approved_only: bool, space_id: str | None = None, exclude_id: str | None = None,
@@ -86,11 +129,12 @@ class PostgresReservationRepository:
         try:
             session.flush()
         except IntegrityError as exc:
-            if exc.orig.sqlstate == "23P01":
+            sqlstate = getattr(exc.orig, "sqlstate", None)
+            if sqlstate == "23P01":
                 raise DuplicateResource("Já existe uma reserva aprovada para esta sala no período informado.") from exc
-            if exc.orig.sqlstate == "23514":
-                raise ValueError("O período ou a capacidade da reserva viola uma restrição do banco.") from exc
-            raise
+            if sqlstate == "23514":
+                raise ValueError("Verifique o período e a capacidade da sala.") from exc
+            raise DuplicateResource("Não foi possível gravar a reserva com os vínculos informados.") from exc
         result = session.execute(self._listing(reservation.institution_id).where(Reserva.id == row.id)).one()
         return self._details(result)
 
@@ -129,3 +173,18 @@ class PostgresReservationRepository:
             reviewed_at=row.avaliado_em, decision_reason=row.motivo_decisao,
         )
         return ReservationDetails(reservation, space_name, requester_name, has_overlap)
+
+    @staticmethod
+    def _history_event(row) -> ReservationHistoryEvent:
+        columns = reservation_history.c
+        previous_status = row[columns.status_anterior]
+        actor_id = row[columns.ator_id]
+        return ReservationHistoryEvent(
+            action=ReservationHistoryAction(row[columns.acao]),
+            previous_status=ReservationStatus(previous_status) if previous_status else None,
+            status=ReservationStatus(row[columns.status]),
+            occurred_at=row[columns.ocorreu_em],
+            actor_id=str(actor_id) if actor_id is not None else None,
+            actor_name=row[columns.ator_nome],
+            reason=row[columns.motivo],
+        )
