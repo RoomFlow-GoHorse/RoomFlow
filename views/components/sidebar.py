@@ -9,6 +9,7 @@ from views.components.ui_components import is_dark_theme, logo, role_label
 
 NAV_ICONS = {
     "admin_dashboard": ":material/home:",
+    "historico_admin": ":material/history:",
     "gerente_dashboard": ":material/home:",
     "solicitante_dashboard": ":material/home:",
     "participante_dashboard": ":material/home:",
@@ -29,6 +30,7 @@ NAV_ICONS = {
 }
 
 NAV_LABEL_OVERRIDES = {
+    "historico_admin": "Histórico administrativo",
     "admin_dashboard": "Início",
     "gerente_dashboard": "Início",
     "solicitante_dashboard": "Início",

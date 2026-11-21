@@ -80,28 +80,27 @@ http://localhost:8501
 
 ## Tabelas no PostgreSQL
 
-Instale as dependências e configure no `.env` o banco PostgreSQL que será usado
-em produção, usando `.env.example` como referência. O nome em `DB_NAME` deve ser
-exatamente o nome do banco existente. A porta usual do PostgreSQL é `5432`;
-`8501` é a porta do Streamlit. O servidor precisa estar em execução e o usuário
-configurado precisa ter acesso ao banco.
+O Streamlit e o FastAPI usam os repositórios em memória. A configuração do
+PostgreSQL atende às migrations e aos scripts de seed. Consulte o
+[estado da integração com o banco](docs/institutional-enrollment-data-model.md).
+
+Para preparar um banco de desenvolvimento, use o `.env.example` como referência
+e informe no `DB_NAME` o nome de um banco existente. A porta padrão do PostgreSQL
+é `5432`. Com o ambiente virtual ativo:
 
 ```bash
-# Alembic cria as tabelas e registra a versão
-.venv/bin/alembic upgrade head
+python -m alembic upgrade head
+python -m scripts.seed_perfis
+```
+
+O seed opcional de demonstração usa `python -m scripts.seed_demo` e pede a
+senha das quatro contas de demonstração.
+
+Para mudanças futuras no modelo SQLAlchemy, revise a migration gerada antes
+de aplicá-la:
 
 ```bash
-.venv/bin/python -m scripts.seed_perfis
-
-Para alterações futuras nos modelos, use o Alembic:
-
-```bash
- 1.Defina a classe da tabela em models/database_models.py.
-2. .venv/bin/alembic revision --autogenerate -m "descreva a mudanca"
-# Revise o arquivo gerado em migrations/versions antes de aplicar.
-
- # crie a tabela
- .venv/bin/alembic upgrade head
+python -m alembic revision --autogenerate -m "descreva a mudança"
 ```
 
 ### Arquitetura

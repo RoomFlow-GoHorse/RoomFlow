@@ -2,229 +2,245 @@ import pandas as pd
 import streamlit as st
 
 from config.constants import ROLE_LABELS
-from controllers import mock_data_service
-from controllers.app_state_service import set_toast
+from controllers.streamlit_runtime import get_streamlit_actor, get_streamlit_runtime
+from models.domain.entities.authorized_enrollment import EnrollmentStatus
+from models.domain.entities.profile import Profile
+from models.domain.entities.user import User, UserStatus
+from models.domain.exceptions import DomainAuthorizationError, DuplicateResource, LastActiveAdministrator, ResourceNotFound
 from views.components.ui_components import page_header
 
-# Mapeamento de rótulos visuais para o DataFrame
-STATUS_LABELS = {
-    "ativo": "Ativo",
-    "inativo": "Inativo",
-}
 
-
-# =========================================================
-# DIALOG: CRIAR / EDITAR USUÁRIO
-# =========================================================
-
-@st.dialog("Usuário")
-def _user_dialog(editing_user: dict | None = None):
+@st.dialog("Usuario")
+def _user_dialog(actor: User, editing_user: User | None = None):
+    runtime = get_streamlit_runtime()
     is_edit = editing_user is not None
-    title = "Editar usuário" if is_edit else "Novo usuário"
-    st.subheader(title)
-
-    default_name = editing_user.get("name", "") if is_edit else ""
-    default_email = editing_user.get("email", "") if is_edit else ""
-    default_role = editing_user.get("role", "solicitante") if is_edit else "solicitante"
-
-    name = st.text_input("Nome completo", value=default_name, placeholder="Ex: Carlos Andrade", disabled=is_edit)
-    email = st.text_input("E-mail", value=default_email, placeholder="usuario@instituicao.com", disabled=is_edit)
-
-    role_options = list(ROLE_LABELS.keys())
-    role_labels = [ROLE_LABELS[r] for r in role_options]
-    role_index = role_options.index(default_role) if default_role in role_options else 0
-    selected_role_label = st.selectbox("Perfil de acesso", options=role_labels, index=role_index)
-    selected_role = role_options[role_labels.index(selected_role_label)]
-
-    if not is_edit:
-        st.text_input("Senha temporária", type="password", placeholder="••••••••")
-
-    st.html("""
-        <div style="
-            background:var(--brand-light); border:1px solid var(--stroke);
-            border-radius:8px; padding:10px 12px; margin-top:4px;
-        ">
-            <p style="margin:0 0 4px; font-size:12px; color:var(--brand); font-weight:600;">
-                Sobre os perfis
-            </p>
-            <p style="margin:0; font-size:12px; color:var(--graphite-soft); line-height:1.5;">
-                Gerente: gestão operacional · Administrador: governança ·
-                Solicitante: reservas · Participante: consulta
-            </p>
-        </div>
-    """)
-
-    col_cancel, col_save = st.columns(2)
-
-    with col_cancel:
-        if st.button("Cancelar", width="stretch"):
-            st.rerun()
-
-    with col_save:
-        label = "Salvar alterações" if is_edit else "Criar usuário"
-        if st.button(label, type="primary", width="stretch"):
-            if not is_edit and (not name.strip() or not email.strip()):
-                st.warning("Preencha nome e e-mail.")
-                return
-
+    st.subheader("Editar usuario" if is_edit else "Novo usuario")
+    name = st.text_input("Nome completo", value=editing_user.name if is_edit else "")
+    email = st.text_input("E-mail", value=editing_user.email if is_edit else "")
+    profile_values = [profile.value for profile in Profile]
+    labels = [ROLE_LABELS[value] for value in profile_values]
+    current = editing_user.profile.value if is_edit else Profile.REQUESTER.value
+    selected_label = st.selectbox("Perfil de acesso", labels, index=profile_values.index(current), disabled=is_edit)
+    selected_profile = Profile(profile_values[labels.index(selected_label)])
+    password = "" if is_edit else st.text_input("Senha inicial", type="password")
+    st.caption("Somente um administrador da instituicao pode atribuir o perfil admin.")
+    cancel, save = st.columns(2)
+    if cancel.button("Cancelar", width="stretch"):
+        st.rerun()
+    if save.button("Salvar" if is_edit else "Criar usuario", type="primary", width="stretch"):
+        try:
             if is_edit:
-                for u in st.session_state.users:
-                    if u["id"] == editing_user["id"]:
-                        u["role"] = selected_role
-                        break
-                set_toast("Usuário atualizado com sucesso.")
+                runtime.user_management.update_user(actor, editing_user.id, name, email)
             else:
-                new_id = f"u{len(st.session_state.users) + 1}"
-                parts = name.strip().split()
-                initials = (parts[0][0] + parts[-1][0]).upper() if len(parts) >= 2 else parts[0][:2].upper()
-                st.session_state.users.append({
-                    "id": new_id,
-                    "name": name.strip(),
-                    "email": email.strip(),
-                    "role": selected_role,
-                    "status": "ativo",
-                    "initials": initials,
-                })
-                set_toast("Usuário criado. Convite enviado por e-mail.")
+                if not name.strip() or not email.strip() or len(password) < 8:
+                    st.error("Informe nome, e-mail e uma senha com pelo menos 8 caracteres.")
+                    return
+                runtime.user_management.create_user(actor, name, email, password, selected_profile)
+        except (DuplicateResource, DomainAuthorizationError, LastActiveAdministrator, ResourceNotFound, ValueError) as exc:
+            st.error(str(exc))
+            return
+        st.rerun()
 
+
+def _user_table(users: list[User]) -> pd.DataFrame:
+    return pd.DataFrame([
+        {
+            "Nome": item.name,
+            "E-mail": item.email,
+            "Perfil": ROLE_LABELS[item.profile.value],
+            "Status": "Ativo" if item.is_active else "Inativo",
+        }
+        for item in users
+    ])
+
+
+def _invitation_codes(actor: User) -> None:
+    runtime = get_streamlit_runtime()
+    st.subheader("Codigo institucional")
+    status = runtime.invite_codes.status_for(actor)
+    st.caption("Codigo ativo" if status.active else "Nenhum codigo ativo")
+    if status.created_at:
+        st.caption(f"Criado em {status.created_at.astimezone().strftime('%d/%m/%Y %H:%M')}")
+    if st.button("Gerar / substituir codigo", icon=":material/key:", key="rotate_institution_code"):
+        try:
+            code, _ = runtime.invite_codes.issue_or_replace(actor)
+        except DomainAuthorizationError as exc:
+            st.error(str(exc))
+        else:
+            st.code(code, language=None)
+            st.caption("Compartilhe o código apenas com membros autorizados.")
+    if status.active and st.button("Revogar codigo", key="revoke_institution_code", type="secondary"):
+        try:
+            runtime.invite_codes.revoke(actor)
+        except (DomainAuthorizationError, ValueError) as exc:
+            st.error(str(exc))
+        else:
+            st.success("Codigo institucional revogado.")
             st.rerun()
 
 
-# =========================================================
-# HELPERS DE DADOS
-# =========================================================
+def _enrollments(actor: User) -> None:
+    runtime = get_streamlit_runtime()
+    service = runtime.enrollment_management
+    st.subheader("Matriculas autorizadas")
+    with st.form("manual_enrollment", clear_on_submit=True):
+        col_ra, col_name, col_email = st.columns(3)
+        ra = col_ra.text_input("Matricula / RA *")
+        name = col_name.text_input("Nome (opcional)")
+        email = col_email.text_input("E-mail (opcional)")
+        submitted = st.form_submit_button("Adicionar matricula", type="primary")
+    if submitted:
+        try:
+            service.add_manual(actor, ra, name or None, email or None)
+        except (DuplicateResource, DomainAuthorizationError, ValueError) as exc:
+            st.error(str(exc))
+        else:
+            st.success("Matricula adicionada.")
 
-def _users_dataframe(users_list: list) -> pd.DataFrame:
-    """Converte a lista de usuários filtrados no DataFrame padronizado."""
-    return pd.DataFrame(
-        [
-            {
-                "Usuário": u["name"],
-                "E-mail": u["email"],
-                "Perfil": ROLE_LABELS.get(u["role"], u["role"]),
-                "Status": STATUS_LABELS.get(u["status"], u["status"]),
-            }
-            for u in users_list
-        ]
+    upload = st.file_uploader(
+        "Importar Excel (.xlsx)", type=["xlsx"], max_upload_size=10,
+        key="authorized_enrollment_excel",
+        help="A planilha precisa de uma coluna Matricula ou RA; nome e e-mail sao opcionais.",
     )
+    if upload and st.button("Analisar planilha", key="preview_enrollment_import"):
+        try:
+            preview = service.preview_import(actor, upload.getvalue())
+        except (DomainAuthorizationError, ValueError) as exc:
+            st.error(str(exc))
+        else:
+            st.session_state.enrollment_preview = preview
+            st.session_state.enrollment_preview_institution = actor.institution_id
 
+    preview = st.session_state.get("enrollment_preview")
+    if preview and st.session_state.get("enrollment_preview_institution") == actor.institution_id:
+        st.markdown(
+            f"**Resumo:** {len(preview.valid)} validas | {len(preview.duplicates)} duplicadas | {len(preview.invalid)} invalidas"
+        )
+        for title, rows in (("Validas", preview.valid), ("Duplicadas", preview.duplicates), ("Invalidas", preview.invalid)):
+            if rows:
+                st.caption(title)
+                st.dataframe(pd.DataFrame([
+                    {
+                        "Linha": row.row_number,
+                        "Matricula": row.registration_number or "-",
+                        "Nome": row.name or "-",
+                        "E-mail": row.email or "-",
+                        "Motivo": row.reason or "-",
+                    }
+                    for row in rows
+                ]), hide_index=True, width="stretch")
+        if st.button(
+            f"Confirmar importacao de {len(preview.valid)} matricula(s)",
+            type="primary", disabled=not preview.valid, key="confirm_enrollment_import",
+        ):
+            try:
+                inserted = service.confirm_import(actor, preview.preview_id)
+            except (DomainAuthorizationError, DuplicateResource, ResourceNotFound) as exc:
+                st.error(str(exc))
+            else:
+                st.session_state.pop("enrollment_preview", None)
+                st.session_state.pop("enrollment_preview_institution", None)
+                st.success(f"{inserted} matricula(s) importada(s).")
+                st.rerun()
 
-# =========================================================
-# PÁGINA PRINCIPAL
-# =========================================================
+    st.divider()
+    search_col, status_col = st.columns([3, 1])
+    query = search_col.text_input("Pesquisar matriculas", key="enrollment_search")
+    status_label = status_col.selectbox(
+        "Situacao", ["Todas", "Disponivel", "Vinculada", "Desativada"],
+        key="enrollment_status_filter",
+    )
+    status_filter = {
+        "Disponivel": EnrollmentStatus.ACTIVE,
+        "Vinculada": EnrollmentStatus.USED,
+        "Desativada": EnrollmentStatus.INACTIVE,
+    }.get(status_label)
+    results = service.list_enrollments(actor, query, status_filter)
+    if results:
+        st.dataframe(pd.DataFrame([
+            {
+                "Matricula": item.registration_number,
+                "Nome": item.name or "-",
+                "E-mail": item.email or "-",
+                "Situacao": {
+                    EnrollmentStatus.ACTIVE: "Disponivel",
+                    EnrollmentStatus.INACTIVE: "Desativada",
+                    EnrollmentStatus.USED: "Vinculada",
+                }[item.status],
+            }
+            for item in results
+        ]), hide_index=True, width="stretch")
+        available = [item for item in results if item.is_available]
+        if available:
+            choices = {f"{item.registration_number} — {item.name or 'sem nome'}": item.id for item in available}
+            selected = st.selectbox("Desativar matricula ainda disponivel", list(choices), key="enrollment_deactivate_select")
+            if st.button("Desativar matricula", key="deactivate_enrollment"):
+                try:
+                    service.deactivate(actor, choices[selected])
+                except (DomainAuthorizationError, ResourceNotFound, ValueError) as exc:
+                    st.error(str(exc))
+                else:
+                    st.rerun()
+    else:
+        st.info("Nenhuma matricula encontrada.")
+
 
 def users_page(user):
-    # ---------------------------------------------------------
-    # Cabeçalho
-    # ---------------------------------------------------------
-    col_header, col_action = st.columns([5, 1], vertical_alignment="bottom")
-    with col_header:
-        page_header(
-            "Usuários",
-            "Gerencie contas, perfis e acesso ao sistema.",
-        )
-    with col_action:
-        if st.button("Novo usuário", type="primary", icon=":material/person_add:", width="stretch"):
-            _user_dialog(editing_user=None)
-
-    # ---------------------------------------------------------
-    # Filtros
-    # ---------------------------------------------------------
-    col_search, col_role = st.columns([3, 1])
-
-    with col_search:
-        search = st.text_input(
-            "Buscar",
-            placeholder="Buscar por nome ou e-mail…",
-            label_visibility="collapsed",
-            key="users_search",
-        )
-
-    with col_role:
-        role_options = ["Todos os perfis"] + list(ROLE_LABELS.values())
-        role_filter = st.selectbox(
-            "Perfil",
-            options=role_options,
-            label_visibility="collapsed",
-            key="users_role_filter",
-        )
-
-    # ---------------------------------------------------------
-    # Filtragem dos dados
-    # ---------------------------------------------------------
-    all_users = mock_data_service.users()
-
-    filtered = [
-        u for u in all_users
-        if (
-            search.lower() in u["name"].lower()
-            or search.lower() in u["email"].lower()
-        )
-        and (
-            role_filter == "Todos os perfis"
-            or ROLE_LABELS.get(u["role"]) == role_filter
-        )
-    ]
-
-    # ---------------------------------------------------------
-    # Tabela (Estilo padronizado com st.dataframe)
-    # ---------------------------------------------------------
-    if not filtered:
-        st.info("Nenhum usuário encontrado.")
+    runtime = get_streamlit_runtime()
+    actor = get_streamlit_actor(user)
+    if actor is None or actor.profile is not Profile.ADMIN:
+        st.error("Acesso nao autorizado.")
         return
 
-    # Container informativo padronizado
-    with st.container(border=True):
-        st.caption(
-            ":material/info: Selecione um usuário abaixo no menu de ações para editar suas permissões ou alterar seu status de acesso."
-        )
-
-    # Exibição da tabela identica à página de permissões
-    df_users = _users_dataframe(filtered)
-    st.dataframe(
-        df_users,
-        column_config={
-            "Usuário": st.column_config.TextColumn("Usuário", width="large", pinned=True),
-            "E-mail": st.column_config.TextColumn("E-mail", width="medium"),
-            "Perfil": st.column_config.TextColumn("Perfil", width="small"),
-            "Status": st.column_config.TextColumn("Status", width="small"),
-        },
-        hide_index=True,
-        width="stretch",
-    )
-
-    # ---------------------------------------------------------
-    # Painel de Ações Operacionais sobre a seleção
-    # ---------------------------------------------------------
-    col_select, col_edit, col_toggle = st.columns([3, 1, 1], vertical_alignment="bottom")
-    
-    user_map = {f"{u['name']} ({u['email']})": u for u in filtered}
-    
-    with col_select:
-        selected_user_label = st.selectbox(
-            "Ações do usuário",
-            options=list(user_map.keys()),
-            help="Selecione um usuário para editar dados ou alterar status",
-        )
-        selected_user = user_map[selected_user_label]
-
-    with col_edit:
-        if st.button("Editar", icon=":material/edit:", width="stretch"):
-            _user_dialog(editing_user=selected_user)
-
-    with col_toggle:
-        if selected_user["status"] == "ativo":
-            if st.button("Desativar", icon=":material/block:", width="stretch"):
-                mock_data_service.toggle_user(selected_user["id"])
-                set_toast(f"{selected_user['name']} foi desativado.")
-                st.rerun()
+    page_header("Usuarios", "Gerencie usuarios, codigos institucionais e matriculas da sua instituicao.")
+    users_tab, access_tab = st.tabs(["Usuarios", "Codigos e matriculas"])
+    with users_tab:
+        search_col, profile_col = st.columns([3, 1])
+        query = search_col.text_input("Buscar por nome ou e-mail", key="users_search")
+        profile_labels = ["Todos os perfis", *ROLE_LABELS.values()]
+        selected_profile = profile_col.selectbox("Perfil", profile_labels, key="users_role_filter")
+        try:
+            users = runtime.user_management.list_users(actor, query=query)
+        except DomainAuthorizationError as exc:
+            st.error(str(exc))
+            return
+        users = [item for item in users if selected_profile == "Todos os perfis" or ROLE_LABELS[item.profile.value] == selected_profile]
+        if users:
+            st.dataframe(_user_table(users), hide_index=True, width="stretch")
+            choices = {f"{item.name} ({item.email})": item for item in users}
+            selected = st.selectbox("Usuario", list(choices), key="managed_user_select")
+            selected_user = choices[selected]
+            edit_col, status_col = st.columns(2)
+            if edit_col.button("Editar usuário", width="stretch"):
+                _user_dialog(actor, selected_user)
+            profiles = list(Profile)
+            new_profile = st.selectbox(
+                "Perfil de acesso", profiles, index=profiles.index(selected_user.profile),
+                format_func=lambda profile: ROLE_LABELS[profile.value],
+                key=f"managed_profile_{selected_user.id}",
+            )
+            if st.button("Alterar perfil", disabled=new_profile is selected_user.profile):
+                try:
+                    runtime.user_management.update_profile(actor, selected_user.id, new_profile)
+                except (DomainAuthorizationError, LastActiveAdministrator, ResourceNotFound) as exc:
+                    st.error(str(exc))
+                else:
+                    st.rerun()
+            label = "Desativar" if selected_user.is_active else "Ativar"
+            next_status = UserStatus.INACTIVE if selected_user.is_active else UserStatus.ACTIVE
+            if status_col.button(label, width="stretch"):
+                try:
+                    runtime.user_management.set_status(actor, selected_user.id, next_status)
+                except (DomainAuthorizationError, LastActiveAdministrator, ResourceNotFound) as exc:
+                    st.error(str(exc))
+                else:
+                    st.rerun()
         else:
-            if st.button("Ativar", icon=":material/check_circle:", width="stretch"):
-                mock_data_service.toggle_user(selected_user["id"])
-                set_toast(f"{selected_user['name']} foi ativado.")
-                st.rerun()
+            st.info("Nenhum usuario encontrado.")
+        if st.button("Novo usuario", type="primary", icon=":material/person_add:"):
+            _user_dialog(actor)
 
-    st.info(
-        "Alterações de perfil e status são refletidas imediatamente nos acessos do usuário no sistema.",
-        icon=":material/shield:",
-    )
+    with access_tab:
+        _invitation_codes(actor)
+        st.divider()
+        _enrollments(actor)

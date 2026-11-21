@@ -1,32 +1,57 @@
 import pandas as pd
 import streamlit as st
 
+from controllers.streamlit_runtime import get_streamlit_actor
+from models.domain.entities.permission import Permission
+from models.domain.entities.profile import Profile
+from models.domain.policies.permission_policy import PermissionPolicy
 from views.components.ui_components import page_header
 
 
-# Níveis: acesso completo, somente registros próprios ou sem acesso.
-PERMISSION_MATRIX = [
-    ("Gerenciar usuários", "full", "none", "none", "none"),
-    ("Gerenciar permissões", "full", "none", "none", "none"),
-    ("Configurações do sistema", "full", "none", "none", "none"),
-    ("Gerenciar espaços", "full", "full", "none", "none"),
-    ("Gerenciar recursos", "full", "full", "none", "none"),
-    ("Tipos de reserva", "full", "full", "none", "none"),
-    ("Criar reservas", "full", "full", "own", "none"),
-    ("Aprovar / rejeitar reservas", "full", "full", "none", "none"),
-    ("Cancelar reservas", "full", "full", "own", "none"),
-    ("Resolver conflitos", "full", "full", "none", "none"),
-    ("Bloquear espaços", "full", "full", "none", "none"),
-    ("Consultar agenda", "full", "full", "full", "full"),
-    ("Localizar espaços", "full", "full", "full", "full"),
-    ("Histórico de reservas", "full", "full", "own", "none"),
-    ("Relatórios de ocupação", "full", "full", "none", "none"),
+EFFECTIVE_PERMISSIONS = [
+    ("Acessar dashboard do administrador", {Permission.VIEW_ADMIN_DASHBOARD}),
+    ("Consultar histórico administrativo", {Permission.VIEW_ADMIN_AUDIT}),
+    ("Gerenciar a própria conta", {Permission.MANAGE_OWN_ACCOUNT}),
+    ("Gerenciar usuários, códigos e matrículas", {Permission.MANAGE_USERS}),
+    ("Consultar permissões", {Permission.VIEW_PERMISSIONS}),
+    ("Gerenciar planta da instituição", {Permission.MANAGE_FLOOR_PLAN}),
+    ("Configurações da instituição", {Permission.EDIT_INSTITUTION_SETTINGS}),
+    ("Gerenciar salas e recursos", {Permission.MANAGE_FLOOR_PLAN, Permission.MANAGE_SPACES}),
 ]
 
-ACCESS_LABELS = {"full": "Completo", "own": "Próprio", "none": "—"}
+PENDING_PERMISSIONS = [
+    ("Acessar dashboard do gerente", "none", "pending", "none", "none"),
+    ("Acessar dashboard do solicitante", "none", "none", "pending", "none"),
+    ("Acessar dashboard do participante", "none", "none", "none", "pending"),
+    ("Criar reservas", "none", "none", "pending", "none"),
+    ("Aprovar / rejeitar reservas", "none", "pending", "none", "none"),
+    ("Cancelar próprias reservas", "none", "none", "own_pending", "none"),
+    ("Resolver conflitos", "none", "pending", "none", "none"),
+    ("Bloquear espaços", "none", "pending", "none", "none"),
+    ("Consultar agenda", "none", "none", "pending", "pending"),
+    ("Localizar espaços", "none", "none", "none", "pending"),
+    ("Histórico de reservas", "none", "pending", "own_pending", "none"),
+    ("Consultar notificações", "none", "none", "pending", "pending"),
+    ("Relatórios de ocupação", "none", "pending", "none", "none"),
+]
+
+ACCESS_LABELS = {
+    "institution": "Instituição do vínculo",
+    "own": "Próprio usuário",
+    "own_pending": "Próprio*",
+    "pending": "A validar",
+    "none": "—",
+}
 
 
 def _permission_dataframe() -> pd.DataFrame:
+    policy = PermissionPolicy()
+    profiles = (Profile.ADMIN, Profile.MANAGER, Profile.REQUESTER, Profile.PARTICIPANT)
+    grants = [policy.effective_permissions(profile) for profile in profiles]
+    effective_rows = []
+    for action, permissions in EFFECTIVE_PERMISSIONS:
+        scope = "own" if Permission.MANAGE_OWN_ACCOUNT in permissions else "institution"
+        effective_rows.append((action, *(scope if permissions & values else "none" for values in grants)))
     return pd.DataFrame(
         [
             {
@@ -36,17 +61,25 @@ def _permission_dataframe() -> pd.DataFrame:
                 "Solicitante": ACCESS_LABELS[requester],
                 "Participante": ACCESS_LABELS[participant],
             }
-            for action, admin, manager, requester, participant in PERMISSION_MATRIX
+            for action, admin, manager, requester, participant in [*effective_rows, *PENDING_PERMISSIONS]
         ]
     )
 
 
 def permissions(user):
+    actor = get_streamlit_actor(user)
+    if actor is None or Permission.VIEW_PERMISSIONS not in PermissionPolicy().effective_permissions(actor.profile):
+        st.error("Acesso não autorizado.")
+        return
+
     page_header("Permissões", "Matriz de permissões por perfil de usuário no sistema.")
 
     with st.container(border=True):
         st.caption(
-            ":material/info: Completo: acesso a todos os registros · Próprio: apenas os próprios registros · —: sem acesso"
+            ":material/info: Instituição do vínculo: escopo da instituição do usuário autenticado · "
+            "Próprio usuário: apenas a própria conta · "
+            "Próprio*: somente registros do solicitante, escopo institucional pendente · "
+            "A validar: não concede acesso efetivo pela API"
         )
 
     st.dataframe(
@@ -63,6 +96,7 @@ def permissions(user):
     )
 
     st.info(
-        "Apenas o administrador pode editar a matriz de permissões. Alterações afetam imediatamente todos os usuários do perfil selecionado.",
+        "As permissões institucionais se limitam à instituição vinculada. "
+        "Os escopos marcados como 'A validar' aguardam decisão da equipe e não são grants da API.",
         icon=":material/shield:",
     )

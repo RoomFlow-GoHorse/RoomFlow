@@ -1,0 +1,19 @@
+from typing import Protocol, Sequence
+
+from models.domain.entities.user_account import UserAccount
+
+
+class UserRepository(Protocol):
+    def find_by_email(self, email: str) -> UserAccount | None: ...
+
+    def find_by_id(self, user_id: str) -> UserAccount | None: ...
+
+    def list_by_institution(self, institution_id: str) -> Sequence[UserAccount]: ...
+
+    def add(self, account: UserAccount) -> None: ...
+
+    def save(self, account: UserAccount) -> None: ...
+
+    def save_preserving_active_admin(
+        self, account: UserAccount, institution_id: str
+    ) -> None: ...

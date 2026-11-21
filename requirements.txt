@@ -1,6 +1,11 @@
 streamlit
+fastapi>=0.115,<1.0
+uvicorn>=0.30,<1.0
 SQLAlchemy>=2.0,<3.0
 alembic>=1.13,<2.0
 psycopg[binary]>=3.1,<4.0
 python-dotenv>=1.0,<2.0
 streamlit-calendar
+openpyxl>=3.1,<4.0
+python-multipart>=0.0.9,<1.0
+Pillow>=10,<13

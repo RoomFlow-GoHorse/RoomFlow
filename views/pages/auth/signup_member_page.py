@@ -1,12 +1,17 @@
+import os
+import secrets
 from html import escape
+
 import streamlit as st
 
-from sqlalchemy import select
-from sqlalchemy.exc import SQLAlchemyError
-
-from config.database import SessionLocal
-from models.database_models import Instituicao
+from application.services.enrollment_management_service import (
+    MemberIdentityNotConfirmed,
+    TooManyEnrollmentAttempts,
+)
+from application.services.member_signup_service import InvalidEmailVerification
+from models.domain.exceptions import DuplicateResource
 from controllers.app_state_service import go
+from controllers.streamlit_runtime import get_streamlit_runtime
 from views.components.ui_components import logo
 
 def _init_state():
@@ -16,14 +21,19 @@ def _init_state():
         "signup_member_email": "",
         "signup_member_ra": "",
         "signup_member_instituicao": "",
+        "signup_member_codigo_institucional": "",
+        "signup_member_attempt_key": secrets.token_urlsafe(12),
         "signup_member_senha": "",
         "signup_member_confirm_senha": "",
         "signup_member_error": "",
     }
 
     for key, value in defaults.items():
-        if key not in st.session_state:
-            st.session_state[key] = value
+        if st.session_state.get("signup_member_screen", "form") == "form":
+            st.session_state.setdefault(key, value)
+        else:
+            # Keep form values while the confirmation steps hide their widgets.
+            st.session_state[key] = st.session_state.get(key, value)
 
 def _reset():
     keys = [
@@ -32,10 +42,12 @@ def _reset():
         "signup_member_email",
         "signup_member_ra",
         "signup_member_instituicao",
-        "signup_member_instituicao_select",
+        "signup_member_codigo_institucional",
+        "signup_member_attempt_key",
         "signup_member_senha",
         "signup_member_confirm_senha",
         "signup_member_error",
+        "signup_member_token",
     ]
 
     for key in keys:
@@ -45,7 +57,7 @@ def _validate():
     nome = st.session_state.signup_member_nome.strip()
     email = st.session_state.signup_member_email.strip()
     ra = st.session_state.signup_member_ra.strip()
-    instituicao = st.session_state.signup_member_instituicao
+    institutional_code = st.session_state.signup_member_codigo_institucional.strip()
     senha = st.session_state.signup_member_senha
     confirm = st.session_state.signup_member_confirm_senha
 
@@ -57,17 +69,16 @@ def _validate():
         return "Informe um e-mail válido."
     if not ra:
         return "Informe seu RA ou matrícula."
-    if not instituicao:
-        return "Selecione sua instituição."
+    if not institutional_code:
+        return "Informe o código institucional recebido da sua instituição."
     if not senha:
         return "Crie uma senha para continuar."
-    if len(senha) < 6:
-        return "A senha deve possuir pelo menos 6 caracteres."
+    if len(senha) < 8:
+        return "A senha deve possuir pelo menos 8 caracteres."
     if not confirm:
         return "Confirme a senha para continuar."
     if senha != confirm:
         return "As senhas não coincidem. Verifique e tente novamente."
-
     return None
 
 def _submit():
@@ -141,28 +152,11 @@ def _render_form():
                 placeholder="Ex: 202612345",
             )
 
-        try:
-            with SessionLocal() as sessao:
-                instituicoes = sessao.scalars(
-                    select(Instituicao.name)
-                    .where(Instituicao.status == "ativo")
-                    .distinct()
-                    .order_by(Instituicao.name)
-                ).all()
-        except SQLAlchemyError:
-            instituicoes = []
-            st.error("Não foi possível carregar as instituições. Tente novamente.")
-        else:
-            if not instituicoes:
-                st.info("Nenhuma instituição ativa cadastrada.")
-
-        st.session_state.signup_member_instituicao = st.selectbox(
-            "Instituição *",
-            instituicoes,
-            index=None,
-            placeholder="Selecione sua instituição...",
-            key="signup_member_instituicao_select",
-            disabled=not instituicoes,
+        st.text_input(
+            "C\u00f3digo institucional *",
+            key="signup_member_codigo_institucional",
+            max_chars=200,
+            help="Solicite o c\u00f3digo ao administrador da sua institui\u00e7\u00e3o.",
         )
 
         c3, c4 = st.columns(2)
@@ -173,7 +167,7 @@ def _render_form():
                 placeholder="••••••••",
                 type="password",
             )
-            st.markdown('<span class="rf-field-help" style="font-size:12px; color:#A1A1AA;">Mínimo de 6 caracteres.</span>', unsafe_allow_html=True)
+            st.markdown('<span class="rf-field-help" style="font-size:12px; color:#A1A1AA;">Mínimo de 8 caracteres.</span>', unsafe_allow_html=True)
         with c4:
             st.text_input(
                 "Confirmar senha *",
@@ -195,7 +189,6 @@ def _render_form():
     if st.button(
         "Criar conta →",
         key="signup_member_submit",
-        disabled=not instituicoes,
         type="primary",
         width="stretch",
     ):
@@ -215,24 +208,110 @@ def _render_validating():
         """
         <div class="rf-state-wrapper">
             <div class="rf-state-card">
-                <div class="rf-state-icon loading">
-                    <div class="rf-spinner"></div>
-                </div>
+                <div class="rf-state-icon loading"><div class="rf-spinner"></div></div>
                 <h2>Validando seu vínculo</h2>
-                <p>Estamos verificando seu RA/matrícula e e-mail junto à instituição selecionada.</p>
+                <p>Estamos conferindo o código institucional e sua matrícula.</p>
             </div>
         </div>
         """,
         unsafe_allow_html=True,
     )
-
-    ra = st.session_state.signup_member_ra.strip().upper()
-    if ra.startswith("ERR"):
+    try:
+        preview = get_streamlit_runtime().enrollment_management.preview_member_institution(
+            raw_code=st.session_state.signup_member_codigo_institucional.strip(),
+            registration_number=st.session_state.signup_member_ra.strip(),
+            name=st.session_state.signup_member_nome.strip(),
+            email=st.session_state.signup_member_email.strip(),
+            attempt_key=st.session_state.signup_member_attempt_key,
+        )
+    except TooManyEnrollmentAttempts:
+        st.session_state.signup_member_error = "Muitas tentativas. Aguarde e tente novamente."
+        st.session_state.signup_member_screen = "error"
+    except MemberIdentityNotConfirmed:
+        st.session_state.signup_member_error = "N\u00e3o foi poss\u00edvel confirmar os dados informados. Verifique com sua institui\u00e7\u00e3o."
         st.session_state.signup_member_screen = "error"
     else:
-        st.session_state.signup_member_screen = "success"
-
+        st.session_state.signup_member_instituicao = preview.institution_name
+        st.session_state.signup_member_screen = "confirm"
     st.rerun()
+
+
+def _render_confirm():
+    st.markdown(
+        f"""
+        <div class="rf-state-wrapper">
+            <div class="rf-state-card">
+                <h2>Confirme sua instituição</h2>
+                <p>Encontramos o vínculo com <strong>{escape(st.session_state.signup_member_instituicao)}</strong>.</p>
+                <p>Confira se esta \u00e9 a instituição correta antes de continuar.</p>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    if st.button("Confirmar instituição", key="signup_member_confirm_institution", type="primary", width="stretch"):
+        try:
+            preview = get_streamlit_runtime().enrollment_management.preview_member_institution(
+                raw_code=st.session_state.signup_member_codigo_institucional.strip(),
+                registration_number=st.session_state.signup_member_ra.strip(),
+                name=st.session_state.signup_member_nome.strip(),
+                email=st.session_state.signup_member_email.strip(),
+                attempt_key=st.session_state.signup_member_attempt_key,
+            )
+        except (MemberIdentityNotConfirmed, TooManyEnrollmentAttempts):
+            st.session_state.signup_member_error = "N\u00e3o foi poss\u00edvel confirmar os dados informados. Verifique com sua institui\u00e7\u00e3o."
+            st.session_state.signup_member_screen = "error"
+        else:
+            try:
+                started = get_streamlit_runtime().member_signup.start(
+                    name=st.session_state.signup_member_nome.strip(),
+                    email=st.session_state.signup_member_email.strip(),
+                    registration_number=st.session_state.signup_member_ra.strip(),
+                    institutional_code=st.session_state.signup_member_codigo_institucional.strip(),
+                    password=st.session_state.signup_member_senha,
+                    attempt_key=st.session_state.signup_member_attempt_key,
+                )
+            except (MemberIdentityNotConfirmed, TooManyEnrollmentAttempts, DuplicateResource, ValueError):
+                st.session_state.signup_member_error = "N\u00e3o foi poss\u00edvel iniciar o cadastro. Verifique os dados e tente novamente."
+                st.session_state.signup_member_screen = "error"
+            else:
+                st.session_state.signup_member_instituicao = started.institution_name
+                st.session_state.signup_member_screen = "email_pending"
+        st.rerun()
+
+
+def _render_email_pending():
+    st.info(
+        f"Enviamos uma confirma\u00e7\u00e3o para {st.session_state.signup_member_email}. "
+        "Confirme o e-mail para ativar sua conta.",
+        icon=":material/mark_email_unread:",
+    )
+    environment = os.getenv("APP_ENV", "development").strip().lower()
+    if environment in {"development", "test"}:
+        message = get_streamlit_runtime().simulated_email_sender.latest_for(
+            st.session_state.signup_member_email
+        )
+        if message:
+            st.caption("Caixa de e-mail simulada para desenvolvimento:")
+            st.code(message.verification_token)
+            if st.button("Confirmar e-mail", type="primary", key="signup_member_verify_email"):
+                try:
+                    registered = get_streamlit_runtime().member_signup.verify_email(
+                        message.verification_token,
+                        st.session_state.signup_member_attempt_key,
+                    )
+                except InvalidEmailVerification:
+                    st.session_state.signup_member_error = "Token inv\u00e1lido, expirado ou j\u00e1 utilizado."
+                    st.session_state.signup_member_screen = "error"
+                except TooManyEnrollmentAttempts:
+                    st.session_state.signup_member_error = "Muitas tentativas. Aguarde e tente novamente."
+                    st.session_state.signup_member_screen = "error"
+                else:
+                    st.session_state.signup_member_nome = registered.user.name
+                    st.session_state.signup_member_email = registered.user.email
+                    st.session_state.signup_member_screen = "success"
+                st.rerun()
+
 
 def _render_success():
     check_circle_svg = '<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>'
@@ -275,6 +354,7 @@ def _render_success():
         if st.button("Entrar no RoomFlow →", key="signup_member_login", type="primary", width="stretch"):
             _reset()
             go("login")
+
 
 def _render_error():
     x_circle_svg = '<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>'
@@ -364,6 +444,14 @@ def signup_member():
 
     if screen == "validating":
         _render_validating()
+        return
+
+    if screen == "confirm":
+        _render_confirm()
+        return
+
+    if screen == "email_pending":
+        _render_email_pending()
         return
 
     if screen == "success":

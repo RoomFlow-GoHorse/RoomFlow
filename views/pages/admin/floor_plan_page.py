@@ -1,7 +1,11 @@
+import base64
+import html
 import time as _time
 import streamlit as st
 
 from controllers.app_state_service import set_toast
+from controllers.streamlit_runtime import get_streamlit_actor, get_streamlit_runtime
+from models.domain.exceptions import DomainAuthorizationError, DuplicateResource, ResourceNotFound
 from views.components.ui_components import page_header
 
 # =========================================================
@@ -27,17 +31,6 @@ ROOM_TYPES = [
     "Outro",
 ]
 
-# Salas do mock de SPACES adaptadas ao modelo building/floor
-_MOCK_SPACES = [
-    {"id": "s1", "name": "Sala 101",               "building": "Bloco A", "floor": "1º andar",  "type": "Sala de aula",    "capacity": 20},
-    {"id": "s2", "name": "Sala 204",               "building": "Bloco B", "floor": "2º andar",  "type": "Sala de aula",    "capacity": 30},
-    {"id": "s3", "name": "Auditório Principal",    "building": "Bloco A", "floor": "Térreo",    "type": "Auditório",       "capacity": 150},
-    {"id": "s4", "name": "Lab. de Informática",   "building": "Bloco C", "floor": "Térreo",    "type": "Laboratório",     "capacity": 40},
-    {"id": "s5", "name": "Auditório A",            "building": "Bloco D", "floor": "Térreo",    "type": "Auditório",       "capacity": 80},
-    {"id": "s6", "name": "Sala de Reuniões B",     "building": "Bloco A", "floor": "1º andar",  "type": "Sala de reuniões","capacity": 8},
-]
-
-
 # =========================================================
 # HELPERS
 # =========================================================
@@ -60,33 +53,47 @@ def _uid() -> str:
     return str(int(_time.time() * 1000))
 
 
+def _space_service():
+    actor = get_streamlit_actor()
+    if actor is None:
+        raise PermissionError("Sua sessão expirou. Entre novamente.")
+    return actor, get_streamlit_runtime().space_management
+
+
 # =========================================================
 # BOOT — session_state inicial
 # =========================================================
 
 def _boot():
     st.session_state.pop("fp_select_building_widget", None)
-
-    if "buildings" not in st.session_state or not st.session_state.buildings:
-        st.session_state.buildings = [
-            {"id": "b-1", "name": "Bloco A"},
-            {"id": "b-2", "name": "Bloco B"},
-            {"id": "b-3", "name": "Bloco C"},
-            {"id": "b-4", "name": "Bloco D"},
-        ]
-    if "floors" not in st.session_state or not st.session_state.floors:
-        st.session_state.floors = [
-            {"id": "b-1-f-1", "buildingId": "b-1", "name": "Térreo"},
-            {"id": "b-1-f-2", "buildingId": "b-1", "name": "1º andar"},
-            {"id": "b-1-f-3", "buildingId": "b-1", "name": "2º andar"},
-            {"id": "b-2-f-1", "buildingId": "b-2", "name": "Térreo"},
-            {"id": "b-2-f-2", "buildingId": "b-2", "name": "2º andar"},
-            {"id": "b-3-f-1", "buildingId": "b-3", "name": "Térreo"},
-            {"id": "b-4-f-1", "buildingId": "b-4", "name": "Térreo"},
-        ]
-    if "plans" not in st.session_state:
-        st.session_state.plans = {}
-
+    actor = get_streamlit_actor()
+    if actor is None:
+        st.error("Sua sessão expirou. Entre novamente para gerenciar a planta.")
+        return
+    runtime = get_streamlit_runtime()
+    buildings = runtime.space_management.list_buildings(actor, include_inactive=True)
+    st.session_state.buildings = [
+        {"id": item.id, "name": item.name, "active": item.active}
+        for item in buildings
+    ]
+    floors = []
+    for building in buildings:
+        floors.extend(
+            {"id": item.id, "buildingId": item.building_id, "name": item.name, "active": item.active}
+            for item in runtime.space_management.list_floors(actor, building.id, include_inactive=True)
+        )
+    st.session_state.floors = floors
+    st.session_state.spaces = [
+        {
+            "id": item.id, "name": item.name, "building": item.building,
+            "floor": item.floor, "type": item.type, "capacity": item.capacity,
+            "location": item.location, "status": item.status,
+            "resources": list(item.resources), "occupancy": item.occupancy,
+            "building_id": item.building_id, "floor_id": item.floor_id,
+            "active": item.active,
+        }
+        for item in runtime.space_management.list_spaces(actor, include_inactive=True)
+    ]
     blist = _buildings()
     if "fp_sel_building" not in st.session_state or not any(b["id"] == st.session_state.fp_sel_building for b in blist):
         st.session_state.fp_sel_building = blist[0]["id"] if blist else ""
@@ -137,14 +144,39 @@ def _plan_key() -> str:
     return f"{st.session_state.fp_sel_building}__{st.session_state.fp_sel_floor}"
 
 
+def _upload_key(kind: str) -> str:
+    state_key = f"fp_{kind}_widget_key_{_plan_key()}"
+    if state_key not in st.session_state:
+        st.session_state[state_key] = f"fp_{kind}_{_plan_key()}_{_uid()}"
+    return st.session_state[state_key]
+
+
+def _reset_upload_keys() -> None:
+    for kind in ("upload", "replace"):
+        st.session_state[f"fp_{kind}_widget_key_{_plan_key()}"] = f"fp_{kind}_{_plan_key()}_{_uid()}"
+
+
 def _current_plan() -> dict:
-    return st.session_state.plans.get(_plan_key(), {"src": None, "positions": {}})
+    floor = _current_floor()
+    actor = get_streamlit_actor()
+    if floor is None or actor is None:
+        return {"src": None, "positions": {}}
+    runtime = get_streamlit_runtime()
+    try:
+        saved_plan, content = runtime.floor_plan_management.read_file(actor, floor["id"])
+    except ResourceNotFound:
+        return {"src": None, "positions": {}}
+    return {
+        "src": content,
+        "media_type": saved_plan.media_type,
+        "positions": {item.space_id: {"x": item.x, "y": item.y} for item in saved_plan.positions},
+    }
 
 
-def _rooms_for(building_name: str, floor_name: str) -> list[dict]:
+def _rooms_for(floor_id: str) -> list[dict]:
     return [
         s for s in st.session_state.get("spaces", [])
-        if s.get("building") == building_name and s.get("floor") == floor_name
+        if s["floor_id"] == floor_id
     ]
 
 
@@ -161,25 +193,24 @@ def _dialog_add_building():
 
     c1, c2 = st.columns(2)
     with c1:
-        if st.button("Cancelar", use_container_width=True):
+        if st.button("Cancelar", width="stretch"):
             st.session_state.pop("fp_add_building_err", None)
             st.rerun()
     with c2:
-        if st.button("Adicionar bloco", type="primary", use_container_width=True):
+        if st.button("Adicionar bloco", type="primary", width="stretch"):
             name = name.strip()
             if not name:
                 st.session_state.fp_add_building_err = "Nome do bloco é obrigatório."
                 st.rerun()
                 return
-            exists = any(b["name"].lower() == name.lower() for b in _buildings())
-            if exists:
-                st.session_state.fp_add_building_err = "Já existe um bloco com esse nome."
+            try:
+                actor, service = _space_service()
+                building = service.create_building(actor, name)
+            except (DomainAuthorizationError, DuplicateResource, ValueError, PermissionError) as exc:
+                st.session_state.fp_add_building_err = str(exc)
                 st.rerun()
                 return
-            new_id = f"b-{_uid()}"
-            st.session_state.buildings.append({"id": new_id, "name": name})
-            st.session_state.buildings = sorted(st.session_state.buildings, key=lambda x: x["name"])
-            st.session_state.fp_sel_building = new_id
+            st.session_state.fp_sel_building = building.id
             st.session_state.fp_sel_floor = ""
             st.session_state.pop("fp_add_building_err", None)
             set_toast(f'Bloco "{name}" adicionado.')
@@ -195,28 +226,22 @@ def _dialog_rename_building(building: dict):
 
     c1, c2 = st.columns(2)
     with c1:
-        if st.button("Cancelar", use_container_width=True):
+        if st.button("Cancelar", width="stretch"):
             st.session_state.pop("fp_rename_building_err", None)
             st.rerun()
     with c2:
-        if st.button("Salvar", type="primary", use_container_width=True):
+        if st.button("Salvar", type="primary", width="stretch"):
             new_name = new_name.strip()
             if not new_name or new_name == building["name"]:
                 st.rerun()
                 return
-            exists = any(b["id"] != building["id"] and b["name"].lower() == new_name.lower() for b in _buildings())
-            if exists:
-                st.session_state.fp_rename_building_err = "Já existe um bloco com esse nome."
+            try:
+                actor, service = _space_service()
+                service.update_building(actor, building["id"], new_name)
+            except (DomainAuthorizationError, DuplicateResource, ResourceNotFound, ValueError, PermissionError) as exc:
+                st.session_state.fp_rename_building_err = str(exc)
                 st.rerun()
                 return
-            old_name = building["name"]
-            for b in st.session_state.buildings:
-                if b["id"] == building["id"]:
-                    b["name"] = new_name
-            for s in st.session_state.spaces:
-                if s.get("building") == old_name:
-                    s["building"] = new_name
-                    s["location"] = f"{new_name}, {s.get('floor', '')}"
             st.session_state.pop("fp_rename_building_err", None)
             set_toast("Bloco renomeado.")
             st.rerun()
@@ -226,29 +251,28 @@ def _dialog_rename_building(building: dict):
 def _dialog_confirm_remove_building(building: dict):
     has_floors = any(f.get("buildingId") == building["id"] for f in _all_floors())
     has_rooms = any(s.get("building") == building["name"] for s in st.session_state.spaces)
-    has_plans = any(k.startswith(f"{building['id']}__") for k in st.session_state.plans)
+    actor = get_streamlit_actor()
+    runtime = get_streamlit_runtime()
+    has_plans = actor is not None and any(
+        runtime.floor_plan_management.get_for_floor(actor, floor["id"]) is not None
+        for floor in _building_floors(building["id"])
+    )
 
     if has_floors or has_rooms or has_plans:
-        st.warning("Este bloco possui andares, salas ou plantas cadastradas. Ao remover, esses dados serão perdidos.")
+        st.warning("Prédios com andares ou salas ativos não podem ser inativados. Os registros serão preservados.")
 
     c1, c2 = st.columns(2)
     with c1:
-        if st.button("Cancelar", use_container_width=True):
+        if st.button("Cancelar", width="stretch"):
             st.rerun()
     with c2:
-        if st.button("Remover bloco", type="primary", use_container_width=True):
-            remaining = [b for b in st.session_state.buildings if b["id"] != building["id"]]
-            next_building = remaining[0] if remaining else None
-            st.session_state.buildings = remaining
-            st.session_state.floors = [f for f in _all_floors() if f.get("buildingId") != building["id"]]
-            st.session_state.spaces = [s for s in st.session_state.spaces if s.get("building") != building["name"]]
-            to_del = [k for k in st.session_state.plans if k.startswith(f"{building['id']}__")]
-            for k in to_del:
-                del st.session_state.plans[k]
-            if st.session_state.fp_sel_building == building["id"]:
-                st.session_state.fp_sel_building = next_building["id"] if next_building else ""
-                next_floors = _building_floors(next_building["id"]) if next_building else []
-                st.session_state.fp_sel_floor = next_floors[0]["id"] if next_floors else ""
+        if st.button("Inativar prédio", type="primary", width="stretch"):
+            try:
+                actor, service = _space_service()
+                service.deactivate_building(actor, building["id"])
+            except (DomainAuthorizationError, ResourceNotFound, ValueError, PermissionError) as exc:
+                st.error(str(exc))
+                return
             set_toast(f'Bloco "{building["name"]}" removido.')
             st.rerun()
 
@@ -267,24 +291,24 @@ def _dialog_add_floor(building: dict):
 
     c1, c2 = st.columns(2)
     with c1:
-        if st.button("Cancelar", use_container_width=True):
+        if st.button("Cancelar", width="stretch"):
             st.session_state.pop("fp_add_floor_err", None)
             st.rerun()
     with c2:
-        if st.button("Adicionar andar", type="primary", use_container_width=True):
+        if st.button("Adicionar andar", type="primary", width="stretch"):
             name = name.strip()
             if not name:
                 st.session_state.fp_add_floor_err = "Nome do andar é obrigatório."
                 st.rerun()
                 return
-            b_floors = _building_floors(building["id"])
-            if any(f["name"].lower() == name.lower() for f in b_floors):
-                st.session_state.fp_add_floor_err = "Já existe um andar com esse nome neste bloco."
+            try:
+                actor, service = _space_service()
+                floor = service.create_floor(actor, building["id"], name)
+            except (DomainAuthorizationError, DuplicateResource, ResourceNotFound, ValueError, PermissionError) as exc:
+                st.session_state.fp_add_floor_err = str(exc)
                 st.rerun()
                 return
-            new_id = f"f-{_uid()}"
-            st.session_state.floors.append({"id": new_id, "buildingId": building["id"], "name": name})
-            st.session_state.fp_sel_floor = new_id
+            st.session_state.fp_sel_floor = floor.id
             st.session_state.pop("fp_add_floor_err", None)
             set_toast(f'Andar "{name}" adicionado ao {building["name"]}.')
             st.rerun()
@@ -299,28 +323,22 @@ def _dialog_rename_floor(floor: dict, building: dict):
 
     c1, c2 = st.columns(2)
     with c1:
-        if st.button("Cancelar", use_container_width=True):
+        if st.button("Cancelar", width="stretch"):
             st.session_state.pop("fp_rename_floor_err", None)
             st.rerun()
     with c2:
-        if st.button("Salvar", type="primary", use_container_width=True):
+        if st.button("Salvar", type="primary", width="stretch"):
             new_name = new_name.strip()
             if not new_name or new_name == floor["name"]:
                 st.rerun()
                 return
-            b_floors = _building_floors(building["id"])
-            if any(f["id"] != floor["id"] and f["name"].lower() == new_name.lower() for f in b_floors):
-                st.session_state.fp_rename_floor_err = "Já existe um andar com esse nome neste bloco."
+            try:
+                actor, service = _space_service()
+                service.update_floor(actor, floor["id"], new_name)
+            except (DomainAuthorizationError, DuplicateResource, ResourceNotFound, ValueError, PermissionError) as exc:
+                st.session_state.fp_rename_floor_err = str(exc)
                 st.rerun()
                 return
-            old_name = floor["name"]
-            for f in st.session_state.floors:
-                if f["id"] == floor["id"]:
-                    f["name"] = new_name
-            for s in st.session_state.spaces:
-                if s.get("building") == building["name"] and s.get("floor") == old_name:
-                    s["floor"] = new_name
-                    s["location"] = f"{building['name']}, {new_name}"
             st.session_state.pop("fp_rename_floor_err", None)
             set_toast("Andar renomeado.")
             st.rerun()
@@ -332,29 +350,24 @@ def _dialog_confirm_remove_floor(floor: dict, building: dict):
         s.get("building") == building["name"] and s.get("floor") == floor["name"]
         for s in st.session_state.spaces
     )
-    plan_key = f"{building['id']}__{floor['id']}"
-    has_plan = plan_key in st.session_state.plans
+    actor = get_streamlit_actor()
+    has_plan = actor is not None and get_streamlit_runtime().floor_plan_management.get_for_floor(actor, floor["id"]) is not None
 
     if has_rooms or has_plan:
-        st.warning("Este andar possui salas ou uma planta cadastrada. Ao remover, esses dados serão perdidos.")
+        st.warning("Inative as salas antes de inativar este andar. Os registros e a planta serão preservados.")
 
     c1, c2 = st.columns(2)
     with c1:
-        if st.button("Cancelar", use_container_width=True):
+        if st.button("Cancelar", width="stretch"):
             st.rerun()
     with c2:
-        if st.button("Remover andar", type="primary", use_container_width=True):
-            b_floors = _building_floors(building["id"])
-            remaining = [f for f in b_floors if f["id"] != floor["id"]]
-            st.session_state.floors = [f for f in _all_floors() if f["id"] != floor["id"]]
-            st.session_state.spaces = [
-                s for s in st.session_state.spaces
-                if not (s.get("building") == building["name"] and s.get("floor") == floor["name"])
-            ]
-            if plan_key in st.session_state.plans:
-                del st.session_state.plans[plan_key]
-            if st.session_state.fp_sel_floor == floor["id"]:
-                st.session_state.fp_sel_floor = remaining[0]["id"] if remaining else ""
+        if st.button("Inativar andar", type="primary", width="stretch"):
+            try:
+                actor, service = _space_service()
+                service.deactivate_floor(actor, floor["id"])
+            except (DomainAuthorizationError, ResourceNotFound, ValueError, PermissionError) as exc:
+                st.error(str(exc))
+                return
             set_toast(f'Andar "{floor["name"]}" removido.')
             st.rerun()
 
@@ -374,11 +387,11 @@ def _dialog_add_room(building: dict, floor: dict):
 
     c1, c2 = st.columns(2)
     with c1:
-        if st.button("Cancelar", use_container_width=True):
+        if st.button("Cancelar", width="stretch"):
             st.session_state.pop("fp_add_room_err", None)
             st.rerun()
     with c2:
-        if st.button("Adicionar sala", type="primary", use_container_width=True):
+        if st.button("Adicionar sala", type="primary", width="stretch"):
             name = name.strip()
             if not name:
                 st.session_state.fp_add_room_err = "Nome da sala é obrigatório."
@@ -388,26 +401,74 @@ def _dialog_add_room(building: dict, floor: dict):
                 st.session_state.fp_add_room_err = "Informe o tipo da sala."
                 st.rerun()
                 return
-            existing = _rooms_for(building["name"], floor["name"])
-            if any(r["name"].lower() == name.lower() for r in existing):
-                st.session_state.fp_add_room_err = "Já existe uma sala com esse nome neste andar."
+            try:
+                actor, service = _space_service()
+                service.create_space(
+                    actor, floor["id"], name,
+                    custom_room_type.strip() if room_type == "Outro" else room_type,
+                    int(capacity),
+                )
+            except (DomainAuthorizationError, DuplicateResource, ResourceNotFound, ValueError, PermissionError) as exc:
+                st.session_state.fp_add_room_err = str(exc)
                 st.rerun()
                 return
-            st.session_state.spaces.append({
-                "id": f"s-{_uid()}",
-                "name": name,
-                "building": building["name"],
-                "floor": floor["name"],
-                "type": custom_room_type.strip() if room_type == "Outro" else room_type,
-                "capacity": int(capacity),
-                "location": f"{building['name']}, {floor['name']}",
-                "status": "disponivel",
-                "resources": [],
-                "occupancy": 0,
-            })
             st.session_state.pop("fp_add_room_err", None)
             set_toast(f'Sala "{name}" adicionada ao {floor["name"]}.')
             st.rerun()
+
+
+@st.dialog("Editar sala")
+def _dialog_edit_room(room: dict):
+    actor, service = _space_service()
+    floors = service.list_floors(actor, room["building_id"], include_inactive=True)
+    floor_ids = [item.id for item in floors]
+    floor_names = {item.id: item.name for item in floors}
+    if not floor_ids:
+        st.error("Não há andares disponíveis para esta sala.")
+        return
+    st.text_input("Nome da sala", value=room["name"], key="fp_edit_room_name")
+    available_types = list(dict.fromkeys([*ROOM_TYPES[:-1], room["type"], "Outro"]))
+    current_type = room["type"] if room["type"] in available_types else "Outro"
+    selected_type = st.selectbox(
+        "Tipo da sala", available_types, index=available_types.index(current_type), key="fp_edit_room_type"
+    )
+    custom_type = ""
+    if selected_type == "Outro":
+        custom_type = st.text_input(
+            "Tipo personalizado", value=room["type"] if current_type == "Outro" else "",
+            key="fp_edit_room_custom_type",
+        )
+    floor_index = floor_ids.index(room["floor_id"]) if room["floor_id"] in floor_ids else 0
+    st.selectbox("Andar", floor_ids, index=floor_index, format_func=floor_names.get, key="fp_edit_room_floor")
+    st.number_input("Capacidade", min_value=1, max_value=10000, value=int(room["capacity"]), key="fp_edit_room_capacity")
+    status_values = ["disponivel", "ocupado", "bloqueado"]
+    status_labels = {"disponivel": "Disponível", "ocupado": "Ocupado", "bloqueado": "Bloqueado"}
+    if room["status"] not in status_values:
+        status_values.append(room["status"])
+        status_labels[room["status"]] = room["status"].capitalize()
+    st.selectbox(
+        "Status", status_values, index=status_values.index(room["status"]),
+        format_func=status_labels.get, key="fp_edit_room_status",
+    )
+    cancel, save = st.columns(2)
+    if cancel.button("Cancelar", width="stretch"):
+        st.rerun()
+    if save.button("Salvar alterações", type="primary", width="stretch"):
+        room_type = custom_type.strip() if selected_type == "Outro" else selected_type
+        try:
+            service.update_space(
+                actor, room["id"],
+                name=st.session_state.fp_edit_room_name,
+                room_type=room_type,
+                capacity=int(st.session_state.fp_edit_room_capacity),
+                status=st.session_state.fp_edit_room_status,
+                floor_id=st.session_state.fp_edit_room_floor,
+            )
+        except (DomainAuthorizationError, DuplicateResource, ResourceNotFound, ValueError) as exc:
+            st.error(str(exc))
+            return
+        set_toast("Sala atualizada.")
+        st.rerun()
 
 
 # =========================================================
@@ -480,10 +541,10 @@ def _render_structure_config():
                         rc1, rc2, rc3 = st.columns([3, 1, 1])
                         with rc1:
                             if st.button(
-                                b["name"],
+                                f'{b["name"]}{" · Inativo" if not b["active"] else ""}',
                                 key=f"fp_sel_b_{b['id']}",
                                 type="primary" if is_sel else "tertiary",
-                                use_container_width=True,
+                                width="stretch",
                             ):
                                 if not is_sel:
                                     _select_building(b["id"])
@@ -492,8 +553,18 @@ def _render_structure_config():
                             if st.button("", key=f"fp_ren_b_{b['id']}", icon=":material/edit:", help="Renomear"):
                                 _dialog_rename_building(b)
                         with rc3:
-                            if st.button("", key=f"fp_del_b_{b['id']}", icon=":material/delete:", help="Remover"):
-                                _dialog_confirm_remove_building(b)
+                            if b["active"]:
+                                if st.button("", key=f"fp_del_b_{b['id']}", icon=":material/archive:", help="Inativar prédio"):
+                                    _dialog_confirm_remove_building(b)
+                            else:
+                                if st.button("", key=f"fp_activate_b_{b['id']}", icon=":material/restore:", help="Reativar prédio"):
+                                    try:
+                                        actor, service = _space_service()
+                                        service.activate_building(actor, b["id"])
+                                    except (DomainAuthorizationError, ResourceNotFound, ValueError, PermissionError) as exc:
+                                        st.error(str(exc))
+                                    else:
+                                        st.rerun()
 
         # -------------------------------------------------
         # ANDARES
@@ -504,7 +575,7 @@ def _render_structure_config():
                 floor_title = f"**Andares** — {current_b['name']}" if current_b else "**Andares**"
                 hf1.markdown(floor_title)
                 with hf2:
-                    if st.button("", key="fp_open_add_floor", icon=":material/add:", help="Adicionar andar", disabled=not current_b):
+                    if st.button("", key="fp_open_add_floor", icon=":material/add:", help="Adicionar andar", disabled=not current_b or not current_b["active"]):
                         if current_b:
                             _dialog_add_floor(current_b)
 
@@ -521,10 +592,10 @@ def _render_structure_config():
                             fc1, fc2, fc3 = st.columns([3, 1, 1])
                             with fc1:
                                 if st.button(
-                                    f["name"],
+                                    f'{f["name"]}{" · Inativo" if not f["active"] else ""}',
                                     key=f"fp_sel_f_{f['id']}",
                                     type="primary" if is_sel else "tertiary",
-                                    use_container_width=True,
+                                    width="stretch",
                                 ):
                                     if not is_sel:
                                         st.session_state.fp_sel_floor = f["id"]
@@ -534,8 +605,18 @@ def _render_structure_config():
                                 if st.button("", key=f"fp_ren_f_{f['id']}", icon=":material/edit:", help="Renomear"):
                                     _dialog_rename_floor(f, current_b)
                             with fc3:
-                                if st.button("", key=f"fp_del_f_{f['id']}", icon=":material/delete:", help="Remover"):
-                                    _dialog_confirm_remove_floor(f, current_b)
+                                if f["active"]:
+                                    if st.button("", key=f"fp_del_f_{f['id']}", icon=":material/archive:", help="Inativar andar"):
+                                        _dialog_confirm_remove_floor(f, current_b)
+                                else:
+                                    if st.button("", key=f"fp_activate_f_{f['id']}", icon=":material/restore:", help="Reativar andar"):
+                                        try:
+                                            actor, service = _space_service()
+                                            service.activate_floor(actor, f["id"])
+                                        except (DomainAuthorizationError, ResourceNotFound, ValueError, PermissionError) as exc:
+                                            st.error(str(exc))
+                                        else:
+                                            st.rerun()
 
 
 # =========================================================
@@ -550,7 +631,10 @@ def _render_selectors():
     col_b, col_f, _ = st.columns([2, 2, 3])
 
     building_ids = [b["id"] for b in buildings]
-    building_names = {b["id"]: b["name"] for b in buildings}
+    building_names = {
+        b["id"]: f'{b["name"]}{" · Inativo" if not b["active"] else ""}'
+        for b in buildings
+    }
 
     with col_b:
         st.selectbox(
@@ -566,7 +650,7 @@ def _render_selectors():
 
     with col_f:
         if b_floors:
-            floor_names = [f["name"] for f in b_floors]
+            floor_names = [f'{f["name"]}{" · Inativo" if not f["active"] else ""}' for f in b_floors]
             sel_f_idx = next((i for i, f in enumerate(b_floors) if f["id"] == st.session_state.fp_sel_floor), 0)
             chosen_f_name = st.selectbox(
                 "Andar",
@@ -574,7 +658,7 @@ def _render_selectors():
                 index=sel_f_idx,
                 key="fp_select_floor_widget",
             )
-            chosen_f = next((f for f in b_floors if f["name"] == chosen_f_name), None)
+            chosen_f = next((f for f in b_floors if f'{f["name"]}{" · Inativo" if not f["active"] else ""}' == chosen_f_name), None)
             if chosen_f and chosen_f["id"] != st.session_state.fp_sel_floor:
                 st.session_state.fp_sel_floor = chosen_f["id"]
                 st.session_state.fp_positioning = None
@@ -618,21 +702,36 @@ def _render_floor_plan(current_b: dict | None, current_f: dict | None, plan: dic
             uploaded = st.file_uploader(
                 "Selecionar arquivo",
                 type=["png", "jpg", "jpeg", "svg"],
-                key=f"fp_upload_{_plan_key()}",
+                key=_upload_key("upload"),
                 label_visibility="collapsed",
+                max_upload_size=10,
             )
             if uploaded:
-                import base64
-                data = base64.b64encode(uploaded.read()).decode()
-                mime = uploaded.type or "image/png"
-                src = f"data:{mime};base64,{data}"
-                st.session_state.plans[_plan_key()] = {**plan, "src": src}
-                st.rerun()
+                actor = get_streamlit_actor()
+                try:
+                    get_streamlit_runtime().floor_plan_management.upload(
+                        actor, current_f["id"], uploaded.name, uploaded.getvalue()
+                    )
+                except (DomainAuthorizationError, ResourceNotFound, ValueError, PermissionError) as exc:
+                    st.error(str(exc))
+                else:
+                    _reset_upload_keys()
+                    set_toast("Planta enviada e salva.")
+                    st.rerun()
 
             st.write("")
-            if st.button("Usar planta de exemplo", key="fp_demo_plan", use_container_width=True):
-                st.session_state.plans[_plan_key()] = {**plan, "src": "demo"}
-                st.rerun()
+            if st.button("Usar planta de exemplo", key="fp_demo_plan", width="stretch"):
+                actor = get_streamlit_actor()
+                try:
+                    get_streamlit_runtime().floor_plan_management.upload(
+                        actor, current_f["id"], "planta-exemplo.svg", _DEMO_SVG.encode("utf-8")
+                    )
+                except (DomainAuthorizationError, ResourceNotFound, ValueError, PermissionError) as exc:
+                    st.error(str(exc))
+                else:
+                    _reset_upload_keys()
+                    set_toast("Planta de exemplo salva.")
+                    st.rerun()
         return
 
     # ── Exibir planta ────────────────────────────────────
@@ -645,14 +744,52 @@ def _render_floor_plan(current_b: dict | None, current_f: dict | None, plan: dic
             st.caption(f"{b_label} · {f_label}")
         with pc2:
             if st.button("", key="fp_remove_plan", icon=":material/delete:", help="Remover planta", type="tertiary"):
-                st.session_state.plans[_plan_key()] = {"src": None, "positions": {}}
-                st.rerun()
+                actor = get_streamlit_actor()
+                try:
+                    get_streamlit_runtime().floor_plan_management.remove(actor, current_f["id"])
+                except (DomainAuthorizationError, ResourceNotFound, ValueError, PermissionError) as exc:
+                    st.error(str(exc))
+                else:
+                    _reset_upload_keys()
+                    set_toast("Planta removida.")
+                    st.rerun()
 
         # Planta SVG ou imagem
-        if plan["src"] == "demo":
-            st.html(f'<div style="border:1px solid var(--stroke); border-radius:8px; overflow:hidden;">{_DEMO_SVG}</div>')
-        else:
-            st.image(plan["src"], use_container_width=True)
+        data_uri = f"data:{plan['media_type']};base64,{base64.b64encode(plan['src']).decode('ascii')}"
+        markers = []
+        for room_id, pos in positions.items():
+            room = next((item for item in rooms if item["id"] == room_id), None)
+            if room:
+                label = html.escape(room["name"])
+                markers.append(
+                    f'<span title="{label}" style="position:absolute;left:{float(pos["x"]):.2f}%;top:{float(pos["y"]):.2f}%;transform:translate(-50%,-50%);display:flex;align-items:center;gap:4px;background:#6D28D9;color:#fff;border:2px solid #fff;border-radius:999px;padding:4px 9px;font:600 11px sans-serif;white-space:nowrap;box-shadow:0 1px 5px #0005">📍 {label}</span>'
+                )
+        st.html(
+            '<div style="position:relative;width:100%;border:1px solid var(--stroke);border-radius:8px;overflow:hidden">'
+            f'<img alt="Planta do andar" src="{data_uri}" style="display:block;width:100%;height:auto">'
+            + "".join(markers)
+            + "</div>"
+        )
+
+        with st.expander("Substituir planta"):
+            replacement = st.file_uploader(
+                "Enviar nova planta (PNG, JPG ou SVG)",
+                type=["png", "jpg", "jpeg", "svg"],
+                key=_upload_key("replace"),
+                max_upload_size=10,
+            )
+            if replacement:
+                actor = get_streamlit_actor()
+                try:
+                    get_streamlit_runtime().floor_plan_management.upload(
+                        actor, current_f["id"], replacement.name, replacement.getvalue()
+                    )
+                except (DomainAuthorizationError, ResourceNotFound, ValueError, PermissionError) as exc:
+                    st.error(str(exc))
+                else:
+                    _reset_upload_keys()
+                    set_toast("Planta substituída. As posições das salas foram mantidas.")
+                    st.rerun()
 
         # Marcadores de salas posicionadas
         if positions:
@@ -663,20 +800,21 @@ def _render_floor_plan(current_b: dict | None, current_f: dict | None, plan: dic
                 rname = room["name"] if room else room_id
                 mc1, mc2, mc3 = st.columns([3, 1, 1])
                 mc1.markdown(
-                    f'<span style="background:#EDE9FE; color:#6D28D9; padding:3px 10px; border-radius:999px; font-size:12px; font-weight:600;">📍 {rname}</span>',
+                    f'<span style="background:#EDE9FE; color:#6D28D9; padding:3px 10px; border-radius:999px; font-size:12px; font-weight:600;">📍 {html.escape(rname)}</span>',
                     unsafe_allow_html=True,
                 )
                 mc2.caption(f"x:{pos['x']:.0f}% y:{pos['y']:.0f}%")
                 with mc3:
                     if st.button("", key=f"fp_unpin_{room_id}", icon=":material/close:", help="Remover da planta"):
-                        new_pos = {k: v for k, v in positions.items() if k != room_id}
-                        st.session_state.plans[_plan_key()] = {**plan, "positions": new_pos}
-                        for s in st.session_state.spaces:
-                            if s["id"] == room_id:
-                                s.pop("position", None)
-                        if st.session_state.fp_positioning == room_id:
-                            st.session_state.fp_positioning = None
-                        st.rerun()
+                        actor = get_streamlit_actor()
+                        try:
+                            get_streamlit_runtime().floor_plan_management.remove_room_position(actor, current_f["id"], room_id)
+                        except (DomainAuthorizationError, ResourceNotFound, ValueError, PermissionError) as exc:
+                            st.error(str(exc))
+                        else:
+                            if st.session_state.fp_positioning == room_id:
+                                st.session_state.fp_positioning = None
+                            st.rerun()
 
 
 # =========================================================
@@ -709,24 +847,39 @@ def _render_rooms_panel(current_b: dict | None, current_f: dict | None, plan: di
 
         with st.container(border=True):
             with st.container(gap=None):
-                r_head1, r_head2 = st.columns([4, 1])
+                r_head1, r_edit, r_status = st.columns([4, 1, 1])
                 with r_head1:
                     st.markdown(
-                        f'<div style="font-size:14px; font-weight:600; color:var(--graphite);">{room["name"]}</div>',
+                        f'<div style="font-size:14px; font-weight:600; color:var(--graphite);">{html.escape(room["name"])}</div>',
                         unsafe_allow_html=True,
                     )
-                with r_head2:
-                    if st.button("", key=f"fp_del_room_{rid}", icon=":material/delete:", help="Remover sala"):
-                        st.session_state.spaces = [s for s in st.session_state.spaces if s["id"] != rid]
-                        if rid in positions:
-                            new_pos = {k: v for k, v in positions.items() if k != rid}
-                            st.session_state.plans[_plan_key()] = {**plan, "positions": new_pos}
-                        if st.session_state.fp_positioning == rid:
-                            st.session_state.fp_positioning = None
-                        set_toast(f'Sala "{room["name"]}" removida.')
-                        st.rerun()
+                with r_edit:
+                    if st.button("", key=f"fp_edit_room_{rid}", icon=":material/edit:", help="Editar sala"):
+                        _dialog_edit_room(room)
+                with r_status:
+                    if room["active"]:
+                        if st.button("", key=f"fp_del_room_{rid}", icon=":material/archive:", help="Inativar sala"):
+                            try:
+                                actor, service = _space_service()
+                                service.deactivate_space(actor, rid)
+                            except (DomainAuthorizationError, ResourceNotFound, ValueError, PermissionError) as exc:
+                                st.error(str(exc))
+                            else:
+                                set_toast(f'Sala "{room["name"]}" inativada.')
+                                st.rerun()
+                    else:
+                        if st.button("", key=f"fp_activate_room_{rid}", icon=":material/restore:", help="Reativar sala"):
+                            try:
+                                actor, service = _space_service()
+                                service.activate_space(actor, rid)
+                            except (DomainAuthorizationError, ResourceNotFound, ValueError, PermissionError) as exc:
+                                st.error(str(exc))
+                            else:
+                                set_toast(f'Sala "{room["name"]}" reativada.')
+                                st.rerun()
 
-                st.caption(f'{room["type"]} · {room["capacity"]} pessoas')
+                status_suffix = " · Inativa" if not room["active"] else ""
+                st.caption(f'{room["type"]} · {room["capacity"]} pessoas{status_suffix}')
 
                 if is_positioned:
                     st.markdown(
@@ -750,22 +903,24 @@ def _render_rooms_panel(current_b: dict | None, current_f: dict | None, plan: di
 
                     cb1, cb2 = st.columns(2)
                     with cb1:
-                        if st.button("Confirmar", key=f"fp_confirm_pos_{rid}", type="primary", use_container_width=True):
-                            pos_data = {"x": float(px), "y": float(py)}
-                            new_positions = {**positions, rid: pos_data}
-                            st.session_state.plans[_plan_key()] = {**plan, "positions": new_positions}
-                            for s in st.session_state.spaces:
-                                if s["id"] == rid:
-                                    s["position"] = pos_data
-                            st.session_state.fp_positioning = None
-                            st.rerun()
+                        if st.button("Confirmar", key=f"fp_confirm_pos_{rid}", type="primary", width="stretch"):
+                            actor = get_streamlit_actor()
+                            try:
+                                get_streamlit_runtime().floor_plan_management.set_room_position(
+                                    actor, current_f["id"], rid, float(px), float(py)
+                                )
+                            except (DomainAuthorizationError, ResourceNotFound, ValueError, PermissionError) as exc:
+                                st.error(str(exc))
+                            else:
+                                st.session_state.fp_positioning = None
+                                st.rerun()
                     with cb2:
-                        if st.button("Cancelar", key=f"fp_cancel_pos_{rid}", type="tertiary", use_container_width=True):
+                        if st.button("Cancelar", key=f"fp_cancel_pos_{rid}", type="tertiary", width="stretch"):
                             st.session_state.fp_positioning = None
                             st.rerun()
                 else:
                     btn_label = "Editar posição" if is_positioned else "Posicionar"
-                    if st.button(btn_label, key=f"fp_pos_{rid}", use_container_width=True):
+                    if st.button(btn_label, key=f"fp_pos_{rid}", width="stretch"):
                         st.session_state.fp_positioning = rid
                         st.rerun()
 
@@ -773,6 +928,62 @@ def _render_rooms_panel(current_b: dict | None, current_f: dict | None, plan: di
 # =========================================================
 # PÁGINA PRINCIPAL
 # =========================================================
+
+def _render_resources(rooms: list[dict]) -> None:
+    actor = get_streamlit_actor()
+    if actor is None:
+        return
+    runtime = get_streamlit_runtime()
+    service = runtime.resource_management
+    with st.expander("Recursos institucionais"):
+        try:
+            resources = {
+                item.id: item for item in service.list_resources(actor, include_inactive=True)
+            }
+            with st.form("fp_create_resource", clear_on_submit=True):
+                name = st.text_input("Nome do novo recurso", max_chars=100)
+                if st.form_submit_button("Cadastrar recurso"):
+                    service.create_resource(actor, name)
+                    st.rerun()
+
+            if not resources:
+                st.info("Nenhum recurso cadastrado.")
+                return
+
+            def resource_label(resource_id: str) -> str:
+                resource = resources[resource_id]
+                return resource.name if resource.active else f"{resource.name} (inativo)"
+
+            selected = st.selectbox("Recurso", list(resources), format_func=resource_label)
+            resource = resources[selected]
+            with st.form(f"fp_edit_resource_{resource.id}"):
+                new_name = st.text_input("Nome do recurso", value=resource.name, max_chars=100)
+                if st.form_submit_button("Salvar nome"):
+                    service.update_resource(actor, resource.id, new_name)
+                    st.rerun()
+            if st.button("Inativar recurso" if resource.active else "Reativar recurso", key="fp_toggle_resource"):
+                service.set_resource_active(actor, resource.id, not resource.active)
+                st.rerun()
+
+            if rooms:
+                room_names = {room["id"]: room["name"] for room in rooms if room["active"]}
+                if room_names:
+                    room_id = st.selectbox("Sala para associar recursos", list(room_names), format_func=room_names.__getitem__)
+                    room = runtime.space_management.get_space(actor, room_id)
+                    available = [
+                        item.id for item in resources.values() if item.active or item.id in room.resource_ids
+                    ]
+                    with st.form(f"fp_assign_resources_{room.id}"):
+                        assigned = st.multiselect(
+                            "Recursos da sala", available, default=list(room.resource_ids),
+                            format_func=resource_label,
+                        )
+                        if st.form_submit_button("Salvar recursos da sala"):
+                            service.set_space_resources(actor, room.id, assigned)
+                            st.rerun()
+        except (DomainAuthorizationError, DuplicateResource, ResourceNotFound, ValueError) as exc:
+            st.error(str(exc))
+
 
 def floor_plan(user):
     _boot()
@@ -808,6 +1019,9 @@ def floor_plan(user):
     current_b = _current_building()
     current_f = _current_floor()
 
+    rooms = _rooms_for(current_f["id"]) if current_f else []
+    _render_resources(rooms)
+
     if not current_b:
         st.info("Adicione pelo menos um bloco para começar.")
         return
@@ -817,7 +1031,6 @@ def floor_plan(user):
         return
 
     plan = _current_plan()
-    rooms = _rooms_for(current_b["name"], current_f["name"])
 
     st.divider()
 
@@ -835,10 +1048,10 @@ def floor_plan(user):
     # ── Ações finais ───────────────────────────────────
     ac1, _, ac2 = st.columns([1, 4, 1])
     with ac1:
-        if st.button("Cancelar", key="fp_cancel", use_container_width=True):
+        if st.button("Cancelar", key="fp_cancel", width="stretch"):
             set_toast("Alterações descartadas.")
             st.rerun()
     with ac2:
-        if st.button("Salvar planta", key="fp_save", type="primary", use_container_width=True):
-            set_toast("Planta salva com sucesso.")
+        if st.button("Salvar planta", key="fp_save", type="primary", width="stretch"):
+            set_toast("Planta e posições já estão salvas.")
             st.rerun()
