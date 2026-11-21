@@ -36,6 +36,30 @@ class StructureManagementApiTests(unittest.TestCase):
         floor_id = floor.json()["data"]["id"]
         return building_id, floor_id
 
+    def test_manager_combines_filters_and_edits_a_room_with_its_resources(self):
+        building_id, floor_id = self._create_structure()
+        room = self.client.post("/structure/spaces", headers=self.admin, json={
+            "floor_id": floor_id, "name": "Sala Filtro", "type": "Seminário", "capacity": 29,
+        }).json()["data"]["id"]
+        resource = self.client.post("/structure/resources", headers=self.manager, json={
+            "name": "Câmera de teste",
+        }).json()["data"]["id"]
+        changed = self.client.put(f"/structure/spaces/{room}/configuration", headers=self.manager, json={
+            "name": "Sala Editada", "type": "Estúdio", "capacity": 31, "resource_ids": [resource],
+        })
+        self.assertEqual(changed.status_code, 200, changed.text)
+        filters = {
+            "q": "editada", "building_id": building_id, "floor_id": floor_id, "room_type": "Estúdio",
+            "min_capacity": 31, "max_capacity": 31, "resource_id": resource, "status": "disponivel",
+        }
+        result = self.client.get("/structure/spaces", headers=self.manager, params=filters)
+        self.assertEqual([item["id"] for item in result.json()["data"]], [room])
+        self.assertFalse(result.json()["data"][0]["occupancy_verified"])
+        filters["max_capacity"] = 30
+        self.assertEqual(self.client.get("/structure/spaces", headers=self.manager, params=filters).status_code, 422)
+        for path in ("/structure/buildings", f"/structure/buildings/{building_id}/floors", "/admin/users", "/institutions/me"):
+            self.assertEqual(self.client.get(path, headers=self.manager).status_code, 403, path)
+
     def test_building_floor_room_crud_and_relationship_updates(self):
         building_id, floor_id = self._create_structure()
         room = self.client.post(

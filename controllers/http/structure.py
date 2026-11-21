@@ -86,6 +86,8 @@ class SpaceResponse(BaseModel):
     resource_ids: list[str]
     resource_quantities: dict[str, int]
     occupancy: int
+    block_reason: str | None = None
+    occupancy_verified: bool = False
 
 
 class ResourceRequest(BaseModel):
@@ -110,6 +112,12 @@ class ResourceAssignmentRequest(BaseModel):
 
 class SpaceConfigurationRequest(ResourceAssignmentRequest):
     capacity: int = Field(ge=1, le=10000, strict=True)
+    name: str | None = Field(default=None, min_length=1, max_length=120)
+    type: str | None = Field(default=None, min_length=1, max_length=60)
+
+
+class SpaceBlockRequest(BaseModel):
+    reason: str = Field(min_length=1, max_length=500)
 
 
 class RoomPositionRequest(BaseModel):
@@ -248,10 +256,16 @@ def list_institution_spaces(
     floor_id: str | None = None,
     resource_id: str | None = None,
     include_inactive: bool = False,
+    room_type: str | None = Query(default=None, max_length=80),
+    min_capacity: int | None = Query(default=None, ge=1, le=10000),
+    max_capacity: int | None = Query(default=None, ge=1, le=10000),
     actor: User = Depends(get_current_user),
     service: SpaceService = Depends(get_space_management_service),
 ):
-    items = _run(lambda: service.list_spaces(actor, q, status, building_id, floor_id, resource_id, include_inactive))
+    items = _run(lambda: service.list_spaces(
+        actor, q, status, building_id, floor_id, resource_id, include_inactive,
+        room_type=room_type, min_capacity=min_capacity, max_capacity=max_capacity,
+    ))
     return ListResponse(data=[_space(item) for item in items])
 
 
@@ -297,6 +311,25 @@ def set_space_status(
 ):
     result = _run(lambda: service.activate_space(actor, space_id) if payload.active else service.deactivate_space(actor, space_id))
     return ItemResponse(data=_space(result))
+
+
+@router.post("/spaces/{space_id}/block", response_model=ItemResponse[SpaceResponse])
+def block_space(
+    space_id: str,
+    payload: SpaceBlockRequest,
+    actor: User = Depends(get_current_user),
+    service: SpaceService = Depends(get_space_management_service),
+):
+    return ItemResponse(data=_space(_run(lambda: service.block_space(actor, space_id, payload.reason))))
+
+
+@router.delete("/spaces/{space_id}/block", response_model=ItemResponse[SpaceResponse])
+def unblock_space(
+    space_id: str,
+    actor: User = Depends(get_current_user),
+    service: SpaceService = Depends(get_space_management_service),
+):
+    return ItemResponse(data=_space(_run(lambda: service.unblock_space(actor, space_id))))
 
 
 @router.get("/resources", response_model=ListResponse[ResourceResponse])
@@ -375,7 +408,7 @@ def update_space_configuration(
 ):
     def update_configuration():
         with audit.atomic():
-            spaces.update_space(actor, space_id, capacity=payload.capacity)
+            spaces.update_space(actor, space_id, name=payload.name, room_type=payload.type, capacity=payload.capacity)
             return resources.set_space_resources(actor, space_id, payload.resource_ids, payload.quantities)
 
     return ItemResponse(data=_space(_run(update_configuration)))
@@ -486,6 +519,7 @@ def _space(item: Space) -> SpaceResponse:
         status=item.status, active=item.active,
         resources=list(item.resources), resource_ids=list(item.resource_ids),
         resource_quantities=dict(item.resource_quantities), occupancy=item.occupancy,
+        block_reason=item.block_reason, occupancy_verified=item.occupancy_verified,
     )
 
 

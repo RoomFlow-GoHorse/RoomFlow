@@ -27,6 +27,8 @@ class AdminAuditAction(str, Enum):
     FLOOR_DEACTIVATED = "floor.deactivated"
     SPACE_CREATED = "space.created"
     SPACE_UPDATED = "space.updated"
+    SPACE_BLOCKED = "space.blocked"
+    SPACE_UNBLOCKED = "space.unblocked"
     SPACE_ACTIVATED = "space.activated"
     SPACE_DEACTIVATED = "space.deactivated"
     SPACE_RESOURCES_UPDATED = "space.resources_updated"

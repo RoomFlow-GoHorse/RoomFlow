@@ -34,6 +34,8 @@ ACTION_LABELS = {
     Action.FLOOR_DEACTIVATED: "Andar inativado",
     Action.SPACE_CREATED: "Sala cadastrada",
     Action.SPACE_UPDATED: "Sala editada",
+    Action.SPACE_BLOCKED: "Sala bloqueada",
+    Action.SPACE_UNBLOCKED: "Sala desbloqueada",
     Action.SPACE_ACTIVATED: "Sala ativada",
     Action.SPACE_DEACTIVATED: "Sala inativada",
     Action.SPACE_RESOURCES_UPDATED: "Recursos da sala alterados",

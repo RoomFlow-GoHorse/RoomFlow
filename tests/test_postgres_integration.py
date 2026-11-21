@@ -27,6 +27,7 @@ from streamlit.testing.v1 import AppTest
 from api.app import create_app
 from infrastructure.email.in_memory_email_sender import InMemoryEmailSender
 from infrastructure.persistence.records import institution_invites, pending_signups, sessions
+from infrastructure.persistence.structure_records import bloqueios_espaco
 from models.database_models import Espaco, Reserva, UsuarioInstituicao
 
 
@@ -79,6 +80,90 @@ class PostgresIntegrationTests(unittest.TestCase):
     def headers(login):
         assert login.status_code == 200, login.text
         return {"Authorization": "Bearer " + login.json()["data"]["access_token"]}
+
+    def _structure_room(self, headers, name):
+        building = self.client.post("/structure/buildings", headers=headers, json={"name": "Bloco A"})
+        self.assertEqual(building.status_code, 201, building.text)
+        building_id = building.json()["data"]["id"]
+        floor = self.client.post(f"/structure/buildings/{building_id}/floors", headers=headers,
+                                 json={"name": "Térreo"})
+        self.assertEqual(floor.status_code, 201, floor.text)
+        room = self.client.post("/structure/spaces", headers=headers, json={
+            "floor_id": floor.json()["data"]["id"], "name": name, "type": "Sala", "capacity": 20,
+        })
+        self.assertEqual(room.status_code, 201, room.text)
+        return room.json()["data"]
+
+    def _manager_login(self, admin):
+        email = f"{secrets.token_hex(5)}@example.test"
+        created = self.client.post("/admin/users", headers=admin, json={
+            "name": "Gerente Teste", "email": email, "password": PASSWORD, "profile": "gerente",
+        })
+        self.assertEqual(created.status_code, 201, created.text)
+        return self.login(email)
+
+    def test_manager_persists_room_changes_blocks_and_reports_real_availability(self):
+        own, registration = self.register()
+        foreign, _ = self.register()
+        admin = self.headers(self.login(own["responsible_email"]))
+        outside = self.headers(self.login(foreign["responsible_email"]))
+        login = self._manager_login(admin)
+        manager = self.headers(login)
+        room = self._structure_room(admin, "Sala Gerente")
+        foreign_room = self._structure_room(outside, "Sala Externa")
+        path = f"/structure/spaces/{room['id']}"
+        resource = self.client.post("/structure/resources", headers=manager, json={"name": "Projetor"})
+        foreign_resource = self.client.post("/structure/resources", headers=outside, json={"name": "Projetor"})
+        self.assertEqual((resource.status_code, foreign_resource.status_code), (201, 201))
+        resource_id = resource.json()["data"]["id"]
+        foreign_resource_id = foreign_resource.json()["data"]["id"]
+        self.assertEqual(self.client.get(f"/structure/spaces/{foreign_room['id']}", headers=manager).status_code, 404)
+        self.assertEqual(self.client.post(f"/structure/spaces/{foreign_room['id']}/block", headers=manager,
+                                         json={"reason": "Manutenção"}).status_code, 404)
+        rejected = self.client.put(path + "/configuration", headers=manager, json={
+            "name": "Não deve gravar", "type": "Estúdio", "capacity": 30, "resource_ids": [foreign_resource_id],
+        })
+        self.assertEqual(rejected.status_code, 404, rejected.text)
+        original = self.client.get(path, headers=manager).json()["data"]
+        self.assertEqual((original["name"], original["type"], original["capacity"]), ("Sala Gerente", "Sala", 20))
+        change = {"name": "Estúdio 01", "type": "Estúdio", "capacity": 24, "resource_ids": [resource_id]}
+        changed = self.client.put(path + "/configuration", headers=manager, json=change)
+        self.assertEqual(changed.status_code, 200, changed.text)
+
+        now = datetime.now(timezone.utc)
+        with self.factory.begin() as session:
+            session.add(Reserva(
+                instituicao_id=int(room["institution_id"]), espaco_id=int(room["id"]),
+                solicitante_id=int(registration["administrator"]["id"]), titulo="Reserva vigente",
+                tipo="Aula", inicio=now - timedelta(minutes=5), fim=now + timedelta(hours=1),
+                quantidade_participantes=12, status="aprovada",
+            ))
+        result = self.client.get("/structure/spaces", headers=manager, params={
+            "q": "01", "building_id": room["building_id"], "floor_id": room["floor_id"], "room_type": "Estúdio",
+            "min_capacity": 24, "max_capacity": 24, "resource_id": resource_id, "status": "ocupado",
+        }).json()["data"]
+        self.assertEqual([(row["id"], row["occupancy"], row["occupancy_verified"]) for row in result],
+                         [(room["id"], 12, True)])
+        blocked = self.client.post(path + "/block", headers=manager, json={"reason": "  Manutenção elétrica  "})
+        self.assertEqual(blocked.status_code, 200, blocked.text)
+        self.assertEqual(blocked.json()["data"]["status"], "bloqueado")
+        with TestClient(create_app(postgres_session_factory=self.factory)) as restarted:
+            saved = restarted.get(path, headers=manager).json()["data"]
+            self.assertEqual((saved["name"], saved["capacity"], saved["resource_ids"]),
+                             ("Estúdio 01", 24, [resource_id]))
+            self.assertEqual(saved["block_reason"], "Manutenção elétrica")
+            self.assertEqual(restarted.patch(path, headers=manager, json={"status": "disponivel"}).status_code, 422)
+            unblocked = restarted.delete(path + "/block", headers=manager).json()["data"]
+            self.assertEqual((unblocked["status"], unblocked["block_reason"]), ("ocupado", None))
+            changed = restarted.put(path + "/configuration", headers=manager, json={**change, "resource_ids": []})
+            self.assertEqual(changed.json()["data"]["resource_ids"], [])
+        with self.factory() as session:
+            entry = session.execute(select(bloqueios_espaco).where(
+                bloqueios_espaco.c.espaco_id == int(room["id"]),
+            )).one()
+            self.assertEqual(entry.motivo, "Manutenção elétrica")
+            self.assertEqual(entry.responsavel_id, int(login.json()["data"]["user"]["id"]))
+            self.assertIsNotNone(entry.desbloqueado_em)
 
     def test_registration_session_settings_and_audit_survive_runtime_restart(self):
         payload, registration = self.register()
@@ -361,6 +446,48 @@ class PostgresIntegrationTests(unittest.TestCase):
         finally:
             process.terminate()
             process.wait(timeout=10)
+
+    def test_manager_streamlit_filters_edits_and_blocks_via_http(self):
+        payload, _ = self.register()
+        admin = self.headers(self.login(payload["responsible_email"]))
+        login = self._manager_login(admin)
+        manager = self.headers(login)
+        room = self._structure_room(admin, "Sala Streamlit")
+        resource = self.client.post("/structure/resources", headers=manager, json={"name": "Webcam"})
+        self.assertEqual(resource.status_code, 201, resource.text)
+        resource_id = resource.json()["data"]["id"]
+        path = f"/structure/spaces/{room['id']}"
+        with self.api_process() as url, patch.dict(os.environ, {"ROOMFLOW_API_URL": url}):
+            app = AppTest.from_file(str(PROJECT / "main.py"), default_timeout=20)
+            app.query_params["page"] = "espacos"
+            app.session_state["auth_token"] = login.json()["data"]["access_token"]
+            app.run()
+            self.assertFalse(app.exception)
+            self.assertIn("Sala Streamlit", app.dataframe[0].value["Espaço"].tolist())
+            self.assertNotIn("spaces", app.session_state.filtered_state)
+            self.assertNotIn("resources", app.session_state.filtered_state)
+            app.selectbox(key="space_building_filter").select(room["building_id"]).run()
+            app.selectbox(key=f"space_floor_filter_{room['building_id']}").select(room["floor_id"]).run()
+            app.number_input(key="space_min_capacity").set_value(21).run()
+            self.assertFalse(app.dataframe)
+            app.number_input(key="space_min_capacity").set_value(20).run()
+            app.button(key="btn_action_edit_space").click().run()
+            app.text_input(key="space_edit_name").set_value("Sala Atualizada")
+            app.number_input(key="space_edit_capacity").set_value(25)
+            app.multiselect(key="space_edit_resources").set_value([resource_id])
+            next(button for button in app.button if button.label == "Salvar alterações").click().run()
+            self.assertFalse(app.exception)
+            current = self.client.get(path, headers=manager).json()["data"]
+            self.assertEqual((current["name"], current["capacity"], current["resource_ids"]),
+                             ("Sala Atualizada", 25, [resource_id]))
+            app.button(key="btn_action_block_space").click().run()
+            next(iter(app.text_area)).set_value("Troca de equipamentos")
+            next(button for button in app.button if button.label == "Bloquear sala").click().run()
+            self.assertFalse(app.exception)
+            self.assertIn("Troca de equipamentos", app.text[0].value)
+            app.button(key="btn_action_unblock_space").click().run()
+            self.assertFalse(app.exception)
+            self.assertEqual(self.client.get(path, headers=manager).json()["data"]["status"], "disponivel")
 
     def test_streamlit_uses_separate_api_process(self):
         payload, _ = self.register()

@@ -6,7 +6,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import IntegrityError
 
 from infrastructure.persistence.structure_records import (
-    andares, ativacao_recurso, estrutura_espaco, plantas_andar, posicoes_planta, predios,
+    andares, ativacao_recurso, bloqueios_espaco, estrutura_espaco, plantas_andar, posicoes_planta, predios,
 )
 from infrastructure.persistence.transaction import PostgresTransaction
 from infrastructure.persistence.user_mapping import to_database_identity_id
@@ -99,16 +99,23 @@ class PostgresStructureRepository:
     @staticmethod
     def _space_select():
         occupancy = select(Reserva.quantidade_participantes).where(
-            Reserva.espaco_id == Espaco.id, Reserva.status == "aprovada",
+            Reserva.espaco_id == Espaco.id, Reserva.instituicao_id == Espaco.instituicao_id,
+            Reserva.status == "aprovada",
             Reserva.inicio <= func.now(), Reserva.fim > func.now(),
         ).correlate(Espaco).scalar_subquery()
         return (
             select(Espaco, estrutura_espaco.c.ativo, andares.c.id.label("floor_id"),
                    andares.c.nome.label("floor_name"), predios.c.id.label("building_id"),
-                   predios.c.nome.label("building_name"), func.coalesce(occupancy, 0).label("occupancy"))
+                   predios.c.nome.label("building_name"), func.coalesce(occupancy, 0).label("occupancy"),
+                   bloqueios_espaco.c.motivo)
             .outerjoin(estrutura_espaco, estrutura_espaco.c.espaco_id == Espaco.id)
             .outerjoin(andares, andares.c.id == estrutura_espaco.c.andar_id)
             .outerjoin(predios, predios.c.id == andares.c.predio_id)
+            .outerjoin(bloqueios_espaco, (
+                (bloqueios_espaco.c.espaco_id == Espaco.id)
+                & (bloqueios_espaco.c.instituicao_id == Espaco.instituicao_id)
+                & bloqueios_espaco.c.desbloqueado_em.is_(None)
+            ))
         )
 
     def list_all(self):
@@ -118,12 +125,19 @@ class PostgresStructureRepository:
     def list_spaces(
         self, institution_id, search="", status=None, building_id=None, floor_id=None,
         resource_id=None, include_inactive=False,
+        *, room_type=None, min_capacity=None, max_capacity=None,
     ):
         statement = self._space_select().where(Espaco.instituicao_id == to_database_identity_id(institution_id))
         if building_id:
             statement = statement.where(predios.c.id == building_id)
         if floor_id:
             statement = statement.where(andares.c.id == floor_id)
+        if room_type:
+            statement = statement.where(Espaco.tipo == room_type)
+        if min_capacity is not None:
+            statement = statement.where(Espaco.capacidade >= min_capacity)
+        if max_capacity is not None:
+            statement = statement.where(Espaco.capacidade <= max_capacity)
         with self._transaction.session() as session:
             rows = self._spaces(session, statement.order_by(Espaco.nome))
         query = search.strip().casefold()
@@ -176,6 +190,7 @@ class PostgresStructureRepository:
                 resources=tuple(name for _, name, _ in assigned),
                 resource_ids=tuple(key for key, _, _ in assigned),
                 resource_quantities=tuple((key, quantity) for key, _, quantity in assigned),
+                block_reason=row.motivo, occupancy_verified=True,
             ))
         return tuple(spaces)
 
@@ -184,6 +199,16 @@ class PostgresStructureRepository:
 
     def save_space(self, space):
         self._write_space(space, new=False)
+
+    def block_space(self, space, actor_id):
+        with self._transaction.atomic(), self._transaction.session() as session:
+            self.save_space(space)
+            session.execute(bloqueios_espaco.insert().values(
+                instituicao_id=to_database_identity_id(space.institution_id),
+                espaco_id=to_database_identity_id(space.id, bits=64),
+                responsavel_id=to_database_identity_id(actor_id),
+                motivo=space.block_reason,
+            ))
 
     def _write_space(self, space, *, new):
         institution_id = to_database_identity_id(space.institution_id)
@@ -198,11 +223,18 @@ class PostgresStructureRepository:
                 self._unique_name(session, Espaco, Espaco.instituicao_id == institution_id, room_id,
                                   space.name, "Já existe uma sala com esse nome na instituição.")
                 existing = None if new else self.find_space(space.id)
+                was_blocked = not new and row.status == "bloqueado"
                 row.nome, row.tipo, row.capacidade, row.localizacao = space.name, space.type, space.capacity, space.location
                 if space.status != "inativo" or new:
                     row.status = "bloqueado" if space.status == "bloqueado" else "disponivel"
                 session.add(row)
                 session.flush()
+                if was_blocked and row.status != "bloqueado":
+                    session.execute(update(bloqueios_espaco).where(
+                        bloqueios_espaco.c.espaco_id == row.id,
+                        bloqueios_espaco.c.instituicao_id == institution_id,
+                        bloqueios_espaco.c.desbloqueado_em.is_(None),
+                    ).values(desbloqueado_em=func.now()))
                 values = dict(instituicao_id=institution_id, andar_id=space.floor_id or None, ativo=space.active)
                 session.execute(insert(estrutura_espaco).values(espaco_id=row.id, **values)
                                 .on_conflict_do_update(index_elements=[estrutura_espaco.c.espaco_id], set_=values))

@@ -73,14 +73,23 @@ class ApiSpaceManagement:
                                         payload={"active": active}))
 
     def list_spaces(self, actor, search="", status=None, building_id=None, floor_id=None,
-                    resource_id=None, include_inactive=False):
+                    resource_id=None, include_inactive=False, *, room_type=None,
+                    min_capacity=None, max_capacity=None):
         filters = dict(q=search, status=status, building_id=building_id, floor_id=floor_id,
-                       resource_id=resource_id, include_inactive=include_inactive)
+                       resource_id=resource_id, include_inactive=include_inactive, room_type=room_type,
+                       min_capacity=min_capacity, max_capacity=max_capacity)
         params = {key: value for key, value in filters.items() if value is not None}
         return [_space(item) for item in self._api.request("GET", "/structure/spaces", params=params)]
 
     def get_space(self, actor, space_id):
         return _space(self._api.request("GET", f"/structure/spaces/{_id(space_id)}"))
+
+    def block_space(self, actor, space_id, reason):
+        return _space(self._api.request("POST", f"/structure/spaces/{_id(space_id)}/block",
+                                       payload={"reason": reason}))
+
+    def unblock_space(self, actor, space_id):
+        return _space(self._api.request("DELETE", f"/structure/spaces/{_id(space_id)}/block"))
 
     def create_space(self, actor, floor_id, name, room_type, capacity, status="disponivel"):
         return _space(self._api.request("POST", "/structure/spaces", payload={
@@ -130,9 +139,10 @@ class ApiResourceManagement:
         return _space(self._api.request("PUT", f"/structure/spaces/{_id(space_id)}/resources",
                                        payload={"resource_ids": resource_ids, "quantities": quantities or {}}))
 
-    def update_space_configuration(self, space_id, capacity, resource_ids):
+    def update_space_configuration(self, space_id, capacity, resource_ids, *, name=None, room_type=None):
         return _space(self._api.request("PUT", f"/structure/spaces/{_id(space_id)}/configuration",
-                                       payload={"capacity": capacity, "resource_ids": resource_ids}))
+                                       payload={"capacity": capacity, "resource_ids": resource_ids,
+                                                "name": name, "type": room_type}))
 
 
 @dataclass(frozen=True, slots=True)

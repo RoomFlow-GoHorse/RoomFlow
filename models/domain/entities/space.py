@@ -23,6 +23,8 @@ class Space:
     active: bool = True
     resource_ids: tuple[str, ...] = ()
     resource_quantities: tuple[tuple[str, int], ...] = ()
+    block_reason: str | None = None
+    occupancy_verified: bool = False
 
     def __post_init__(self) -> None:
         if not self.id.strip() or not self.institution_id.strip():

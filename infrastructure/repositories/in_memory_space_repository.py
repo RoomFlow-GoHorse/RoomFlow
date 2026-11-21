@@ -162,6 +162,10 @@ class InMemorySpaceRepository:
         floor_id: str | None = None,
         resource_id: str | None = None,
         include_inactive: bool = False,
+        *,
+        room_type: str | None = None,
+        min_capacity: int | None = None,
+        max_capacity: int | None = None,
     ) -> tuple[Space, ...]:
         query = search.strip().casefold()
         with self._lock:
@@ -178,6 +182,12 @@ class InMemorySpaceRepository:
                 if floor_id and item.floor_id != floor_id:
                     continue
                 if resource_id and resource_id not in item.resource_ids:
+                    continue
+                if room_type and item.type != room_type:
+                    continue
+                if min_capacity is not None and item.capacity < min_capacity:
+                    continue
+                if max_capacity is not None and item.capacity > max_capacity:
                     continue
                 if query and query not in " ".join((item.name, item.type, item.building, item.floor, item.location)).casefold():
                     continue
@@ -215,7 +225,10 @@ class InMemorySpaceRepository:
             current = self._spaces[space.id]
             if current.floor_id != space.floor_id or (current.active and not space.active):
                 self._remove_room_positions(current.floor_id, space.id)
-            self._spaces[space.id] = space
+            self._spaces[space.id] = replace(space, block_reason=None) if space.active and space.status != "bloqueado" else space
+
+    def block_space(self, space: Space, actor_id: str) -> None:
+        self.save_space(space)
 
     def list_resources(
         self, institution_id: str, search: str = "", include_inactive: bool = False

@@ -1,6 +1,6 @@
 from sqlalchemy import (
     BigInteger, Boolean, CheckConstraint, Column, DateTime, Float, ForeignKey, ForeignKeyConstraint,
-    Index, Integer, LargeBinary, String, Table, UniqueConstraint, text,
+    Index, Integer, LargeBinary, String, Table, UniqueConstraint, func, text,
 )
 
 from infrastructure.persistence.base import Base
@@ -39,6 +39,27 @@ estrutura_espaco = Table(
     ForeignKeyConstraint(["instituicao_id", "andar_id"], ["andares.instituicao_id", "andares.id"],
                          name="fk_estrutura_andar"),
     Index("ix_estrutura_espaco_andar", "andar_id"),
+)
+bloqueios_espaco = Table(
+    "bloqueios_espaco", metadata,
+    Column("id", BigInteger, primary_key=True),
+    Column("instituicao_id", Integer, nullable=False),
+    Column("espaco_id", BigInteger, nullable=False),
+    Column("responsavel_id", Integer, nullable=False),
+    Column("motivo", String(500), nullable=False),
+    Column("bloqueado_em", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    Column("desbloqueado_em", DateTime(timezone=True)),
+    ForeignKeyConstraint(
+        ["instituicao_id", "espaco_id"], ["espacos.instituicao_id", "espacos.id"], name="fk_bloqueio_espaco",
+    ),
+    ForeignKeyConstraint(
+        ["responsavel_id", "instituicao_id"],
+        ["usuario_instituicao.user_id", "usuario_instituicao.institution_id"],
+        name="fk_bloqueio_responsavel",
+    ),
+    CheckConstraint("length(btrim(motivo)) > 0", name="ck_bloqueio_motivo"),
+    CheckConstraint("desbloqueado_em >= bloqueado_em", name="ck_bloqueio_periodo"),
+    Index("uq_bloqueio_espaco_aberto", "espaco_id", unique=True, postgresql_where=text("desbloqueado_em IS NULL")),
 )
 ativacao_recurso = Table(
     "ativacao_recurso", metadata,

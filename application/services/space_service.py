@@ -10,7 +10,7 @@ from models.domain.entities.permission import Permission
 from models.domain.entities.profile import Profile
 from models.domain.entities.space import SPACE_STATUSES, Space
 from models.domain.entities.user import User
-from models.domain.exceptions import ResourceNotFound
+from models.domain.exceptions import DuplicateResource, ResourceNotFound
 from models.domain.policies.permission_policy import PermissionPolicy
 
 
@@ -36,12 +36,18 @@ class SpaceService:
         floor_id: str | None = None,
         resource_id: str | None = None,
         include_inactive: bool = False,
+        *,
+        room_type: str | None = None,
+        min_capacity: int | None = None,
+        max_capacity: int | None = None,
     ) -> list[Space]:
         if actor is None:
             return list(self._repository.list_all())
         institution_id = self._space_listing_scope(actor)
         if status is not None and status not in SPACE_STATUSES:
             raise ValueError("Status de sala inválido.")
+        if min_capacity is not None and max_capacity is not None and min_capacity > max_capacity:
+            raise ValueError("A capacidade mínima deve ser menor ou igual à máxima.")
         if building_id:
             building = self._building_for_space(actor, building_id)
         else:
@@ -58,6 +64,9 @@ class SpaceService:
             floor_id=floor_id,
             resource_id=resource_id,
             include_inactive=include_inactive,
+            room_type=room_type.strip() if room_type else None,
+            min_capacity=min_capacity,
+            max_capacity=max_capacity,
         ))
 
     def list_buildings(self, actor: User, include_inactive: bool = False) -> list[Building]:
@@ -170,6 +179,8 @@ class SpaceService:
         capacity: int,
         status: str = "disponivel",
     ) -> Space:
+        if actor.profile is Profile.MANAGER and status == "bloqueado":
+            raise ValueError("Cadastre a sala e use a operação de bloqueio para informar o motivo.")
         floor = self._floor_for_space(actor, floor_id)
         building = self._building_for_space(actor, floor.building_id)
         if not floor.active or not building.active:
@@ -194,6 +205,10 @@ class SpaceService:
         floor_id: str | None = None,
     ) -> Space:
         current = self.get_space(actor, space_id)
+        if actor.profile is Profile.MANAGER and status is not None and (
+            status == "bloqueado" or (current.status == "bloqueado" and status != "inativo")
+        ):
+            raise ValueError("Use a operação de bloqueio ou desbloqueio da sala.")
         if not current.active and status not in {None, "inativo"}:
             raise ValueError("Reative a sala antes de alterar seu status.")
         updated = replace(
@@ -218,6 +233,29 @@ class SpaceService:
             action = AdminAuditAction.SPACE_DEACTIVATED if current.active and not updated.active else AdminAuditAction.SPACE_UPDATED
             self._record(actor, action, "space", updated.id)
         return updated
+
+    @audited_mutation
+    def block_space(self, actor: User, space_id: str, reason: str) -> Space:
+        current = self.get_space(actor, space_id)
+        reason = reason.strip()
+        if not 1 <= len(reason) <= 500:
+            raise ValueError("Informe um motivo de bloqueio com até 500 caracteres.")
+        if not current.active:
+            raise ValueError("Reative a sala antes de bloqueá-la.")
+        if current.block_reason is not None:
+            raise DuplicateResource("A sala já tem um bloqueio registrado.")
+        self._repository.block_space(replace(current, status="bloqueado", block_reason=reason), actor.id)
+        self._record(actor, AdminAuditAction.SPACE_BLOCKED, "space", current.id)
+        return self.get_space(actor, space_id)
+
+    @audited_mutation
+    def unblock_space(self, actor: User, space_id: str) -> Space:
+        current = self.get_space(actor, space_id)
+        if current.status != "bloqueado":
+            raise ValueError("A sala não está bloqueada.")
+        self._repository.save_space(replace(current, status="disponivel", block_reason=None))
+        self._record(actor, AdminAuditAction.SPACE_UNBLOCKED, "space", current.id)
+        return self.get_space(actor, space_id)
 
     @audited_mutation
     def deactivate_space(self, actor: User, space_id: str) -> Space:
