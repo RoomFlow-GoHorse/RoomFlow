@@ -102,7 +102,7 @@ def _render_topbar():
             st.rerun()
 
     with col2:
-        st.html(logo(size="small", class_name="rf-choice-logo"))
+        st.html(logo(size="small", variant="dark", class_name="rf-choice-logo"))
 
 def _render_form():
     _render_topbar()
@@ -398,7 +398,7 @@ def signup_member():
     st.html(
         """
         <style>
-            [data-testid="stMainBlockContainer"] {
+            :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] {
                 max-width: 672px !important;
                 margin-left: auto !important;
                 margin-right: auto !important;
@@ -408,11 +408,7 @@ def signup_member():
                 padding-right: 24px !important;
             }
 
-            .stApp {
-                background-color: #F7F7F9 !important;
-            }
-
-            [data-testid="stMainBlockContainer"] div[data-testid="stColumn"]:first-child button {
+            :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] div[data-testid="stColumn"]:first-child button {
                 background: transparent !important;
                 border: none !important;
                 box-shadow: none !important;
@@ -422,7 +418,7 @@ def signup_member():
                 padding: 0 !important;
             }
 
-            [data-testid="stMainBlockContainer"] div[data-testid="stColumn"]:first-child button:hover {
+            :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] div[data-testid="stColumn"]:first-child button:hover {
                 color: var(--brand, #6D28D9) !important;
             }
 
@@ -434,7 +430,7 @@ def signup_member():
                 font-weight: 700;
             }
 
-            [data-testid="stMainBlockContainer"] [data-testid="stVerticalBlock"]:has(div.rf-member-form-card) {
+            :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] [data-testid="stVerticalBlock"]:has(div.rf-member-form-card) {
                 background-color: #FFFFFF !important;
                 border: 1px solid #E4E4E7 !important;
                 border-radius: 16px !important;
@@ -443,7 +439,7 @@ def signup_member():
                 margin-bottom: 24px !important;
             }
 
-            [data-testid="stMainBlockContainer"] [data-testid="stVerticalBlock"]:has(div.rf-member-form-card) [data-testid="stVerticalBlock"] {
+            :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] [data-testid="stVerticalBlock"]:has(div.rf-member-form-card) [data-testid="stVerticalBlock"] {
                 background-color: transparent !important;
                 border: none !important;
                 box-shadow: none !important;

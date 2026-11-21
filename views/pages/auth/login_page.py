@@ -47,11 +47,7 @@ def _render_styles():
     st.html(
         """
         <style>
-            .stApp {
-                background-color: #F7F7F9 !important;
-            }
-
-            [data-testid="stMainBlockContainer"] {
+            :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] {
                 width: 100% !important;
                 max-width: 480px !important;
                 min-height: 100vh !important;
@@ -63,7 +59,7 @@ def _render_styles():
                 justify-content: center !important;
             }
 
-            [data-testid="stMainBlockContainer"] > [data-testid="stVerticalBlock"] {
+            :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] > [data-testid="stVerticalBlock"] {
                 width: 100% !important;
                 min-height: calc(100vh - 72px) !important;
                 display: flex !important;
@@ -150,7 +146,7 @@ def _render_styles():
                 margin-bottom: 32px;
             }
 
-            [data-testid="stMainBlockContainer"] .st-key-login_card {
+            :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] .st-key-login_card {
                 width: 100% !important;
                 height: auto !important;
                 min-height: 0 !important;
@@ -162,7 +158,7 @@ def _render_styles():
                 box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
             }
 
-            [data-testid="stMainBlockContainer"] .st-key-login_card [data-testid="stVerticalBlock"] {
+            :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] .st-key-login_card [data-testid="stVerticalBlock"] {
                 background: transparent !important;
                 border: none !important;
                 box-shadow: none !important;
@@ -258,13 +254,13 @@ def _render_styles():
                 font-size: 12px;
             }
 
-            [data-testid="stMainBlockContainer"] .stButton > button {
+            :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] .stButton > button {
                 border-radius: 12px !important;
                 font-size: 14px !important;
                 font-weight: 600 !important;
             }
 
-            [data-testid="stMainBlockContainer"] .stButton > button[kind="primary"] {
+            :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] .stButton > button[kind="primary"] {
                 height: 48px !important;
                 border: none !important;
                 background: #6D28D9 !important;
@@ -272,12 +268,12 @@ def _render_styles():
                 box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
             }
 
-            [data-testid="stMainBlockContainer"] .stButton > button[kind="primary"]:hover {
+            :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] .stButton > button[kind="primary"]:hover {
                 background: #5B21B6 !important;
                 color: #FFFFFF !important;
             }
 
-            [data-testid="stMainBlockContainer"] .stButton > button[kind="secondary"] {
+            :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] .stButton > button[kind="secondary"] {
                 height: auto !important;
                 min-height: 72px !important;
                 padding: 12px !important;
@@ -290,13 +286,13 @@ def _render_styles():
                 white-space: normal !important;
             }
 
-            [data-testid="stMainBlockContainer"] .stButton > button[kind="secondary"]:hover {
+            :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] .stButton > button[kind="secondary"]:hover {
                 border-color: #A78BFA !important;
                 background: #F5F3FF !important;
                 color: #6D28D9 !important;
             }
 
-            [data-testid="stMainBlockContainer"] .stButton > button[kind="tertiary"] {
+            :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] .stButton > button[kind="tertiary"] {
                 min-height: auto !important;
                 height: auto !important;
                 padding: 0 !important;
@@ -307,43 +303,43 @@ def _render_styles():
                 font-weight: 600 !important;
             }
 
-            [data-testid="stMainBlockContainer"] .stButton > button[kind="tertiary"] {
+            :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] .stButton > button[kind="tertiary"] {
                 color: #737373 !important;
             }
 
-            [data-testid="stMainBlockContainer"] .stButton > button[kind="tertiary"]:hover {
+            :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] .stButton > button[kind="tertiary"]:hover {
                 color: #4C1D95 !important;
                 background: transparent !important;
             }
 
-            [data-testid="stMainBlockContainer"] .st-key-login_forgot_password {
+            :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] .st-key-login_forgot_password {
                 display: flex !important;
                 justify-content: flex-end !important;
             }
 
-            [data-testid="stMainBlockContainer"] .st-key-login_forgot_password button[kind="tertiary"] {
+            :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] .st-key-login_forgot_password button[kind="tertiary"] {
                 color: #6D28D9 !important;
                 font-size: 12px !important;
                 font-weight: 500 !important;
                 text-align: right !important;
             }
 
-            [data-testid="stMainBlockContainer"] .st-key-login_forgot_password button[kind="tertiary"]:hover {
+            :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] .st-key-login_forgot_password button[kind="tertiary"]:hover {
                 color: #4C1D95 !important;
             }
 
-            [data-testid="stMainBlockContainer"] [data-testid="stTextInput"] {
+            :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] [data-testid="stTextInput"] {
                 margin-bottom: 20px !important;
             }
 
-            [data-testid="stMainBlockContainer"] [data-testid="stTextInput"] label {
+            :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] [data-testid="stTextInput"] label {
                 color: #262626 !important;
                 font-size: 14px !important;
                 font-weight: 500 !important;
                 margin-bottom: 8px !important;
             }
 
-            [data-testid="stMainBlockContainer"] [data-testid="stTextInput"] input {
+            :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] [data-testid="stTextInput"] input {
                 height: 48px !important;
                 border: 1px solid #D4D4D8 !important;
                 border-radius: 12px !important;
@@ -353,16 +349,12 @@ def _render_styles():
                 box-shadow: none !important;
             }
 
-            [data-testid="stMainBlockContainer"] [data-testid="stTextInput"] input:focus {
+            :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] [data-testid="stTextInput"] input:focus {
                 border-color: #7C3AED !important;
                 box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.1) !important;
             }
 
-            [data-testid="stMainBlockContainer"] [data-testid="stTextInput"] input::placeholder {
-                color: #A1A1AA !important;
-            }
-
-            [data-testid="stMainBlockContainer"] [data-testid="column"] {
+            :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] [data-testid="column"] {
                 padding: 0 !important;
             }
 
@@ -371,7 +363,7 @@ def _render_styles():
                     display: none;
                 }
 
-                [data-testid="stMainBlockContainer"] {
+                :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] {
                     max-width: 480px !important;
                     margin-left: auto !important;
                     margin-right: auto !important;
@@ -381,13 +373,13 @@ def _render_styles():
             }
 
             @media (max-width: 640px) {
-                [data-testid="stMainBlockContainer"] {
+                :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] {
                     max-width: none !important;
                     padding: 40px 24px !important;
                     justify-content: flex-start !important;
                 }
 
-                [data-testid="stMainBlockContainer"] > [data-testid="stVerticalBlock"] {
+                :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] > [data-testid="stVerticalBlock"] {
                     min-height: auto !important;
                     justify-content: flex-start !important;
                 }
@@ -405,7 +397,7 @@ def _render_art_panel():
     st.html(
         f"""
         <aside class="rf-login-art">
-            <div>{logo(variant="light")}</div>
+            <div class="rf-public-art-logo">{logo(variant="dark")}</div>
             <div class="rf-login-art-copy">
                 <div class="rf-login-gold-line"></div>
                 <h2>Gestão de espaços<br><span>simples e inteligente.</span></h2>
@@ -419,8 +411,9 @@ def _render_art_panel():
 
 def _render_header():
     st.markdown(
-        """
+        f"""
         <div class="rf-login-header">
+            <div class="rf-public-mobile-logo">{logo(variant="dark")}</div>
             <p class="rf-login-eyebrow">Bem-vindo de volta</p>
             <h1>Entrar na sua conta</h1>
             <p>Acesse o RoomFlow para gerenciar seus espaços e reservas.</p>

@@ -8,11 +8,7 @@ def signup_choice():
     st.html(
         """
         <style>
-            .stApp {
-                background-color: #F7F7F9 !important;
-            }
-
-            [data-testid="stMainBlockContainer"] {
+            :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] {
                 width: 100% !important;
                 max-width: 820px !important;
                 min-height: 100vh !important;
@@ -24,7 +20,7 @@ def signup_choice():
                 justify-content: center !important;
             }
 
-            [data-testid="stMainBlockContainer"] > [data-testid="stVerticalBlock"] {
+            :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] > [data-testid="stVerticalBlock"] {
                 width: 100% !important;
                 min-height: calc(100vh - 72px) !important;
                 display: flex !important;
@@ -32,7 +28,7 @@ def signup_choice():
                 justify-content: center !important;
             }
 
-            [data-testid="stMainBlockContainer"] .st-key-signup_choice_card {
+            :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] .st-key-signup_choice_card {
                 width: 100% !important;
                 height: auto !important;
                 min-height: 0 !important;
@@ -44,7 +40,7 @@ def signup_choice():
                 box-shadow: none !important;
             }
 
-            [data-testid="stMainBlockContainer"] .st-key-signup_choice_card [data-testid="stVerticalBlock"] {
+            :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] .st-key-signup_choice_card [data-testid="stVerticalBlock"] {
                 background: transparent !important;
                 border: none !important;
                 box-shadow: none !important;
@@ -59,7 +55,7 @@ def signup_choice():
                 font-weight: 700;
             }
 
-            [data-testid="stMainBlockContainer"] .stButton > button {
+            :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] .stButton > button {
                 background: transparent !important;
                 background-color: transparent !important;
                 border: none !important;
@@ -76,7 +72,7 @@ def signup_choice():
                 transition: color 0.2s ease, opacity 0.2s ease !important;
             }
 
-            [data-testid="stMainBlockContainer"] .stButton > button:hover {
+            :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] .stButton > button:hover {
                 color: var(--brand-hover, #5B21B6) !important;
                 background: transparent !important;
                 background-color: transparent !important;
@@ -186,18 +182,18 @@ def signup_choice():
             }
 
             @media (max-width: 768px) {
-                [data-testid="stMainBlockContainer"] {
+                :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] {
                     max-width: none !important;
                     padding: 40px 18px !important;
                     justify-content: flex-start !important;
                 }
 
-                [data-testid="stMainBlockContainer"] > [data-testid="stVerticalBlock"] {
+                :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] > [data-testid="stVerticalBlock"] {
                     min-height: auto !important;
                     justify-content: flex-start !important;
                 }
 
-                [data-testid="stMainBlockContainer"] .st-key-signup_choice_card {
+                :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] .st-key-signup_choice_card {
                     padding: 0 !important;
                 }
 
@@ -221,7 +217,7 @@ def signup_choice():
                 go("landing")
 
         with col_tb2:
-            st.html(logo(size="small", class_name="rf-choice-logo"))
+            st.html(logo(size="small", variant="dark", class_name="rf-choice-logo"))
 
         st.markdown(
             '<div class="rf-choice-header"><p class="rf-choice-eyebrow">Bem-vindo ao RoomFlow</p><h1 class="rf-choice-title">Criar sua conta</h1><p class="rf-choice-subtitle">Escolha como você deseja utilizar o RoomFlow.</p></div>',

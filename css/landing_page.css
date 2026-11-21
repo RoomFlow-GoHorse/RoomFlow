@@ -5,22 +5,6 @@
 .rf-landing {
     width: 100%;
     overflow-x: hidden;
-    --brand: #6D28D9;
-    --brand-hover: #5B21B6;
-    --brand-light: #EDE9FE;
-    --brand-lighter: #F5F3FF;
-    --surface: #FFFFFF;
-    --surface-card: #FFFFFF;
-    --surface-alt: #F4F4F5;
-    --graphite: #18181B;
-    --graphite-soft: #52525B;
-    --graphite-muted: #71717A;
-    --soft: #52525B;
-    --muted: #71717A;
-    --text-muted: #71717A;
-    --stroke: #E4E4E7;
-    --stroke-strong: #D4D4D8;
-    --success-bg: #DCFCE7;
     background: var(--surface);
 }
 

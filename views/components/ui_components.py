@@ -50,9 +50,9 @@ def is_dark_theme() -> bool:
 # ============================================================
 
 @lru_cache
-def _read_css_content(path):
+def _read_css_content(path, style_attributes=""):
     content = Path(path).read_text(encoding="utf-8")
-    return f"<style>\n{content}\n</style>"
+    return f"<style{style_attributes}>\n{content}\n</style>"
 
 
 def load_css_file(path):
@@ -94,9 +94,12 @@ def load_css():
         )
 
 
-def load_auth_css():
-    """Loads styles that are exclusive to the public authentication flow."""
-    load_css_file("css/signup_pages.css")
+def load_public_css(page):
+    """Attach the light palette to the current public render only."""
+    page = html.escape(page, quote=True)
+    st.html(_read_css_content("css/public_theme.css", f' id="rf-public-theme" data-page="{page}"'))
+    if page != "landing":
+        load_css_file("css/signup_pages.css")
 
 
 # ============================================================

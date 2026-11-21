@@ -23,11 +23,7 @@ def _render_styles():
     st.html(
         """
         <style>
-            .stApp {
-                background-color: #F7F7F9 !important;
-            }
-
-            [data-testid="stMainBlockContainer"] {
+            :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] {
                 width: 100% !important;
                 max-width: 480px !important;
                 min-height: 100vh !important;
@@ -39,7 +35,7 @@ def _render_styles():
                 justify-content: center !important;
             }
 
-            [data-testid="stMainBlockContainer"] > [data-testid="stVerticalBlock"] {
+            :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] > [data-testid="stVerticalBlock"] {
                 width: 100% !important;
                 min-height: calc(100vh - 72px) !important;
                 display: flex !important;
@@ -117,7 +113,7 @@ def _render_styles():
                 line-height: 1.7;
             }
 
-            [data-testid="stMainBlockContainer"] .st-key-forgot_password_card {
+            :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] .st-key-forgot_password_card {
                 width: 100% !important;
                 height: auto !important;
                 min-height: 0 !important;
@@ -129,7 +125,7 @@ def _render_styles():
                 box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
             }
 
-            [data-testid="stMainBlockContainer"] .st-key-forgot_password_card [data-testid="stVerticalBlock"] {
+            :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] .st-key-forgot_password_card [data-testid="stVerticalBlock"] {
                 background: transparent !important;
                 border: none !important;
                 box-shadow: none !important;
@@ -197,13 +193,13 @@ def _render_styles():
                 color: #4C1D95;
             }
 
-            [data-testid="stMainBlockContainer"] .stButton > button {
+            :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] .stButton > button {
                 border-radius: 12px !important;
                 font-size: 14px !important;
                 font-weight: 600 !important;
             }
 
-            [data-testid="stMainBlockContainer"] .stButton > button[kind="primary"] {
+            :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] .stButton > button[kind="primary"] {
                 height: 48px !important;
                 border: none !important;
                 background: #6D28D9 !important;
@@ -211,12 +207,12 @@ def _render_styles():
                 box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
             }
 
-            [data-testid="stMainBlockContainer"] .stButton > button[kind="primary"]:hover {
+            :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] .stButton > button[kind="primary"]:hover {
                 background: #5B21B6 !important;
                 color: #FFFFFF !important;
             }
 
-            [data-testid="stMainBlockContainer"] .stButton > button[kind="tertiary"] {
+            :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] .stButton > button[kind="tertiary"] {
                 min-height: auto !important;
                 height: auto !important;
                 padding: 0 !important;
@@ -228,23 +224,23 @@ def _render_styles():
                 font-weight: 600 !important;
             }
 
-            [data-testid="stMainBlockContainer"] .stButton > button[kind="tertiary"]:hover {
+            :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] .stButton > button[kind="tertiary"]:hover {
                 color: #4C1D95 !important;
                 background: transparent !important;
             }
 
-            [data-testid="stMainBlockContainer"] [data-testid="stTextInput"] {
+            :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] [data-testid="stTextInput"] {
                 margin-bottom: 20px !important;
             }
 
-            [data-testid="stMainBlockContainer"] [data-testid="stTextInput"] label {
+            :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] [data-testid="stTextInput"] label {
                 color: #262626 !important;
                 font-size: 14px !important;
                 font-weight: 500 !important;
                 margin-bottom: 8px !important;
             }
 
-            [data-testid="stMainBlockContainer"] [data-testid="stTextInput"] input {
+            :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] [data-testid="stTextInput"] input {
                 height: 48px !important;
                 border: 1px solid #D4D4D8 !important;
                 border-radius: 12px !important;
@@ -254,13 +250,9 @@ def _render_styles():
                 box-shadow: none !important;
             }
 
-            [data-testid="stMainBlockContainer"] [data-testid="stTextInput"] input:focus {
+            :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] [data-testid="stTextInput"] input:focus {
                 border-color: #7C3AED !important;
                 box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.1) !important;
-            }
-
-            [data-testid="stMainBlockContainer"] [data-testid="stTextInput"] input::placeholder {
-                color: #A1A1AA !important;
             }
 
             @media (max-width: 1023px) {
@@ -268,7 +260,7 @@ def _render_styles():
                     display: none;
                 }
 
-                [data-testid="stMainBlockContainer"] {
+                :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] {
                     max-width: 480px !important;
                     margin-left: auto !important;
                     margin-right: auto !important;
@@ -278,13 +270,13 @@ def _render_styles():
             }
 
             @media (max-width: 640px) {
-                [data-testid="stMainBlockContainer"] {
+                :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] {
                     max-width: none !important;
                     padding: 40px 24px !important;
                     justify-content: flex-start !important;
                 }
 
-                [data-testid="stMainBlockContainer"] > [data-testid="stVerticalBlock"] {
+                :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] > [data-testid="stVerticalBlock"] {
                     min-height: auto !important;
                     justify-content: flex-start !important;
                 }
@@ -298,7 +290,7 @@ def _render_art_panel():
     st.html(
         f"""
         <aside class="rf-forgot-art">
-            <div>{logo(variant="light")}</div>
+            <div class="rf-public-art-logo">{logo(variant="dark")}</div>
             <div class="rf-forgot-art-copy">
                 <div class="rf-forgot-gold-line"></div>
                 <h2>Recupere o acesso<br><span>sem perder o fluxo.</span></h2>
@@ -312,8 +304,9 @@ def _render_art_panel():
 
 def _render_header():
     st.markdown(
-        """
+        f"""
         <div class="rf-forgot-header">
+            <div class="rf-public-mobile-logo">{logo(variant="dark")}</div>
             <p class="rf-forgot-eyebrow">Recuperação de senha</p>
             <h1>Esqueci minha senha</h1>
             <p>Informe seu e-mail institucional para receber as instruções de recuperação.</p>

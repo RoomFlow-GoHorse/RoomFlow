@@ -162,7 +162,7 @@ def _render_topbar():
         if st.button("← Voltar", key="signup_inst_top_back", type="tertiary"):
             _exit_signup()
     with col2:
-        st.html(logo(size="small", class_name="rf-choice-logo"))
+        st.html(logo(size="small", variant="dark", class_name="rf-choice-logo"))
 
 def _render_stepper():
     step = st.session_state.signup_inst_step
@@ -243,7 +243,7 @@ def _render_form():
             c3, c4 = st.columns(2)
             with c3:
                 st.text_input("Senha *", key="signup_inst_senha", placeholder="••••••••", type="password")
-                st.markdown('<span class="rf-field-help" style="font-size:12px; color:#A1A1AA;">Mínimo de 8 caracteres.</span>', unsafe_allow_html=True)
+                st.markdown('<span class="rf-field-help" style="font-size:12px; color:var(--graphite-muted);">Mínimo de 8 caracteres.</span>', unsafe_allow_html=True)
             with c4:
                 st.text_input("Confirmar senha *", key="signup_inst_confirm_senha", placeholder="••••••••", type="password")
 
@@ -353,7 +353,7 @@ def signup_institution():
         """
         <style>
             /* Restringe a tela a 672px idêntico ao max-w-2xl do Figma com padding top seguro */
-            [data-testid="stMainBlockContainer"] {
+            :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] {
                 max-width: 672px !important;
                 margin-left: auto !important;
                 margin-right: auto !important;
@@ -363,12 +363,8 @@ def signup_institution():
                 padding-right: 24px !important;
             }
 
-            .stApp {
-                background-color: #F7F7F9 !important;
-            }
-
             /* TOPBAR BOTÃO VOLTAR */
-            [data-testid="stMainBlockContainer"] div[data-testid="stColumn"]:first-child button {
+            :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] div[data-testid="stColumn"]:first-child button {
                 background: transparent !important;
                 border: none !important;
                 box-shadow: none !important;
@@ -378,7 +374,7 @@ def signup_institution():
                 padding: 0 !important;
             }
 
-            [data-testid="stMainBlockContainer"] div[data-testid="stColumn"]:first-child button:hover {
+            :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] div[data-testid="stColumn"]:first-child button:hover {
                 color: var(--brand, #6D28D9) !important;
             }
 
@@ -392,7 +388,7 @@ def signup_institution():
             }
 
             /* CONTAINER CARD DE FORMULÁRIO (FUNDO BRANCO, BORDA #E4E4E7, RADIUS 16PX) */
-            [data-testid="stMainBlockContainer"] [data-testid="stVerticalBlock"]:has(div.rf-inst-form-card) {
+            :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] [data-testid="stVerticalBlock"]:has(div.rf-inst-form-card) {
                 background-color: #FFFFFF !important;
                 border: 1px solid #E4E4E7 !important;
                 border-radius: 16px !important;
@@ -401,7 +397,7 @@ def signup_institution():
                 margin-bottom: 24px !important;
             }
 
-            [data-testid="stMainBlockContainer"] [data-testid="stVerticalBlock"]:has(div.rf-inst-form-card) [data-testid="stVerticalBlock"] {
+            :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] [data-testid="stVerticalBlock"]:has(div.rf-inst-form-card) [data-testid="stVerticalBlock"] {
                 background-color: transparent !important;
                 border: none !important;
                 box-shadow: none !important;

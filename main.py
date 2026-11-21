@@ -5,7 +5,7 @@ from controllers.app_state_service import boot_state, clear_operational_dialogs,
 from controllers.roomflow_api import ApiUnavailable
 from controllers.streamlit_runtime import API_PAGES, render_api_error, uses_roomflow_api
 from views.components.app_shell import shell_end, shell_start
-from views.components.ui_components import load_auth_css, load_css, toast
+from views.components.ui_components import load_css, load_public_css, toast
 
 from views.pages.admin import admin_audit_page, admin_dashboard_page, floor_plan_page, permissions_page, settings_page, users_page
 from views.pages.auth import forgot_password_page, login_page, signup_choice_page, signup_institution_page, signup_member_page
@@ -190,17 +190,9 @@ def main():
     # ---------------------------------------------------------
 
     if not user:
-        page_function = PUBLIC_ROUTES.get(page)
-
-        if page_function:
-            if page != "landing":
-                load_auth_css()
-            page_function()
-            return
-
-        # Se tentar acessar uma rota interna sem estar autenticado,
-        # volta para a landing page.
-        PUBLIC_ROUTES["landing"]()
+        public_page = page if page in PUBLIC_ROUTES else "landing"
+        load_public_css(public_page)
+        PUBLIC_ROUTES[public_page]()
         return
 
     # ---------------------------------------------------------
