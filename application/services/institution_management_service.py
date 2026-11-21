@@ -2,6 +2,7 @@ import secrets
 import re
 from dataclasses import dataclass, replace
 
+from application.ports.clock import Clock
 from application.ports.institution_repository import InstitutionRepository
 from application.ports.password_hasher import PasswordHasher
 from application.ports.user_repository import UserRepository
@@ -50,11 +51,13 @@ class InstitutionManagementService:
         users: UserRepository,
         password_hasher: PasswordHasher,
         permission_policy: PermissionPolicy | None = None,
+        clock: Clock | None = None,
     ) -> None:
         self._institutions = institutions
         self._users = users
         self._password_hasher = password_hasher
         self._permissions = permission_policy or PermissionPolicy()
+        self._clock = clock
 
     def register(self, data: InstitutionRegistration) -> tuple[Institution, User]:
         cnpj = "".join(character for character in data.cnpj if character.isdigit())
@@ -83,6 +86,7 @@ class InstitutionManagementService:
             profile=Profile.ADMIN,
             institution_id=institution.id,
             status=UserStatus.ACTIVE,
+            created_at=self._clock.now() if self._clock is not None else None,
         )
         account = UserAccount(owner, self._password_hasher.hash_password(data.password))
 

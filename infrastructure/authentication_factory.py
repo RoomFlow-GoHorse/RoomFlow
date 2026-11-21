@@ -10,7 +10,7 @@ from application.services.member_signup_service import MemberSignupService
 from application.services.space_service import SpaceService
 from application.services.resource_management_service import ResourceManagementService
 from application.services.floor_plan_service import FloorPlanService
-from application.services.login_attempt_limiter import LoginAttemptLimiter
+from application.services.admin_dashboard_service import AdminDashboardService
 from infrastructure.repositories.in_memory_institution_repository import InMemoryInstitutionRepository
 from infrastructure.repositories.in_memory_institution_invite_code_repository import InMemoryInstitutionInviteCodeRepository
 from infrastructure.repositories.in_memory_authorized_enrollment_repository import InMemoryAuthorizedEnrollmentRepository
@@ -47,11 +47,13 @@ class InMemoryApplicationRuntime:
     resource_management: ResourceManagementService
     floor_plan_management: FloorPlanService
     plant_file_storage: TemporaryPlantFileStorage
+    admin_dashboard: AdminDashboardService
 
 
 def build_application_runtime(environment: str) -> InMemoryApplicationRuntime:
     """Build process-shared adapters; demo data exists only in local envs."""
     hasher = Pbkdf2PasswordHasher()
+    clock = SystemClock()
     accounts = []
     institutions = []
     if environment in {"development", "test"}:
@@ -110,17 +112,17 @@ def build_application_runtime(environment: str) -> InMemoryApplicationRuntime:
         password_hasher=hasher,
         email_sender=simulated_email_sender,
         attempt_limiter=LoginAttemptLimiter(max_attempts=8),
-        clock=SystemClock(),
+        clock=clock,
     )
     return InMemoryApplicationRuntime(
         authentication=authentication,
         users=user_repository,
         institutions=institution_repository,
         user_management=UserManagementService(
-            user_repository, institution_repository, hasher
+            user_repository, institution_repository, hasher, clock=clock
         ),
         institution_management=InstitutionManagementService(
-            institution_repository, user_repository, hasher
+            institution_repository, user_repository, hasher, clock=clock
         ),
         invite_codes=invite_code_service,
         authorized_enrollments=enrollment_repository,
@@ -133,4 +135,5 @@ def build_application_runtime(environment: str) -> InMemoryApplicationRuntime:
         resource_management=ResourceManagementService(spaces, spaces),
         floor_plan_management=FloorPlanService(spaces, plant_file_storage),
         plant_file_storage=plant_file_storage,
+        admin_dashboard=AdminDashboardService(user_repository, spaces, spaces, clock),
     )

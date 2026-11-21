@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import datetime
 from enum import Enum
 
 from models.domain.entities.profile import Profile
@@ -23,6 +24,7 @@ class User:
     profile: Profile
     institution_id: str | None
     status: UserStatus = UserStatus.ACTIVE
+    created_at: datetime | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.profile, Profile):

@@ -2,6 +2,7 @@ import secrets
 import re
 from dataclasses import replace
 
+from application.ports.clock import Clock
 from application.ports.institution_repository import InstitutionRepository
 from application.ports.password_hasher import PasswordHasher
 from application.ports.user_repository import UserRepository
@@ -23,11 +24,13 @@ class UserManagementService:
         institutions: InstitutionRepository,
         password_hasher: PasswordHasher,
         permission_policy: PermissionPolicy | None = None,
+        clock: Clock | None = None,
     ) -> None:
         self._users = users
         self._institutions = institutions
         self._password_hasher = password_hasher
         self._permissions = permission_policy or PermissionPolicy()
+        self._clock = clock
 
     def list_users(
         self,
@@ -91,6 +94,7 @@ class UserManagementService:
             profile=Profile(profile),
             institution_id=institution_id,
             status=UserStatus.ACTIVE,
+            created_at=self._clock.now() if self._clock is not None else None,
         )
         self._users.add(UserAccount(user, self._password_hasher.hash_password(password)))
         return user

@@ -134,6 +134,7 @@ class MemberSignupService:
                 profile=Profile.PARTICIPANT,
                 institution_id=pending.institution_id,
                 status=UserStatus.ACTIVE,
+                created_at=self._clock.now(),
             )
 
             def create_account() -> None:

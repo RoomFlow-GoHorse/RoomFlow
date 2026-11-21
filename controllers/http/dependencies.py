@@ -11,6 +11,7 @@ from application.services.institution_management_service import InstitutionManag
 from application.services.space_service import SpaceService
 from application.services.resource_management_service import ResourceManagementService
 from application.services.floor_plan_service import FloorPlanService
+from application.services.admin_dashboard_service import AdminDashboardService
 from application.services.user_management_service import UserManagementService
 from application.services.member_signup_service import MemberSignupService
 from models.domain.entities.user import User
@@ -33,6 +34,10 @@ def get_resource_management_service(request: Request) -> ResourceManagementServi
 
 def get_floor_plan_management_service(request: Request) -> FloorPlanService:
     return request.app.state.floor_plan_management_service
+
+
+def get_admin_dashboard_service(request: Request) -> AdminDashboardService:
+    return request.app.state.admin_dashboard_service
 
 
 def get_authentication_service(request: Request) -> AuthenticationService:
