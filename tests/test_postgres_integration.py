@@ -362,6 +362,171 @@ class PostgresIntegrationTests(unittest.TestCase):
             self.assertIn("Aprovada", institution.dataframe[0].value["Status"].tolist())
             self.assertIn("Aprovada pelo Streamlit", [item.value for item in institution.text])
 
+    def test_conflicts_detect_existing_overlaps_and_close_after_cancellation(self):
+        own, info = self.register()
+        other, _ = self.register()
+        admin = self.headers(self.login(own["responsible_email"]))
+        foreign_admin = self.headers(self.login(other["responsible_email"]))
+        manager = self.headers(self._manager_login(admin))
+        foreign_manager = self.headers(self._manager_login(foreign_admin))
+        owners = [self._requester_login(admin) for _ in range(3)]
+        room = self._structure_room(admin, "Sala de Sobreposições")
+        data = self._reservation_payload(room)
+        start, end = (datetime.fromisoformat(data[key]) for key in ("start", "end"))
+        intervals = [(start, end), (start + timedelta(minutes=30), end), (end, end + timedelta(hours=1))]
+        with self.factory.begin() as session:
+            for login, (begin, finish) in zip(owners, intervals, strict=True):
+                session.add(Reserva(
+                    instituicao_id=int(info["institution"]["id"]), espaco_id=int(room["id"]),
+                    solicitante_id=int(login.json()["data"]["user"]["id"]), titulo=data["title"], tipo="Aula",
+                    inicio=begin, fim=finish, quantidade_participantes=20,
+                ))
+        self.assertEqual(self.client.get("/conflicts", headers=manager).json()["data"]["items"], [])
+        self.assertEqual(self.client.post("/conflicts/detect", headers=foreign_manager).json()["data"]["updated"], 0)
+        scan = self.client.post("/conflicts/detect", headers=manager)
+        self.assertEqual(scan.status_code, 200, scan.text)
+        self.assertEqual(scan.json()["data"]["updated"], 1)
+        self.assertEqual(self.client.post("/conflicts/detect", headers=manager).json()["data"]["updated"], 0)
+        result = self.client.get("/conflicts", headers=manager, params={"query": room["name"], "status": "nao_resolvido"})
+        item, = result.json()["data"]["items"]
+        path = f"/conflicts/{item['id']}"
+        requester = self.headers(owners[0])
+        self.assertEqual(self.client.get("/conflicts", headers=requester).status_code, 403)
+        self.assertEqual(self.client.get("/conflicts", headers=admin).status_code, 403)
+        self.assertEqual(self.client.get(path, headers=foreign_manager).status_code, 404)
+        self.assertEqual(self.client.get(path + "/alternatives", headers=foreign_manager).status_code, 404)
+        self.assertEqual(self.client.post(path + "/resolve", headers=foreign_manager, json={
+            "action": "manteve_a", "reason": "Aula",
+        }).status_code, 404)
+        own_reservation, = self.client.get("/reservations/mine", headers=requester).json()["data"]
+        self.assertEqual(self.client.post(f"/reservations/{own_reservation['id']}/cancel",
+                                          headers=requester).status_code, 200)
+        resolved = self.client.get(path, headers=manager).json()["data"]
+        self.assertEqual(resolved["status"], "resolvido")
+        self.assertEqual(resolved["resolved_by"], owners[0].json()["data"]["user"]["id"])
+        self.assertEqual(resolved["available_actions"], [])
+        self.assertEqual(self.client.get("/conflicts", headers=manager, params={"status": "nao_resolvido"})
+                         .json()["data"]["items"], [])
+
+    def test_conflict_keep_rolls_back_and_serializes_competing_decisions(self):
+        own, _ = self.register()
+        admin = self.headers(self.login(own["responsible_email"]))
+        managers = [self.headers(self._manager_login(admin)) for _ in range(2)]
+        room = self._structure_room(admin, "Sala de Conflitos")
+        data = self._reservation_payload(room)
+        for _ in range(2):
+            owner = self.headers(self._requester_login(admin))
+            created = self.client.post("/reservations", headers=owner, json=data)
+            self.assertEqual(created.status_code, 201, created.text)
+        item, = self.client.get("/conflicts", headers=managers[0]).json()["data"]["items"]
+        path = f"/conflicts/{item['id']}"
+        decision = {"action": "manteve_a", "reason": "Aula prioritária"}
+        self.assertEqual(self.client.post(path + "/resolve", headers=managers[0],
+                                          json={**decision, "reason": " "}).status_code, 422)
+        block = f"/structure/spaces/{room['id']}/block"
+        self.assertEqual(self.client.post(block, headers=managers[0], json={"reason": "Obra"}).status_code, 200)
+        self.assertEqual(self.client.post(path + "/resolve", headers=managers[0], json=decision).status_code, 409)
+        rolled_back = self.client.get(path, headers=managers[0]).json()["data"]
+        self.assertEqual(rolled_back["status"], "nao_resolvido")
+        self.assertIsNone(rolled_back["resolved_by"])
+        for reservation in rolled_back["reservations"]:
+            self.assertEqual(reservation["status"], "pendente")
+            stored = self.client.get(f"/reservations/{reservation['id']}", headers=managers[0]).json()["data"]
+            self.assertEqual(stored["history"], [])
+        self.assertEqual(self.client.delete(block, headers=managers[0]).status_code, 200)
+
+        ready = Barrier(2)
+
+        def resolve(pair):
+            action, headers = pair
+            with TestClient(create_app(postgres_session_factory=self.factory)) as api:
+                ready.wait(timeout=10)
+                return api.post(path + "/resolve", headers=headers, json={**decision, "action": action})
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            responses = list(pool.map(resolve, zip(("manteve_a", "manteve_b"), managers, strict=True)))
+        self.assertCountEqual([response.status_code for response in responses], [200, 409])
+        with TestClient(create_app(postgres_session_factory=self.factory)) as restarted:
+            result = restarted.get(path, headers=managers[0]).json()["data"]
+        self.assertEqual(result["status"], "resolvido")
+        self.assertEqual(result["resolver_name"], "Gerente Teste")
+        self.assertIn(decision["reason"], result["decision"])
+        self.assertCountEqual([reservation["status"] for reservation in result["reservations"]],
+                              ["aprovada", "rejeitada"])
+
+    def test_conflict_streamlit_moves_reservation_to_compatible_room(self):
+        own, _ = self.register()
+        other, _ = self.register()
+        admin = self.headers(self.login(own["responsible_email"]))
+        foreign_admin = self.headers(self.login(other["responsible_email"]))
+        login = self._manager_login(admin)
+        manager = self.headers(login)
+        source = self._structure_room(admin, "Sala Original")
+        foreign = self._structure_room(foreign_admin, "Sala de Outra Instituição")
+        resource = self.client.post("/structure/resources", headers=manager, json={"name": "Projetor", "quantity_total": 8})
+        self.assertEqual(resource.status_code, 201, resource.text)
+        resource_id = resource.json()["data"]["id"]
+
+        def room(name, capacity=20, quantity=0):
+            response = self.client.post("/structure/spaces", headers=admin, json={
+                "floor_id": source["floor_id"], "name": name, "type": "Sala", "capacity": capacity,
+            })
+            self.assertEqual(response.status_code, 201, response.text)
+            room_id = response.json()["data"]["id"]
+            if quantity:
+                response = self.client.put(f"/structure/spaces/{room_id}/resources", headers=manager,
+                                           json={"resource_ids": [resource_id], "quantities": {resource_id: quantity}})
+                self.assertEqual(response.status_code, 200, response.text)
+            return room_id
+
+        assigned = self.client.put(f"/structure/spaces/{source['id']}/resources", headers=manager,
+                                   json={"resource_ids": [resource_id], "quantities": {resource_id: 2}})
+        self.assertEqual(assigned.status_code, 200, assigned.text)
+        compatible = room("Sala Compatível", quantity=2)
+        busy = room("Sala com Solicitação", quantity=2)
+        room("Sala Pequena", capacity=10)
+        incompatible = room("Sala sem Equipamento")
+        limited = room("Sala com Pouco Equipamento", quantity=1)
+        owners = [self.headers(self._requester_login(admin)) for _ in range(2)]
+        payload = self._reservation_payload(source)
+        for index, owner in enumerate(owners):
+            created = self.client.post("/reservations", headers=owner, json={**payload, "title": f"Oficina {index}"})
+            self.assertEqual(created.status_code, 201, created.text)
+        busy_slot = self.client.post("/reservations", headers=owners[0], json={**payload, "space_id": busy})
+        self.assertEqual(busy_slot.status_code, 201, busy_slot.text)
+        item, = self.client.get("/conflicts", headers=manager).json()["data"]["items"]
+        path = f"/conflicts/{item['id']}"
+        a, b = item["reservations"]
+        suggestions = self.client.get(path + "/alternatives", headers=manager).json()["data"]
+        for reservation in (a, b):
+            self.assertEqual([space["id"] for space in suggestions[reservation["id"]]], [compatible])
+        for invalid in (incompatible, limited, busy, foreign["id"]):
+            failed = self.client.post(path + "/resolve", headers=manager, json={
+                "action": "alterou", "reason": "Realocação", "reservation_id": a["id"], "space_id": invalid,
+            })
+            self.assertEqual(failed.status_code, 409, failed.text)
+        with self.api_process() as url, patch.dict(os.environ, {"ROOMFLOW_API_URL": url}):
+            app = AppTest.from_file(str(PROJECT / "main.py"), default_timeout=20)
+            app.query_params["page"] = "gerente_conflitos"
+            app.session_state["auth_token"] = login.json()["data"]["access_token"]
+            app.run()
+            self.assertFalse(app.exception)
+            self.assertNotIn("conflicts", app.session_state.filtered_state)
+            self.assertEqual(app.dataframe[0].value["Status"].tolist(), ["Em aberto"])
+            app.button(key="btn_resolve_conflict").click().run()
+            app.selectbox(key=f"conflict_outcome_{item['id']}").select("alterou").run()
+            app.text_area(key=f"conflict_justification_{item['id']}").set_value("Realocada com projetores")
+            next(button for button in app.button if button.label == "Aplicar decisão").click().run()
+            self.assertFalse(app.exception)
+            self.assertEqual(app.dataframe[0].value["Status"].tolist(), ["Resolvido"])
+        resolved = self.client.get(path, headers=manager).json()["data"]
+        self.assertIn("Realocada com projetores", resolved["decision"])
+        moved, kept = resolved["reservations"]
+        self.assertEqual((moved["space_id"], moved["status"]), (compatible, "em_analise"))
+        self.assertEqual((kept["space_id"], kept["status"]), (source["id"], "pendente"))
+        history = self.client.get(f"/reservations/{a['id']}", headers=manager).json()["data"]["history"]
+        self.assertEqual(history[-1]["reason"], "Realocada com projetores")
+
     def test_manager_persists_room_changes_blocks_and_reports_real_availability(self):
         own, registration = self.register()
         foreign, _ = self.register()

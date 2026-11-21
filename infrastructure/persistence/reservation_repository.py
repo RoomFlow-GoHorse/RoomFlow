@@ -53,6 +53,14 @@ class PostgresReservationRepository:
             statement = self._listing(institution_id, requester_id).order_by(Reserva.inicio.desc(), Reserva.id.desc())
             return [self._details(row) for row in session.execute(statement)]
 
+    def find_many(self, institution_id: str, reservation_ids: set[str]) -> dict[str, ReservationDetails]:
+        if not reservation_ids:
+            return {}
+        ids = [to_database_identity_id(value, bits=64) for value in reservation_ids]
+        with self._transaction.session() as session:
+            statement = self._listing(institution_id).where(Reserva.id.in_(ids))
+            return {str(row[0].id): self._details(row) for row in session.execute(statement)}
+
     def find_with_history(
         self, institution_id: str, reservation_id: str,
     ) -> tuple[ReservationDetails, list[ReservationHistoryEvent]] | None:

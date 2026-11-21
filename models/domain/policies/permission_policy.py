@@ -21,7 +21,9 @@ class PermissionPolicy:
                 Permission.EDIT_INSTITUTION_SETTINGS,
             }
         ) | _COMMON_PERMISSIONS,
-        Profile.MANAGER: frozenset({Permission.MANAGE_SPACES, Permission.REVIEW_RESERVATIONS}) | _COMMON_PERMISSIONS,
+        Profile.MANAGER: frozenset({
+            Permission.MANAGE_SPACES, Permission.REVIEW_RESERVATIONS, Permission.RESOLVE_CONFLICTS,
+        }) | _COMMON_PERMISSIONS,
         Profile.REQUESTER: frozenset({
             Permission.CREATE_RESERVATION, Permission.VIEW_OWN_RESERVATIONS, Permission.CANCEL_OWN_RESERVATION,
         }) | _COMMON_PERMISSIONS,

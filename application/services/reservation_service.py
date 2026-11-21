@@ -5,6 +5,7 @@ from datetime import datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
 from application.ports.clock import Clock
+from application.ports.conflict_repository import ConflictRepository
 from application.ports.institution_repository import InstitutionRepository
 from application.ports.reservation_repository import ReservationRepository
 from application.ports.space_repository import SpaceRepository
@@ -52,6 +53,7 @@ class ReservationService:
         clock: Clock,
         atomic: Callable[[], AbstractContextManager],
         current_actor: Callable[[User], User],
+        conflicts: ConflictRepository,
     ) -> None:
         self._repository = repository
         self._spaces = spaces
@@ -59,6 +61,7 @@ class ReservationService:
         self._clock = clock
         self._atomic = atomic
         self._current_actor = current_actor
+        self._conflicts = conflicts
         self._permissions = PermissionPolicy()
 
     def catalog(self, actor: User, period: ReservationPeriod | None = None) -> tuple[Institution, list[Space]]:
@@ -106,6 +109,7 @@ class ReservationService:
                 self._repository.append_history(result.reservation, ReservationHistoryEvent(
                     ReservationHistoryAction.AUTO_APPROVAL, None, status, now,
                 ))
+            self._conflicts.synchronize(institution.id, now, actor.id, result.reservation.id)
             return result
 
     def edit(self, actor: User, reservation_id: str, request: ReservationRequest) -> ReservationDetails:
@@ -166,6 +170,49 @@ class ReservationService:
             )
             return self._save_change(actor, current, updated, ReservationHistoryAction.REVIEW, now, reason or None)
 
+    def alternative_rooms(self, current: Reservation, now: datetime) -> list[Space]:
+        if current.status not in EDITABLE or current.request.period.start <= now:
+            return []
+        request = current.request
+        rooms = self._spaces.list_spaces(current.institution_id)
+        original = self._spaces.find_space(request.space_id)
+        if original is None or original.institution_id != current.institution_id:
+            raise ResourceNotFound("Sala da reserva não encontrada.")
+        booked = self._repository.overlapping_spaces(
+            current.institution_id, request.period, approved_only=False, exclude_id=current.id,
+        )
+        required = original.resource_quantities
+        return sorted((
+            room for room in rooms
+            if room.id != original.id and room.id not in booked
+            and room.active and room.status != "bloqueado"
+            and room.capacity >= request.participants and room.type.casefold() == original.type.casefold()
+            and self._has_resources(room, required)
+        ), key=lambda room: (room.capacity, room.name.casefold(), room.id))
+
+    @staticmethod
+    def _has_resources(room: Space, required: tuple[tuple[str, int], ...]) -> bool:
+        available = dict(room.resource_quantities)
+        return all(available.get(resource_id, 0) >= quantity for resource_id, quantity in required)
+
+    def move_for_conflict(self, actor: User, reservation_id: str, space_id: str, reason: str) -> ReservationDetails:
+        with self._atomic():
+            actor = self._current_actor(actor)
+            scope = self._permissions.authorize_listing(actor, Permission.RESOLVE_CONFLICTS)
+            current = self._find(scope, reservation_id).reservation
+            now = self._clock.now()
+            if not any(room.id == space_id for room in self.alternative_rooms(current, now)):
+                raise DuplicateResource("A sala alternativa não está disponível ou não é compatível.")
+            approved = current.status is ReservationStatus.APPROVED
+            updated = replace(
+                current, request=replace(current.request, space_id=space_id),
+                status=current.status if approved else ReservationStatus.IN_REVIEW,
+                reviewed_by=actor.id if approved else None,
+                reviewed_at=now if approved else None,
+                decision_reason=reason if approved else None,
+            )
+            return self._save_change(actor, current, updated, ReservationHistoryAction.EDIT, now, reason)
+
     def _save_change(
         self, actor: User, previous: Reservation, updated: Reservation, action: ReservationHistoryAction,
         occurred_at: datetime, reason: str | None = None,
@@ -174,6 +221,7 @@ class ReservationService:
         self._repository.append_history(result.reservation, ReservationHistoryEvent(
             action, previous.status, updated.status, occurred_at, actor.id, actor.name, reason,
         ))
+        self._conflicts.synchronize(updated.institution_id, occurred_at, actor.id, updated.id)
         return result
 
     def _institution(self, actor: User, permission: Permission) -> Institution:

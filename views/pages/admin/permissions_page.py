@@ -21,13 +21,13 @@ EFFECTIVE_PERMISSIONS = [
     ("Consultar, aprovar e rejeitar solicitações", {Permission.REVIEW_RESERVATIONS}),
     ("Consultar as próprias reservas", {Permission.VIEW_OWN_RESERVATIONS}),
     ("Cancelar as próprias reservas", {Permission.CANCEL_OWN_RESERVATION}),
+    ("Consultar e resolver conflitos", {Permission.RESOLVE_CONFLICTS}),
 ]
 
 PENDING_PERMISSIONS = [
     ("Acessar dashboard do gerente", "none", "pending", "none", "none"),
     ("Acessar dashboard do solicitante", "none", "none", "pending", "none"),
     ("Acessar dashboard do participante", "none", "none", "none", "pending"),
-    ("Resolver conflitos", "none", "pending", "none", "none"),
     ("Bloquear espaços", "none", "pending", "none", "none"),
     ("Consultar agenda", "none", "none", "pending", "pending"),
     ("Localizar espaços", "none", "none", "none", "pending"),

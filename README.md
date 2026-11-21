@@ -136,7 +136,11 @@ própria instituição. A disponibilidade considera salas ativas e desbloqueadas
 e reservas aprovadas no PostgreSQL. Solicitações abertas com horários
 sobrepostos aparecem sinalizadas na lista do gerente.
 
-As telas de agenda, ocupação, conflitos e notificações continuam no modo de
+Em **Conflitos**, o gerente consulta pares de reservas da própria instituição,
+mantém uma reserva e rejeita a outra, ou move uma para uma sala compatível.
+O botão **Detectar sobreposições** também verifica reservas anteriores à integração.
+
+As telas de agenda, ocupação e notificações continuam no modo de
 demonstração. O modo em memória continua disponível sem as duas variáveis.
 
 ### Arquitetura

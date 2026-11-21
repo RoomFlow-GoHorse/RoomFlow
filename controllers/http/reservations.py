@@ -54,7 +54,7 @@ def list_spaces(
 ):
     if (start is None) != (end is None):
         raise HTTPException(422, "Informe início e fim juntos.")
-    institution, spaces = _run(lambda: service.catalog(
+    institution, spaces = run_reservation_action(lambda: service.catalog(
         actor, ReservationPeriod(start, end) if start is not None and end is not None else None,
     ))
     return {"data": {
@@ -75,17 +75,17 @@ def create(
     actor: User = Depends(get_current_user),
     service: ReservationService = Depends(get_service),
 ):
-    return {"data": _response(_run(lambda: service.create(actor, payload.to_request())))}
+    return {"data": reservation_response(run_reservation_action(lambda: service.create(actor, payload.to_request())))}
 
 
 @router.get("/mine")
 def list_own(actor: User = Depends(get_current_user), service: ReservationService = Depends(get_service)):
-    return {"data": [_response(item) for item in _run(lambda: service.list_own(actor))]}
+    return {"data": [reservation_response(item) for item in run_reservation_action(lambda: service.list_own(actor))]}
 
 
 @router.get("/institution")
 def list_institution(actor: User = Depends(get_current_user), service: ReservationService = Depends(get_service)):
-    return {"data": [_response(item) for item in _run(lambda: service.list_institution(actor))]}
+    return {"data": [reservation_response(item) for item in run_reservation_action(lambda: service.list_institution(actor))]}
 
 
 @router.get("/{reservation_id}")
@@ -93,10 +93,10 @@ def detail(
     reservation_id: str, response: Response,
     actor: User = Depends(get_current_user), service: ReservationService = Depends(get_service),
 ):
-    item, history = _run(lambda: service.detail(actor, reservation_id))
+    item, history = run_reservation_action(lambda: service.detail(actor, reservation_id))
     response.headers["Cache-Control"] = "private, no-store"
     return {"data": {
-        **_response(item),
+        **reservation_response(item),
         "reviewed_by": item.reservation.reviewed_by,
         "available_decisions": review_decisions(item.reservation.status),
         "history": [asdict(event) for event in history],
@@ -108,14 +108,14 @@ def edit(
     reservation_id: str, payload: ReservationPayload,
     actor: User = Depends(get_current_user), service: ReservationService = Depends(get_service),
 ):
-    return {"data": _response(_run(lambda: service.edit(actor, reservation_id, payload.to_request())))}
+    return {"data": reservation_response(run_reservation_action(lambda: service.edit(actor, reservation_id, payload.to_request())))}
 
 
 @router.post("/{reservation_id}/cancel")
 def cancel(
     reservation_id: str, actor: User = Depends(get_current_user), service: ReservationService = Depends(get_service),
 ):
-    return {"data": _response(_run(lambda: service.cancel(actor, reservation_id)))}
+    return {"data": reservation_response(run_reservation_action(lambda: service.cancel(actor, reservation_id)))}
 
 
 @router.patch("/{reservation_id}/decision")
@@ -123,10 +123,10 @@ def review(
     reservation_id: str, payload: DecisionPayload,
     actor: User = Depends(get_current_user), service: ReservationService = Depends(get_service),
 ):
-    return {"data": _response(_run(lambda: service.review(actor, reservation_id, payload.status, payload.reason)))}
+    return {"data": reservation_response(run_reservation_action(lambda: service.review(actor, reservation_id, payload.status, payload.reason)))}
 
 
-def _response(details: ReservationDetails) -> dict:
+def reservation_response(details: ReservationDetails) -> dict:
     item = details.reservation
     request = item.request
     return {
@@ -138,7 +138,7 @@ def _response(details: ReservationDetails) -> dict:
     }
 
 
-def _run(action):
+def run_reservation_action(action):
     try:
         return action()
     except DomainAuthorizationError as exc:

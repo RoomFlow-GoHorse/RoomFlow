@@ -6,6 +6,7 @@ from application.ports.email_sender import EmailSender
 from application.services.admin_audit_service import AdminAuditService
 from application.services.admin_dashboard_service import AdminDashboardService
 from application.services.authentication_service import AuthenticationService
+from application.services.conflict_service import ConflictService
 from application.services.institution_management_service import InstitutionManagementService
 from application.services.institution_invite_code_service import InstitutionInviteCodeService
 from application.services.enrollment_management_service import EnrollmentManagementService
@@ -18,6 +19,7 @@ from application.services.reservation_service import ReservationService
 from application.services.login_attempt_limiter import LoginAttemptLimiter
 from application.services.user_management_service import UserManagementService
 from infrastructure.persistence.audit_repository import PostgresAdminAuditRepository
+from infrastructure.persistence.conflict_repository import PostgresConflictRepository
 from infrastructure.persistence.enrollment_repository import PostgresAuthorizedEnrollmentRepository
 from infrastructure.persistence.enrollment_preview_repository import PostgresEnrollmentPreviewRepository
 from infrastructure.persistence.institutions import PostgresInstitutionRepository
@@ -51,6 +53,7 @@ class PostgresRuntime:
     admin_dashboard: AdminDashboardService
     password_recovery: PasswordRecoveryService
     reservation_service: ReservationService
+    conflict_service: ConflictService
 
 
 def build_postgres_runtime(
@@ -69,6 +72,11 @@ def build_postgres_runtime(
     invites = InstitutionInviteCodeService(PostgresInviteCodeRepository(transaction), audit=audit)
     enrollments = PostgresAuthorizedEnrollmentRepository(transaction)
     structure = PostgresStructureRepository(transaction)
+    conflicts = PostgresConflictRepository(transaction)
+    reservations = PostgresReservationRepository(transaction)
+    reservation_service = ReservationService(
+        reservations, structure, institutions, clock, transaction.atomic, audit.current_actor, conflicts,
+    )
     enrollment_management = EnrollmentManagementService(
         enrollments, institutions, invites, OpenpyxlEnrollmentSpreadsheetParser(),
         PostgresEnrollmentPreviewRepository(transaction),
@@ -89,8 +97,9 @@ def build_postgres_runtime(
         invite_codes=invites,
         enrollment_management=enrollment_management,
         space_management=SpaceService(structure, audit=audit),
-        reservation_service=ReservationService(
-            PostgresReservationRepository(transaction), structure, institutions, clock, transaction.atomic, audit.current_actor,
+        reservation_service=reservation_service,
+        conflict_service=ConflictService(
+            conflicts, reservations, reservation_service, institutions, clock, transaction.atomic, audit.current_actor,
         ),
         resource_management=ResourceManagementService(structure, structure, audit=audit),
         floor_plan_management=FloorPlanService(
