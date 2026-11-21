@@ -27,7 +27,7 @@ def _init_state():
 
 def _target_for(user):
     if uses_roomflow_api():
-        return {"admin": "admin_dashboard", "gerente": "espacos", "solicitante": "minhas_reservas"}.get(user["role"], "conta")
+        return {"admin": "admin_dashboard", "gerente": "gerente_dashboard", "solicitante": "minhas_reservas"}.get(user["role"], "conta")
     return ROLE_REDIRECT.get(user["role"], "participante_dashboard")
 
 

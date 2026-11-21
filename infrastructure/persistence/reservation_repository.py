@@ -1,16 +1,18 @@
-from sqlalchemy import select
+from sqlalchemy import distinct, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import aliased
 
+from application.ports.reservation_dashboard_query import ReservationDashboardMetrics
 from infrastructure.persistence.records import reservation_history
 from infrastructure.persistence.transaction import PostgresTransaction
 from infrastructure.persistence.user_mapping import to_database_identity_id
-from models.database_models import Espaco, Reserva, Usuario
+from models.database_models import ConflitoReserva, Espaco, Reserva, Usuario
 from models.domain.entities.reservation import (
     EDITABLE, Reservation, ReservationDetails, ReservationHistoryAction, ReservationHistoryEvent,
     ReservationPeriod, ReservationRequest, ReservationStatus,
 )
 from models.domain.exceptions import DuplicateResource, ResourceNotFound
+from models.domain.entities.reservation_conflict import ConflictStatus
 
 
 class PostgresReservationRepository:
@@ -52,6 +54,56 @@ class PostgresReservationRepository:
         with self._transaction.session() as session:
             statement = self._listing(institution_id, requester_id).order_by(Reserva.inicio.desc(), Reserva.id.desc())
             return [self._details(row) for row in session.execute(statement)]
+
+    def list_for_period(
+        self, institution_id: str, period: ReservationPeriod, space_ids: frozenset[str],
+    ) -> list[ReservationDetails]:
+        if not space_ids:
+            return []
+        ids = [to_database_identity_id(item, bits=64) for item in space_ids]
+        statement = self._listing(institution_id).where(
+            Reserva.espaco_id.in_(ids), Reserva.inicio < period.end, Reserva.fim > period.start,
+        ).order_by(Reserva.inicio, Reserva.id)
+        with self._transaction.session() as session:
+            return [self._details(row) for row in session.execute(statement)]
+
+    def get_metrics(
+        self, institution_id: str, start_at: datetime, end_at: datetime,
+        *, space_ids: frozenset[str] | None = None,
+    ) -> ReservationDashboardMetrics:
+        if space_ids is not None and not space_ids:
+            return ReservationDashboardMetrics(0, 0, 0, 0, 0)
+        institution = to_database_identity_id(institution_id)
+        approved = Reserva.status == ReservationStatus.APPROVED
+        counts = select(
+            func.count(),
+            func.count().filter(Reserva.status.in_((ReservationStatus.PENDING, ReservationStatus.IN_REVIEW))),
+            func.count().filter(approved),
+            func.count().filter(Reserva.status == ReservationStatus.REJECTED),
+            func.count().filter(Reserva.status == ReservationStatus.CANCELLED),
+            func.count(distinct(Reserva.espaco_id)).filter(approved),
+        ).where(Reserva.instituicao_id == institution, Reserva.inicio < end_at, Reserva.fim > start_at)
+        a, b = aliased(Reserva), aliased(Reserva)
+        conflicts = (
+            select(func.count()).select_from(ConflitoReserva)
+            .join(a, (a.id == ConflitoReserva.reserva_a_id) & (a.instituicao_id == institution))
+            .join(b, (b.id == ConflitoReserva.reserva_b_id) & (b.instituicao_id == institution))
+            .where(
+                ConflitoReserva.instituicao_id == institution, ConflitoReserva.status != ConflictStatus.RESOLVED,
+                a.espaco_id == b.espaco_id, a.status.in_(EDITABLE), b.status.in_(EDITABLE),
+                func.greatest(a.inicio, b.inicio, start_at) < func.least(a.fim, b.fim, end_at),
+            )
+        )
+        if space_ids is not None:
+            ids = [to_database_identity_id(item, bits=64) for item in space_ids]
+            counts = counts.where(Reserva.espaco_id.in_(ids))
+            conflicts = conflicts.where(a.espaco_id.in_(ids))
+        with self._transaction.session() as session:
+            total, pending, approved_count, rejected, cancelled, occupied = session.execute(counts).one()
+            open_conflicts = session.scalar(conflicts)
+        return ReservationDashboardMetrics(
+            total, pending, approved_count, open_conflicts, occupied, rejected=rejected, cancelled=cancelled,
+        )
 
     def find_many(self, institution_id: str, reservation_ids: set[str]) -> dict[str, ReservationDetails]:
         if not reservation_ids:

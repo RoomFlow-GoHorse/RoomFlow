@@ -14,6 +14,10 @@ class ReservationRepository(Protocol):
 
     def list(self, institution_id: str, requester_id: str | None = None) -> list[ReservationDetails]: ...
 
+    def list_for_period(
+        self, institution_id: str, period: ReservationPeriod, space_ids: frozenset[str],
+    ) -> list[ReservationDetails]: ...
+
     def find_many(self, institution_id: str, reservation_ids: set[str]) -> dict[str, ReservationDetails]: ...
 
     def find_with_history(

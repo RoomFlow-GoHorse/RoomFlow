@@ -23,6 +23,7 @@ class PermissionPolicy:
         ) | _COMMON_PERMISSIONS,
         Profile.MANAGER: frozenset({
             Permission.MANAGE_SPACES, Permission.REVIEW_RESERVATIONS, Permission.RESOLVE_CONFLICTS,
+            Permission.VIEW_MANAGER_DASHBOARD,
         }) | _COMMON_PERMISSIONS,
         Profile.REQUESTER: frozenset({
             Permission.CREATE_RESERVATION, Permission.VIEW_OWN_RESERVATIONS, Permission.CANCEL_OWN_RESERVATION,

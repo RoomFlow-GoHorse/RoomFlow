@@ -140,7 +140,7 @@ def sync_page_from_query():
 
 def get_dashboard_by_role(user):
     if uses_roomflow_api():
-        return {"admin": "admin_dashboard", "gerente": "espacos", "solicitante": "minhas_reservas"}.get(user.get("role"), "conta")
+        return {"admin": "admin_dashboard", "gerente": "gerente_dashboard", "solicitante": "minhas_reservas"}.get(user.get("role"), "conta")
     dashboard_by_role = {
         "admin": "admin_dashboard",
         "gerente": "gerente_dashboard",

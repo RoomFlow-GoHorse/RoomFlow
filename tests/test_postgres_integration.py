@@ -527,6 +527,160 @@ class PostgresIntegrationTests(unittest.TestCase):
         history = self.client.get(f"/reservations/{a['id']}", headers=manager).json()["data"]["history"]
         self.assertEqual(history[-1]["reason"], "Realocada com projetores")
 
+    def test_manager_operations_filters_rates_and_refreshes_after_decisions(self):
+        own, info = self.register()
+        other, _ = self.register()
+        admin = self.headers(self.login(own["responsible_email"]))
+        foreign_admin = self.headers(self.login(other["responsible_email"]))
+        manager_login = self._manager_login(admin)
+        manager = self.headers(manager_login)
+        foreign_manager = self.headers(self._manager_login(foreign_admin))
+        requester_login = self._requester_login(admin)
+        requester = self.headers(requester_login)
+        institution = info["institution"]
+        institution["preferences"]["reservations"].update(allowed_start="08:00", allowed_end="18:00")
+        updated = self.client.patch("/institutions/me", headers=admin, json={
+            "name": institution["name"], "timezone": "America/Manaus", "preferences": institution["preferences"],
+        })
+        self.assertEqual(updated.status_code, 200, updated.text)
+        room = self._structure_room(admin, "Sala dos Indicadores")
+        foreign = self._structure_room(foreign_admin, "Sala de Outra Instituição")
+        building = self.client.post("/structure/buildings", headers=admin, json={"name": "Bloco B"}).json()["data"]
+        floor = self.client.post(f"/structure/buildings/{building['id']}/floors", headers=admin,
+                                 json={"name": "Térreo"}).json()["data"]
+        spare = self.client.post("/structure/spaces", headers=admin, json={
+            "floor_id": floor["id"], "name": "Sala Livre", "type": "Sala", "capacity": 25,
+        }).json()["data"]
+        timezone = ZoneInfo("America/Manaus")
+        start = (datetime.now(timezone) + timedelta(days=3)).replace(hour=8, minute=0, second=0, microsecond=0)
+        day = start.date()
+        ids = []
+        for index, (begin, finish) in enumerate(((0, 2), (2, 3), (3, 4), (4, 5))):
+            created = self.client.post("/reservations", headers=requester, json={
+                **self._reservation_payload(room), "title": f"Atividade {index}",
+                "start": (start + timedelta(hours=begin)).isoformat(), "end": (start + timedelta(hours=finish)).isoformat(),
+            })
+            self.assertEqual(created.status_code, 201, created.text)
+            ids.append(created.json()["data"]["id"])
+        for reservation_id, status in ((ids[0], "aprovada"), (ids[2], "rejeitada")):
+            decision = self.client.patch(f"/reservations/{reservation_id}/decision", headers=manager, json={
+                "status": status, "reason": "Decisão de teste",
+            })
+            self.assertEqual(decision.status_code, 200, decision.text)
+        self.assertEqual(self.client.post(f"/reservations/{ids[3]}/cancel", headers=requester).status_code, 200)
+
+        path = "/manager/operations"
+        query = {"start_date": day.isoformat()}
+        self.assertEqual(self.client.get(path, headers=requester).status_code, 403)
+        self.assertEqual(self.client.get(path + "/context", headers=admin).status_code, 403)
+        self.assertEqual(self.client.get(path, headers=foreign_manager, params={**query, "space_id": room["id"]})
+                         .status_code, 404)
+        self.assertEqual(self.client.get(path, headers=manager, params={**query, "building_id": foreign["building_id"]})
+                         .status_code, 404)
+        context = self.client.get(path + "/context", headers=manager).json()["data"]
+        self.assertEqual(context["timezone"], "America/Manaus")
+        self.assertEqual(context["today"], datetime.now(timezone).date().isoformat())
+        self.assertCountEqual([item["id"] for item in context["spaces"]], [room["id"], spare["id"]])
+
+        def report(**filters):
+            response = self.client.get(path, headers=manager, params={**query, **filters})
+            self.assertEqual(response.status_code, 200, response.text)
+            return response.json()["data"]
+
+        listing = report()
+        self.assertEqual(listing["metrics"], {
+            "total": 4, "pending": 1, "approved": 1, "rejected": 1, "cancelled": 1, "conflicts": 0, "occupied_spaces": 1,
+        })
+        self.assertAlmostEqual(listing["occupancy_rate"], 0.1)
+        self.assertEqual(listing["space_counts"]["available"], 1)
+        selected = report(building_id=room["building_id"], status="pendente")
+        self.assertEqual([row["id"] for row in selected["reservations"]], [ids[1]])
+        self.assertEqual([row["id"] for row in selected["spaces"]], [room["id"]])
+        self.assertAlmostEqual(selected["occupancy_rate"], 0.2)
+        self.assertEqual(selected["space_counts"]["available"], 0)
+        clipped = report(space_id=room["id"], start_time="09:00", end_time="11:00")
+        self.assertEqual(clipped["spaces"][0]["occupied_seconds"], 3600)
+        self.assertAlmostEqual(clipped["occupancy_rate"], 0.5)
+        adjacent = report(space_id=room["id"], start_time="10:00", end_time="11:00")
+        self.assertEqual(adjacent["metrics"]["approved"], 0)
+        self.assertEqual(adjacent["space_counts"]["available"], 1)
+        empty = report(start_date=(day + timedelta(days=1)).isoformat())
+        self.assertEqual(empty["metrics"]["total"], 0)
+        self.assertEqual(empty["occupancy_rate"], 0)
+        self.assertEqual(empty["space_counts"]["available"], 2)
+        before_rooms = datetime.now(timezone).date() - timedelta(days=1)
+        self.assertEqual(report(start_date=before_rooms.isoformat())["space_counts"]["unavailable"], 2)
+        self.assertAlmostEqual(report(end_date=(day + timedelta(days=1)).isoformat())["occupancy_rate"], 0.05)
+        for invalid in ({"end_date": (day - timedelta(days=1)).isoformat()}, {"start_time": "09:00"},
+                        {"start_time": "07:30", "end_time": "09:30"}):
+            self.assertEqual(self.client.get(path, headers=manager, params={**query, **invalid}).status_code, 422)
+
+        # Historical block overlaps one hour of the approved reservation.
+        with self.factory.begin() as session:
+            session.execute(bloqueios_espaco.insert().values(
+                instituicao_id=int(institution["id"]), espaco_id=int(room["id"]),
+                responsavel_id=int(manager_login.json()["data"]["user"]["id"]), motivo="Bloqueio de teste",
+                bloqueado_em=start + timedelta(minutes=30), desbloqueado_em=start + timedelta(minutes=90),
+            ))
+            late = start.replace(hour=23, minute=30)
+            session.add(Reserva(
+                instituicao_id=int(institution["id"]), espaco_id=int(spare["id"]),
+                solicitante_id=int(requester_login.json()["data"]["user"]["id"]), titulo="Data local", tipo="Aula",
+                inicio=late, fim=late + timedelta(minutes=15), quantidade_participantes=1,
+            ))
+        historical = report(space_id=room["id"])
+        self.assertEqual(historical["spaces"][0]["status"], "bloqueado")
+        self.assertEqual(historical["spaces"][0]["blocked_seconds"], 3600)
+        self.assertAlmostEqual(historical["occupancy_rate"], 1 / 9)
+        self.assertEqual([item["title"] for item in report(space_id=spare["id"])["reservations"]], ["Data local"])
+        self.assertEqual(report(space_id=spare["id"], start_date=(day + timedelta(days=1)).isoformat())
+                         ["metrics"]["total"], 0)
+        self.assertEqual(self.client.post(f"/reservations/{ids[0]}/cancel", headers=requester).status_code, 200)
+        final = report(space_id=room["id"])
+        self.assertEqual(final["metrics"]["approved"], 0)
+        self.assertEqual(final["metrics"]["cancelled"], 2)
+        self.assertEqual(final["occupancy_rate"], 0)
+
+    def test_streamlit_manager_dashboard_and_occupancy_use_persisted_status(self):
+        own, _ = self.register()
+        admin = self.headers(self.login(own["responsible_email"]))
+        login = self._manager_login(admin)
+        manager = self.headers(login)
+        requester = self.headers(self._requester_login(admin))
+        room = self._structure_room(admin, "Sala Painel Real")
+        payload = self._reservation_payload(room)
+        created = self.client.post("/reservations", headers=requester, json={**payload, "title": "Aula do Painel Real"})
+        self.assertEqual(created.status_code, 201, created.text)
+        reservation = created.json()["data"]
+        day = datetime.fromisoformat(payload["start"]).date()
+        with self.api_process() as url, patch.dict(os.environ, {"ROOMFLOW_API_URL": url}):
+            app = AppTest.from_file(str(PROJECT / "main.py"), default_timeout=20)
+            app.query_params["page"] = "gerente_dashboard"
+            app.session_state["auth_token"] = login.json()["data"]["access_token"]
+            app.run()
+            self.assertFalse(app.exception)
+            app.date_input(key="dashboard_start").set_value(day).run()
+            self.assertEqual({item.label: item.value for item in app.metric}["Pendentes"], "1")
+            self.assertIn("Aula do Painel Real", app.dataframe[0].value["Título"].tolist())
+            approved = self.client.patch(f"/reservations/{reservation['id']}/decision",
+                                         headers=manager, json={"status": "aprovada"})
+            self.assertEqual(approved.status_code, 200, approved.text)
+            app.run()
+            metrics = {item.label: item.value for item in app.metric}
+            self.assertEqual((metrics["Pendentes"], metrics["Aprovadas"]), ("0", "1"))
+            app.button(key="manager_dashboard_ver_ocupacao").click().run()
+            app.date_input(key="occupancy_date").set_value(day).run()
+            self.assertFalse(app.exception)
+            self.assertEqual({item.label: item.value for item in app.metric}["Taxa de ocupação no período"], "6.7%")
+            self.assertNotIn("reservations", app.session_state.filtered_state)
+            self.assertEqual(app.selectbox(key="occupancy_reservation_selector").value, reservation["id"])
+            next(button for button in app.button if button.label == "Ver detalhes").click().run()
+            self.assertIn("Aula do Painel Real", [item.value for item in app.subheader])
+            app.selectbox(key="occupancy_status").select("pendente").run()
+            self.assertEqual(app.selectbox(key="occupancy_status").value, "pendente")
+            self.assertFalse(any(item.key == "occupancy_reservation_selector" for item in app.selectbox))
+            self.assertEqual({item.label: item.value for item in app.metric}["Salas disponíveis no período"], "0")
+
     def test_manager_persists_room_changes_blocks_and_reports_real_availability(self):
         own, registration = self.register()
         foreign, _ = self.register()

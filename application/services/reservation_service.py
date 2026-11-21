@@ -83,12 +83,21 @@ class ReservationService:
         scope = self._permissions.authorize_listing(actor, Permission.REVIEW_RESERVATIONS)
         return self._repository.list(scope)
 
+    def list_for_operations(
+        self, actor: User, period: ReservationPeriod, space_ids: frozenset[str],
+    ) -> list[ReservationDetails]:
+        scope = self._permissions.authorize_listing(actor, Permission.VIEW_MANAGER_DASHBOARD)
+        return self._repository.list_for_period(scope, period, space_ids)
+
     def detail(self, actor: User, reservation_id: str) -> tuple[ReservationDetails, list[ReservationHistoryEvent]]:
         scope = self._permissions.authorize_listing(actor, Permission.REVIEW_RESERVATIONS)
         result = self._repository.find_with_history(scope, reservation_id)
         if result is None:
             raise ResourceNotFound("Reserva não encontrada.")
         return result
+
+    def can_edit(self, reservation: Reservation) -> bool:
+        return reservation.status in EDITABLE and reservation.request.period.start > self._clock.now()
 
     def create(self, actor: User, request: ReservationRequest) -> ReservationDetails:
         with self._atomic():
@@ -121,7 +130,7 @@ class ReservationService:
             details = self._find(institution.id, reservation_id, None if manager else actor.id)
             current = details.reservation
             now = self._clock.now()
-            if current.status not in EDITABLE or current.request.period.start <= now:
+            if not self.can_edit(current):
                 raise DuplicateResource("Esta reserva não permite alterações.")
             request = request.validated()
             if request == current.request:

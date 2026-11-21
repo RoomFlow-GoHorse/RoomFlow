@@ -11,6 +11,7 @@ from application.services.institution_management_service import InstitutionManag
 from application.services.institution_invite_code_service import InstitutionInviteCodeService
 from application.services.enrollment_management_service import EnrollmentManagementService
 from application.services.member_signup_service import MemberSignupService
+from application.services.manager_operations_service import ManagerOperationsService
 from application.services.password_recovery_service import PasswordRecoveryService
 from application.services.floor_plan_service import FloorPlanService
 from application.services.resource_management_service import ResourceManagementService
@@ -54,6 +55,7 @@ class PostgresRuntime:
     password_recovery: PasswordRecoveryService
     reservation_service: ReservationService
     conflict_service: ConflictService
+    manager_operations: ManagerOperationsService
 
 
 def build_postgres_runtime(
@@ -100,6 +102,9 @@ def build_postgres_runtime(
         reservation_service=reservation_service,
         conflict_service=ConflictService(
             conflicts, reservations, reservation_service, institutions, clock, transaction.atomic, audit.current_actor,
+        ),
+        manager_operations=ManagerOperationsService(
+            institutions, structure, reservation_service, reservations, structure, clock, transaction.snapshot,
         ),
         resource_management=ResourceManagementService(structure, structure, audit=audit),
         floor_plan_management=FloorPlanService(

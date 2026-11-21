@@ -98,6 +98,7 @@ def detail(
     return {"data": {
         **reservation_response(item),
         "reviewed_by": item.reservation.reviewed_by,
+        "can_edit": service.can_edit(item.reservation),
         "available_decisions": review_decisions(item.reservation.status),
         "history": [asdict(event) for event in history],
     }}

@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import datetime
 
 SPACE_STATUSES = frozenset({"disponivel", "ocupado", "bloqueado", "inativo"})
 
@@ -25,6 +26,7 @@ class Space:
     resource_quantities: tuple[tuple[str, int], ...] = ()
     block_reason: str | None = None
     occupancy_verified: bool = False
+    created_at: datetime | None = None
 
     def __post_init__(self) -> None:
         if not self.id.strip() or not self.institution_id.strip():

@@ -140,7 +140,13 @@ Em **Conflitos**, o gerente consulta pares de reservas da própria instituição
 mantém uma reserva e rejeita a outra, ou move uma para uma sala compatível.
 O botão **Detectar sobreposições** também verifica reservas anteriores à integração.
 
-As telas de agenda, ocupação e notificações continuam no modo de
+O painel do gerente e a tela de ocupação consultam as reservas no fuso da
+instituição. A taxa divide o tempo coberto por reservas aprovadas pelo tempo
+utilizável das salas ativas no horário institucional, descontando bloqueios
+registrados. O filtro de status restringe a linha do tempo. A disponibilidade
+continua considerando todas as aprovações do período selecionado.
+
+As telas de agenda e notificações continuam no modo de
 demonstração. O modo em memória continua disponível sem as duas variáveis.
 
 ### Arquitetura

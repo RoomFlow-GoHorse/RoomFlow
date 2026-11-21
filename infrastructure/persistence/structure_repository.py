@@ -14,6 +14,7 @@ from models.database_models import Espaco, EspacoRecurso, Recurso, Reserva
 from models.domain.entities.building import Building
 from models.domain.entities.floor import Floor
 from models.domain.entities.resource import Resource
+from models.domain.entities.reservation import ReservationPeriod
 from models.domain.entities.space import Space
 from models.domain.exceptions import DuplicateResource, ResourceNotFound
 
@@ -158,6 +159,20 @@ class PostgresStructureRepository:
             rows = self._spaces(session, self._space_select().where(Espaco.id == database_id))
             return rows[0] if rows else None
 
+    def block_periods(self, institution_id: str, period: ReservationPeriod) -> dict[str, list[ReservationPeriod]]:
+        columns = bloqueios_espaco.c
+        statement = select(columns.espaco_id, columns.bloqueado_em, columns.desbloqueado_em).where(
+            columns.instituicao_id == to_database_identity_id(institution_id),
+            columns.bloqueado_em < period.end,
+            columns.desbloqueado_em.is_(None) | (columns.desbloqueado_em > period.start),
+            columns.desbloqueado_em.is_(None) | (columns.bloqueado_em < columns.desbloqueado_em),
+        )
+        blocks = defaultdict(list)
+        with self._transaction.session() as session:
+            for room, blocked, unblocked in session.execute(statement):
+                blocks[str(room)].append(ReservationPeriod(blocked, unblocked or period.end))
+        return dict(blocks)
+
     @staticmethod
     def _spaces(session, statement):
         rows = session.execute(statement).all()
@@ -191,6 +206,7 @@ class PostgresStructureRepository:
                 resource_ids=tuple(key for key, _, _ in assigned),
                 resource_quantities=tuple((key, quantity) for key, _, quantity in assigned),
                 block_reason=row.motivo, occupancy_verified=True,
+                created_at=room.criado_em,
             ))
         return tuple(spaces)
 

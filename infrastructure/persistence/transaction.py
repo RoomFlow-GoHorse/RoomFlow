@@ -32,3 +32,16 @@ class PostgresTransaction:
                 yield
             finally:
                 self._active.reset(token)
+
+    @contextmanager
+    def snapshot(self):
+        if self._active.get() is not None:
+            yield
+            return
+        with self._factory.begin() as session:
+            session.execute(text("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY"))
+            token = self._active.set(session)
+            try:
+                yield
+            finally:
+                self._active.reset(token)

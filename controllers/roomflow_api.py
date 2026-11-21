@@ -17,6 +17,7 @@ from application.services.password_recovery_service import InvalidRecoveryToken
 from controllers.structure_api import ApiAdminDashboard, ApiFloorPlans, ApiResourceManagement, ApiSpaceManagement
 from controllers.reservation_api import ApiReservations
 from controllers.conflict_api import ApiConflicts
+from controllers.manager_operations_api import ApiManagerOperations
 from models.domain.entities.admin_audit_event import AdminAuditAction, AdminAuditEvent
 from models.domain.entities.authorized_enrollment import AuthorizedEnrollment
 from models.domain.entities.institution import (
@@ -327,6 +328,7 @@ class ApiRuntime:
         self.password_recovery = ApiPasswordRecovery(api)
         self.reservation_service = ApiReservations(api)
         self.conflict_service = ApiConflicts(api)
+        self.manager_operations = ApiManagerOperations(api)
 
 
 class ApiPasswordRecovery:
