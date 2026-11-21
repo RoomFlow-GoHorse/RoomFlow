@@ -4,6 +4,7 @@ from config.constants import ROLE_NAV
 from controllers import auth_service
 from controllers.app_state_service import go
 from controllers.mock_data_service import notifications_for
+from controllers.streamlit_runtime import API_PAGES, uses_roomflow_api
 from views.components.ui_components import is_dark_theme, logo, role_label
 
 
@@ -70,7 +71,11 @@ def render_sidebar(user):
     current_page = st.session_state.get("page", "landing")
     role = user.get("role", "participante")
     allowed_pages = {page for _, page in ROLE_NAV.get(role, [])}
-    unread = sum(not item["read"] for item in notifications_for(role) if item.get("category") != "sistema")
+    if uses_roomflow_api():
+        allowed_pages &= API_PAGES
+        unread = 0
+    else:
+        unread = sum(not item["read"] for item in notifications_for(role) if item.get("category") != "sistema")
 
     with st.sidebar:
         with st.container(key="rf_sidebar_logo"):
@@ -81,7 +86,7 @@ def render_sidebar(user):
             st.caption("Navegação")
 
         for label, page, icon in _sidebar_items(role):
-            if page == "conta":
+            if page == "conta" or page not in allowed_pages:
                 continue
 
             is_active = current_page == page

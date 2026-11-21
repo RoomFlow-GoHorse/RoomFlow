@@ -143,12 +143,12 @@ class MemberSignupService:
                 created_at=self._clock.now(),
             )
 
-            def create_account() -> None:
-                self._users.add(UserAccount(user, pending.password_hash))
+            def create_account() -> User:
+                return self._users.add(UserAccount(user, pending.password_hash)).user
 
             try:
-                self._enrollments.consume_with(
-                    pending.institution_id, pending.registration_number, user.id,
+                _, user = self._enrollments.consume_with(
+                    pending.institution_id, pending.registration_number,
                     create_account,
                 )
             except (DuplicateResource, ResourceNotFound):

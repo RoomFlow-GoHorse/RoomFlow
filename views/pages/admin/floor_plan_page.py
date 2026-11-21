@@ -942,8 +942,10 @@ def _render_resources(rooms: list[dict]) -> None:
             }
             with st.form("fp_create_resource", clear_on_submit=True):
                 name = st.text_input("Nome do novo recurso", max_chars=100)
+                total = st.number_input("Estoque total", min_value=0, max_value=2**31 - 1, step=1)
+                unavailable = st.number_input("Quantidade indisponível", min_value=0, max_value=2**31 - 1, step=1)
                 if st.form_submit_button("Cadastrar recurso"):
-                    service.create_resource(actor, name)
+                    service.create_resource(actor, name, total, unavailable)
                     st.rerun()
 
             if not resources:
@@ -958,8 +960,12 @@ def _render_resources(rooms: list[dict]) -> None:
             resource = resources[selected]
             with st.form(f"fp_edit_resource_{resource.id}"):
                 new_name = st.text_input("Nome do recurso", value=resource.name, max_chars=100)
-                if st.form_submit_button("Salvar nome"):
-                    service.update_resource(actor, resource.id, new_name)
+                total = st.number_input("Estoque total", min_value=0, max_value=2**31 - 1,
+                                        value=resource.quantity_total, step=1)
+                unavailable = st.number_input("Quantidade indisponível", min_value=0, max_value=2**31 - 1,
+                                              value=resource.quantity_unavailable, step=1)
+                if st.form_submit_button("Salvar recurso"):
+                    service.update_resource(actor, resource.id, new_name, total, unavailable)
                     st.rerun()
             if st.button("Inativar recurso" if resource.active else "Reativar recurso", key="fp_toggle_resource"):
                 service.set_resource_active(actor, resource.id, not resource.active)

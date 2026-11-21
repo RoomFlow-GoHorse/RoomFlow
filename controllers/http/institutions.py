@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, Field
 
 from application.services.institution_management_service import (
@@ -28,6 +28,7 @@ from models.domain.exceptions import (
 
 
 router = APIRouter(prefix="/institutions", tags=["institutions"])
+registration_router = APIRouter(prefix="/institutions", tags=["institutions"])
 
 
 class InstitutionRegistrationRequest(BaseModel):
@@ -123,19 +124,22 @@ class SingleInstitutionResponse(BaseModel):
     data: InstitutionResponse
 
 
-@router.post("/signup", response_model=RegistrationResponse, status_code=201)
+@registration_router.post("/signup", response_model=RegistrationResponse, status_code=201)
 def register_institution(
     payload: InstitutionRegistrationRequest,
+    response: Response,
     service: InstitutionManagementService = Depends(get_institution_management_service),
     invitation_codes: InstitutionInviteCodeService = Depends(get_institution_invite_code_service),
 ) -> RegistrationResponse:
     try:
-        institution, owner = service.register(InstitutionRegistration(**payload.model_dump()))
+        institution, owner, code = service.register_with_invitation(
+            InstitutionRegistration(**payload.model_dump()), invitation_codes,
+        )
     except DuplicateResource as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from None
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from None
-    code, _ = invitation_codes.issue_or_replace(owner)
+    response.headers["Cache-Control"] = "private, no-store"
     return RegistrationResponse(data=InstitutionRegistrationData(
         institution=_institution_response(institution),
         administrator=RegisteredOwnerResponse(

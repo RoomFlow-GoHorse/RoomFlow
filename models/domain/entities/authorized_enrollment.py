@@ -9,6 +9,10 @@ class EnrollmentStatus(str, Enum):
     USED = "utilizado"
 
 
+def normalize_registration_number(number: str) -> str:
+    return re.sub(r"\s+", "", number).casefold()
+
+
 @dataclass(frozen=True, slots=True)
 class AuthorizedEnrollment:
     id: str
@@ -33,7 +37,7 @@ class AuthorizedEnrollment:
 
     @property
     def normalized_registration_number(self) -> str:
-        return re.sub(r"\s+", "", self.registration_number).casefold()
+        return normalize_registration_number(self.registration_number)
 
     @property
     def is_available(self) -> bool:

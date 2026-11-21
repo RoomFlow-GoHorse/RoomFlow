@@ -467,6 +467,9 @@ def _security(user):
     except InvalidCredentials:
         st.error("A senha atual informada nao confere.")
         return
+    except (DomainAuthorizationError, ValueError) as exc:
+        st.error(str(exc))
+        return
     st.success("Senha alterada com sucesso.", icon=":material/check_circle:")
 
 

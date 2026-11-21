@@ -1,6 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field
 
+from application.ports.email_sender import EmailDeliveryUnavailable
+
 from application.services.enrollment_management_service import (
     EnrollmentManagementService,
     MemberIdentityNotConfirmed,
@@ -106,6 +108,8 @@ def start_member_signup(
         raise HTTPException(status_code=429, detail="Muitas tentativas. Aguarde e tente novamente.", headers={"Retry-After": "60"}) from None
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from None
+    except EmailDeliveryUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from None
     return MemberSignupStartResponse(data={
         "institution_name": started.institution_name,
         "email": started.email,
@@ -128,6 +132,7 @@ def verify_member_email(
         raise HTTPException(status_code=400, detail="Token inv\u00e1lido, expirado ou j\u00e1 utilizado.") from None
     return MemberSignupCompleteResponse(data={
         "id": registered.user.id,
+        "name": registered.user.name,
         "email": registered.user.email,
         "profile": registered.user.profile.value,
         "institution_id": registered.user.institution_id or "",

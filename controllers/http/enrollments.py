@@ -142,6 +142,8 @@ def confirm_import(
         raise HTTPException(status_code=409, detail=str(exc)) from None
     except ResourceNotFound as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from None
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from None
     return ConfirmImportResponse(data={"imported": count})
 
 

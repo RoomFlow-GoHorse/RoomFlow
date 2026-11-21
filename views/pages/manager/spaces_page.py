@@ -3,7 +3,7 @@ import streamlit as st
 
 from controllers import mock_data_service
 from controllers.app_state_service import set_toast
-from controllers.streamlit_runtime import get_streamlit_actor, get_streamlit_runtime
+from controllers.streamlit_runtime import get_streamlit_actor, get_streamlit_runtime, uses_roomflow_api
 from models.domain.exceptions import DomainAuthorizationError, DuplicateResource, ResourceNotFound
 from views.components.ui_components import badge, page_header
 
@@ -99,10 +99,14 @@ def block_space_dialog(space):
         st.html(f'<div style="display: flex; justify-content: flex-end; width: 100%;">{badge(space["status"])}</div>')
 
     st.caption(f"{space['location']} · {space['type']}")
-    st.warning("Reservas ativas para esta sala serão sinalizadas como conflito e precisarão ser tratadas.", icon=":material/warning:")
+    remote = uses_roomflow_api()
+    if remote:
+        st.warning("A sala ficará bloqueada no catálogo.", icon=":material/warning:")
+    else:
+        st.warning("Reservas ativas para esta sala serão sinalizadas como conflito e precisarão ser tratadas.", icon=":material/warning:")
 
     with st.form(f"block_space_form_{space['id']}"):
-        reason = st.text_area(
+        reason = "" if remote else st.text_area(
             "Motivo do bloqueio *",
             placeholder="Ex.: Manutenção do ar-condicionado prevista para esta semana.",
             height=100,
@@ -118,7 +122,7 @@ def block_space_dialog(space):
         st.rerun()
 
     if submitted:
-        if not reason.strip():
+        if not remote and not reason.strip():
             st.error("Informe o motivo do bloqueio.")
             return
 
@@ -130,7 +134,7 @@ def block_space_dialog(space):
         except (DomainAuthorizationError, ResourceNotFound, ValueError, PermissionError) as exc:
             st.error(str(exc))
             return
-        _, affected = mock_data_service.block_space(space["id"], reason.strip())
+        affected = [] if remote else mock_data_service.block_space(space["id"], reason.strip())[1]
         message = (
             f"Sala bloqueada. {len(affected)} reserva(s) foram sinalizadas em Conflitos."
             if affected else "Sala bloqueada."
@@ -198,8 +202,11 @@ def edit_space_dialog(space):
         actor = get_streamlit_actor()
         try:
             runtime = get_streamlit_runtime()
-            runtime.space_management.update_space(actor, space["id"], capacity=capacity)
-            runtime.resource_management.set_space_resources(actor, space["id"], selected_resource_ids)
+            if uses_roomflow_api():
+                runtime.resource_management.update_space_configuration(space["id"], capacity, selected_resource_ids)
+            else:
+                runtime.space_management.update_space(actor, space["id"], capacity=capacity)
+                runtime.resource_management.set_space_resources(actor, space["id"], selected_resource_ids)
         except (DomainAuthorizationError, ResourceNotFound, ValueError, PermissionError) as exc:
             st.error(str(exc))
             return
@@ -260,7 +267,8 @@ def _space_table_and_actions(items):
                 get_streamlit_runtime().space_management.update_space(
                     actor, selected_space["id"], status="disponivel"
                 )
-                mock_data_service.toggle_space(selected_space["id"])
+                if not uses_roomflow_api():
+                    mock_data_service.toggle_space(selected_space["id"])
                 set_toast("Sala desbloqueada.")
                 st.rerun()
         else:

@@ -188,7 +188,7 @@ class InMemorySpaceRepository:
         with self._lock:
             return self._spaces.get(space_id)
 
-    def add_space(self, space: Space) -> None:
+    def add_space(self, space: Space) -> Space:
         with self._lock:
             self._assert_space_relationship(space)
             self._assert_unique_name(
@@ -199,6 +199,7 @@ class InMemorySpaceRepository:
             if space.id in self._spaces:
                 raise DuplicateResource("O identificador da sala já está em uso.")
             self._spaces[space.id] = space
+            return space
 
     def save_space(self, space: Space) -> None:
         with self._lock:
@@ -233,7 +234,7 @@ class InMemorySpaceRepository:
         with self._lock:
             return self._resources.get(resource_id)
 
-    def add_resource(self, resource: Resource) -> None:
+    def add_resource(self, resource: Resource) -> Resource:
         with self._lock:
             self._assert_unique_name(
                 resource.name,
@@ -244,6 +245,7 @@ class InMemorySpaceRepository:
             if resource.id in self._resources:
                 raise DuplicateResource("O identificador do recurso já está em uso.")
             self._resources[resource.id] = resource
+            return resource
 
     def save_resource(self, resource: Resource) -> None:
         with self._lock:

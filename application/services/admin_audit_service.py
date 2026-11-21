@@ -58,7 +58,7 @@ class AdminAuditService:
     def current_actor(self, actor: User) -> User:
         if self._users is None:
             return actor
-        account = self._users.find_by_id(actor.id)
+        account = self._users.find_by_id(actor.id, actor.institution_id)
         if account is None or not account.user.is_active:
             raise PermissionDenied("A conta do responsável não está ativa.")
         return account.user

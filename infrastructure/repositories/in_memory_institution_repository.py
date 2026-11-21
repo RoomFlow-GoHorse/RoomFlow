@@ -29,13 +29,14 @@ class InMemoryInstitutionRepository:
                 None,
             )
 
-    def add(self, institution: Institution) -> None:
+    def add(self, institution: Institution) -> Institution:
         with self._lock:
             if institution.id in self._institutions:
                 raise DuplicateResource("O identificador da instituição já está em uso.")
             if institution.cnpj and self.find_by_cnpj(institution.cnpj):
                 raise DuplicateResource("Já existe uma instituição com este CNPJ.")
             self._institutions[institution.id] = institution
+            return institution
 
     def save(self, institution: Institution) -> None:
         with self._lock:

@@ -1,9 +1,8 @@
 from collections.abc import Callable
-from typing import Protocol, Sequence, TypeVar
+from typing import Protocol, Sequence
 
 from models.domain.entities.authorized_enrollment import AuthorizedEnrollment
-
-T = TypeVar("T")
+from models.domain.entities.user import User
 
 
 class AuthorizedEnrollmentRepository(Protocol):
@@ -22,6 +21,6 @@ class AuthorizedEnrollmentRepository(Protocol):
     def consume(self, institution_id: str, registration_number: str, user_id: str) -> AuthorizedEnrollment: ...
 
     def consume_with(
-        self, institution_id: str, registration_number: str, user_id: str,
-        operation: Callable[[], T],
-    ) -> tuple[AuthorizedEnrollment, T]: ...
+        self, institution_id: str, registration_number: str,
+        operation: Callable[[], User],
+    ) -> tuple[AuthorizedEnrollment, User]: ...

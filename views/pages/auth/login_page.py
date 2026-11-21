@@ -1,7 +1,10 @@
+from html import escape
+
 import streamlit as st
 
 from controllers import auth_service
 from controllers.app_state_service import go, go_authenticated
+from controllers.streamlit_runtime import uses_roomflow_api
 from views.components.ui_components import logo
 
 
@@ -23,13 +26,17 @@ def _init_state():
 
 
 def _target_for(user):
+    if uses_roomflow_api():
+        return {"admin": "admin_dashboard", "gerente": "espacos"}.get(user["role"], "conta")
     return ROLE_REDIRECT.get(user["role"], "participante_dashboard")
 
 
-def _attempt_login(email, password):
-    user, error = auth_service.login(email, password)
+def _attempt_login(email, password, institution_id=None):
+    user, error = auth_service.login(email, password, institution_id)
     if error:
         st.session_state.login_error = error
+        if st.session_state.get("login_institutions") and institution_id is None:
+            st.rerun()
         return
 
     st.session_state.login_error = ""
@@ -447,13 +454,8 @@ def login():
                 '<span class="rf-login-password-label">Senha</span>',
                 unsafe_allow_html=True,
             )
-        with forgot_col:
-            if st.button(
-                "Esqueci minha senha",
-                key="login_forgot_password",
-                type="tertiary",
-            ):
-                go("forgot_password")
+        if forgot_col.button("Esqueci minha senha", key="login_forgot_password", type="tertiary"):
+            go("forgot_password")
 
         st.text_input(
             "Senha",
@@ -465,12 +467,19 @@ def login():
 
         if st.session_state.login_error:
             st.markdown(
-                f'<div class="rf-login-error">{st.session_state.login_error}</div>',
+                f'<div class="rf-login-error">{escape(st.session_state.login_error)}</div>',
                 unsafe_allow_html=True,
             )
 
+        institution_id = None
+        if options := st.session_state.get("login_institutions"):
+            institution_id = st.selectbox("Instituição", options, format_func=lambda item: f"Instituição {item}")
+            if st.button("Trocar e-mail"):
+                st.session_state.pop("login_institutions", None)
+                st.session_state.login_error = ""
+                st.rerun()
         if st.button("Entrar →", key="login_submit", type="primary", width="stretch"):
-            _attempt_login(st.session_state.login_email, st.session_state.login_password)
+            _attempt_login(st.session_state.login_email, st.session_state.login_password, institution_id)
 
         st.markdown(
             '<div class="rf-login-footer"><p class="rf-login-signup-link">Ainda não possui uma conta? <a href="?page=signup_choice" target="_self">Criar conta</a></p><span>Problemas para acessar? Entre em contato com a instituição.</span></div>',

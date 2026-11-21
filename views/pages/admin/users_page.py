@@ -2,7 +2,7 @@ import pandas as pd
 import streamlit as st
 
 from config.constants import ROLE_LABELS
-from controllers.streamlit_runtime import get_streamlit_actor, get_streamlit_runtime
+from controllers.streamlit_runtime import get_streamlit_actor, get_streamlit_runtime, uses_roomflow_api
 from models.domain.entities.authorized_enrollment import EnrollmentStatus
 from models.domain.entities.profile import Profile
 from models.domain.entities.user import User, UserStatus
@@ -135,7 +135,7 @@ def _enrollments(actor: User) -> None:
         ):
             try:
                 inserted = service.confirm_import(actor, preview.preview_id)
-            except (DomainAuthorizationError, DuplicateResource, ResourceNotFound) as exc:
+            except (DomainAuthorizationError, DuplicateResource, ResourceNotFound, ValueError) as exc:
                 st.error(str(exc))
             else:
                 st.session_state.pop("enrollment_preview", None)
@@ -192,8 +192,12 @@ def users_page(user):
         st.error("Acesso nao autorizado.")
         return
 
-    page_header("Usuarios", "Gerencie usuarios, codigos institucionais e matriculas da sua instituicao.")
-    users_tab, access_tab = st.tabs(["Usuarios", "Codigos e matriculas"])
+    if uses_roomflow_api():
+        page_header("Usuários", "Gerencie usuários, convites e matrículas da sua instituição.")
+        users_tab, access_tab = st.tabs(["Usuários", "Códigos e matrículas"])
+    else:
+        page_header("Usuarios", "Gerencie usuarios, codigos institucionais e matriculas da sua instituicao.")
+        users_tab, access_tab = st.tabs(["Usuarios", "Codigos e matriculas"])
     with users_tab:
         search_col, profile_col = st.columns([3, 1])
         query = search_col.text_input("Buscar por nome ou e-mail", key="users_search")
@@ -240,7 +244,14 @@ def users_page(user):
         if st.button("Novo usuario", type="primary", icon=":material/person_add:"):
             _user_dialog(actor)
 
-    with access_tab:
-        _invitation_codes(actor)
-        st.divider()
-        _enrollments(actor)
+    if access_tab is not None:
+        with access_tab:
+            try:
+                _invitation_codes(actor)
+            except (DomainAuthorizationError, ResourceNotFound) as exc:
+                st.error(str(exc))
+            st.divider()
+            try:
+                _enrollments(actor)
+            except (DomainAuthorizationError, ResourceNotFound) as exc:
+                st.error(str(exc))

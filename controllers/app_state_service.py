@@ -2,7 +2,7 @@ import copy
 import streamlit as st
 
 from models import mock_data
-from controllers.streamlit_runtime import get_streamlit_actor
+from controllers.streamlit_runtime import get_streamlit_actor, uses_roomflow_api
 
 
 def _clear_occupancy_modal_state():
@@ -21,6 +21,9 @@ def boot_state():
     }
     for key, value in simple_defaults.items():
         st.session_state.setdefault(key, value)
+
+    if uses_roomflow_api():
+        return
 
     deep_defaults = {
         "reservations": mock_data.RESERVATIONS,

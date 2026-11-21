@@ -5,7 +5,7 @@ import streamlit as st
 from application.services.institution_management_service import InstitutionRegistration
 from controllers.app_state_service import go
 from controllers.streamlit_runtime import get_streamlit_runtime
-from models.domain.exceptions import DuplicateResource
+from models.domain.exceptions import DomainAuthorizationError, DuplicateResource
 from views.components.ui_components import logo
 
 INSTITUTION_TYPES = [
@@ -146,7 +146,7 @@ def _submit():
                 password=state.signup_inst_senha,
             )
         )
-    except (DuplicateResource, ValueError) as exc:
+    except (DuplicateResource, DomainAuthorizationError, ValueError) as exc:
         state.signup_inst_error = str(exc)
         return
 
@@ -300,7 +300,7 @@ def _render_form():
     st.markdown('<p class="rf-terms">Ao criar sua conta, você concorda com os termos de uso e a política de privacidade do RoomFlow.</p>', unsafe_allow_html=True)
 
 def _render_success():
-    institution, owner = st.session_state.signup_inst_created
+    institution, owner, *invitation = st.session_state.signup_inst_created
     check_circle_svg = '<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>'
     
     st.html(
@@ -335,6 +335,10 @@ def _render_success():
         </div>
         """,
     )
+
+    if invitation:
+        st.caption("Código institucional. Compartilhe somente com membros autorizados.")
+        st.code(invitation[0], language=None)
 
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:

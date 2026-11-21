@@ -4,9 +4,11 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, Up
 from pydantic import BaseModel, Field
 
 from application.services.space_service import SpaceService
+from application.services.admin_audit_service import AdminAuditService
 from application.services.floor_plan_service import FloorPlanService
 from application.services.resource_management_service import ResourceManagementService
 from controllers.http.dependencies import (
+    get_admin_audit_service,
     get_current_user,
     get_floor_plan_management_service,
     get_resource_management_service,
@@ -82,10 +84,14 @@ class SpaceResponse(BaseModel):
     active: bool
     resources: list[str]
     resource_ids: list[str]
+    resource_quantities: dict[str, int]
+    occupancy: int
 
 
 class ResourceRequest(BaseModel):
     name: str = Field(min_length=1, max_length=100)
+    quantity_total: int | None = Field(default=None, ge=0, lt=2**31, strict=True)
+    quantity_unavailable: int | None = Field(default=None, ge=0, lt=2**31, strict=True)
 
 
 class ResourceResponse(BaseModel):
@@ -93,10 +99,17 @@ class ResourceResponse(BaseModel):
     institution_id: str
     name: str
     active: bool
+    quantity_total: int
+    quantity_unavailable: int
 
 
 class ResourceAssignmentRequest(BaseModel):
     resource_ids: list[str] = Field(max_length=100)
+    quantities: dict[str, int] = Field(default_factory=dict, max_length=100)
+
+
+class SpaceConfigurationRequest(ResourceAssignmentRequest):
+    capacity: int = Field(ge=1, le=10000, strict=True)
 
 
 class RoomPositionRequest(BaseModel):
@@ -312,7 +325,9 @@ def create_resource(
     actor: User = Depends(get_current_user),
     service: ResourceManagementService = Depends(get_resource_management_service),
 ):
-    return ItemResponse(data=_resource(_run(lambda: service.create_resource(actor, payload.name))))
+    return ItemResponse(data=_resource(_run(lambda: service.create_resource(
+        actor, payload.name, payload.quantity_total or 0, payload.quantity_unavailable or 0,
+    ))))
 
 
 @router.patch("/resources/{resource_id}", response_model=ItemResponse[ResourceResponse])
@@ -322,7 +337,9 @@ def update_resource(
     actor: User = Depends(get_current_user),
     service: ResourceManagementService = Depends(get_resource_management_service),
 ):
-    return ItemResponse(data=_resource(_run(lambda: service.update_resource(actor, resource_id, payload.name))))
+    return ItemResponse(data=_resource(_run(lambda: service.update_resource(
+        actor, resource_id, payload.name, payload.quantity_total, payload.quantity_unavailable,
+    ))))
 
 
 @router.patch("/resources/{resource_id}/status", response_model=ItemResponse[ResourceResponse])
@@ -343,8 +360,25 @@ def set_space_resources(
     actor: User = Depends(get_current_user),
     service: ResourceManagementService = Depends(get_resource_management_service),
 ):
-    result = _run(lambda: service.set_space_resources(actor, space_id, payload.resource_ids))
+    result = _run(lambda: service.set_space_resources(actor, space_id, payload.resource_ids, payload.quantities))
     return ItemResponse(data=_space(result))
+
+
+@router.put("/spaces/{space_id}/configuration", response_model=ItemResponse[SpaceResponse])
+def update_space_configuration(
+    space_id: str,
+    payload: SpaceConfigurationRequest,
+    actor: User = Depends(get_current_user),
+    spaces: SpaceService = Depends(get_space_management_service),
+    resources: ResourceManagementService = Depends(get_resource_management_service),
+    audit: AdminAuditService = Depends(get_admin_audit_service),
+):
+    def update_configuration():
+        with audit.atomic():
+            spaces.update_space(actor, space_id, capacity=payload.capacity)
+            return resources.set_space_resources(actor, space_id, payload.resource_ids, payload.quantities)
+
+    return ItemResponse(data=_space(_run(update_configuration)))
 
 
 @router.get("/floors/{floor_id}/plan", response_model=ItemResponse[FloorPlanResponse])
@@ -451,6 +485,7 @@ def _space(item: Space) -> SpaceResponse:
         building=item.building, floor=item.floor, location=item.location,
         status=item.status, active=item.active,
         resources=list(item.resources), resource_ids=list(item.resource_ids),
+        resource_quantities=dict(item.resource_quantities), occupancy=item.occupancy,
     )
 
 
@@ -458,6 +493,7 @@ def _resource(item: Resource) -> ResourceResponse:
     return ResourceResponse(
         id=item.id, institution_id=item.institution_id,
         name=item.name, active=item.active,
+        quantity_total=item.quantity_total, quantity_unavailable=item.quantity_unavailable,
     )
 
 

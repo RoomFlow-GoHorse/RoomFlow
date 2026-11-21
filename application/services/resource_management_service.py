@@ -42,18 +42,29 @@ class ResourceManagementService:
         return resource
 
     @audited_mutation
-    def create_resource(self, actor: User, name: str) -> Resource:
+    def create_resource(
+        self, actor: User, name: str, quantity_total: int = 0, quantity_unavailable: int = 0,
+    ) -> Resource:
         institution_id = self._scope(actor)
         normalized = " ".join(name.split())
-        resource = Resource(f"res-{secrets.token_urlsafe(10)}", institution_id, normalized)
-        self._resources.add_resource(resource)
+        resource = self._resources.add_resource(Resource(
+            f"res-{secrets.token_urlsafe(10)}", institution_id, normalized,
+            quantity_total=quantity_total, quantity_unavailable=quantity_unavailable,
+        ))
         self._record(actor, AdminAuditAction.RESOURCE_CREATED, "resource", resource.id)
         return resource
 
     @audited_mutation
-    def update_resource(self, actor: User, resource_id: str, name: str) -> Resource:
+    def update_resource(
+        self, actor: User, resource_id: str, name: str,
+        quantity_total: int | None = None, quantity_unavailable: int | None = None,
+    ) -> Resource:
         current = self.get_resource(actor, resource_id)
-        updated = replace(current, name=" ".join(name.split()))
+        updated = replace(
+            current, name=" ".join(name.split()),
+            quantity_total=current.quantity_total if quantity_total is None else quantity_total,
+            quantity_unavailable=current.quantity_unavailable if quantity_unavailable is None else quantity_unavailable,
+        )
         self._resources.save_resource(updated)
         if updated != current:
             self._record(actor, AdminAuditAction.RESOURCE_UPDATED, "resource", updated.id)
@@ -71,7 +82,8 @@ class ResourceManagementService:
 
     @audited_mutation
     def set_space_resources(
-        self, actor: User, space_id: str, resource_ids: list[str] | tuple[str, ...]
+        self, actor: User, space_id: str, resource_ids: list[str] | tuple[str, ...],
+        quantities: dict[str, int] | None = None,
     ):
         institution_id = self._scope(actor)
         space = self._spaces.find_space(space_id)
@@ -80,6 +92,10 @@ class ResourceManagementService:
         unique_ids = tuple(dict.fromkeys(resource_ids))
         if len(unique_ids) != len(resource_ids):
             raise ValueError("A lista contém recursos repetidos.")
+        quantities = quantities or {}
+        if quantities.keys() - set(unique_ids) or any(not 1 <= amount < 2**31 for amount in quantities.values()):
+            raise ValueError("Informe quantidades positivas apenas para recursos selecionados.")
+        previous_quantities = dict(space.resource_quantities)
         selected = []
         for resource_id in unique_ids:
             resource = self._resources.find_resource(resource_id)
@@ -93,9 +109,12 @@ class ResourceManagementService:
             space,
             resource_ids=tuple(item.id for item in selected),
             resources=tuple(item.name for item in selected),
+            resource_quantities=tuple(
+                (item.id, quantities.get(item.id, previous_quantities.get(item.id, 1))) for item in selected
+            ),
         )
         self._spaces.save_space(updated)
-        if updated.resource_ids != space.resource_ids:
+        if updated.resource_ids != space.resource_ids or updated.resource_quantities != space.resource_quantities:
             self._record(actor, AdminAuditAction.SPACE_RESOURCES_UPDATED, "space", updated.id)
         return updated
 

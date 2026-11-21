@@ -19,6 +19,8 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import ExcludeConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from infrastructure.persistence import records  # noqa: F401 - register additive tables
+from infrastructure.persistence import structure_records  # noqa: F401 - register structure tables
 from infrastructure.persistence.base import Base
 
 

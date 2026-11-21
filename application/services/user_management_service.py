@@ -15,7 +15,7 @@ from models.domain.entities.permission import Permission
 from models.domain.entities.profile import Profile
 from models.domain.entities.user import User, UserStatus
 from models.domain.entities.user_account import UserAccount
-from models.domain.exceptions import DuplicateResource, ResourceNotFound
+from models.domain.exceptions import DuplicateResource, InstitutionAccessDenied, PermissionDenied, ResourceNotFound
 from models.domain.identity_normalization import normalize_email
 from models.domain.policies.permission_policy import PermissionPolicy
 
@@ -62,14 +62,7 @@ class UserManagementService:
 
     def get_user(self, actor: User, user_id: str) -> User:
         self._permissions.authorize_listing(actor, Permission.MANAGE_USERS)
-        account = self._users.find_by_id(user_id)
-        if account is None:
-            raise ResourceNotFound("Usuário não encontrado.")
-        institution = self._institution_for_user(account.user)
-        self._permissions.authorize_resource(
-            actor, Permission.MANAGE_USERS, institution
-        )
-        return account.user
+        return self._account_in_scope(actor, user_id).user
 
     @audited_mutation
     def create_user(
@@ -106,13 +99,15 @@ class UserManagementService:
             status=UserStatus.ACTIVE,
             created_at=self._clock.now() if self._clock is not None else None,
         )
-        self._users.add(UserAccount(user, self._password_hasher.hash_password(password)))
+        user = self._users.add(UserAccount(user, self._password_hasher.hash_password(password))).user
         self._record(actor, AdminAuditAction.USER_CREATED, "user", user.id)
         return user
 
     @audited_mutation
     def update_user(self, actor: User, user_id: str, name: str, email: str) -> User:
         account = self._account_in_scope(actor, user_id)
+        if actor.id != user_id and self._users.has_other_memberships(user_id, actor.institution_id or ""):
+            raise PermissionDenied("Somente o titular pode editar os dados de uma conta com vários vínculos.")
         return self._update_identity(actor, account, name, email)
 
     @audited_mutation
@@ -143,7 +138,7 @@ class UserManagementService:
             self._users.save(saved)
         if account.user.is_active and not updated.is_active and self._sessions is not None:
             now = self._clock.now() if self._clock else datetime.now(timezone.utc)
-            self._sessions.revoke_user(updated.id, now)
+            self._sessions.revoke_user(updated.id, now, updated.institution_id)
         if account.user.status is not updated.status:
             action = AdminAuditAction.USER_ACTIVATED if updated.is_active else AdminAuditAction.USER_DEACTIVATED
             self._record(actor, action, "user", updated.id)
@@ -163,7 +158,7 @@ class UserManagementService:
     @audited_mutation
     def update_own_profile(self, actor: User, name: str, email: str) -> User:
         self._permissions.authorize_own_account(actor, actor.id)
-        account = self._users.find_by_id(actor.id)
+        account = self._users.find_by_id(actor.id, actor.institution_id)
         if account is None:
             raise ResourceNotFound("Usuário não encontrado.")
         return self._update_identity(actor, account, name, email)
@@ -192,8 +187,10 @@ class UserManagementService:
 
     def _account_in_scope(self, actor: User, user_id: str) -> UserAccount:
         self._permissions.authorize_listing(actor, Permission.MANAGE_USERS)
-        account = self._users.find_by_id(user_id)
+        account = self._users.find_by_id(user_id, actor.institution_id)
         if account is None:
+            if self._users.find_by_id(user_id) is not None:
+                raise InstitutionAccessDenied("O recurso pertence a outra instituição.")
             raise ResourceNotFound("Usuário não encontrado.")
         self._permissions.authorize_resource(
             actor,

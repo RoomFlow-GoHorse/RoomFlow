@@ -2,6 +2,7 @@ import streamlit as st
 
 from config.constants import ROLE_NAV
 from controllers.app_state_service import boot_state, current_user
+from controllers.streamlit_runtime import API_PAGES, uses_roomflow_api
 from views.components.app_shell import shell_end, shell_start
 from views.components.ui_components import load_auth_css, load_css, toast
 
@@ -137,6 +138,8 @@ def sync_page_from_query():
 # =========================================================
 
 def get_dashboard_by_role(user):
+    if uses_roomflow_api():
+        return {"admin": "admin_dashboard", "gerente": "espacos"}.get(user.get("role"), "conta")
     dashboard_by_role = {
         "admin": "admin_dashboard",
         "gerente": "gerente_dashboard",
@@ -151,7 +154,8 @@ def get_dashboard_by_role(user):
 
 
 def get_allowed_pages_by_role(role):
-    return {page for _, page in ROLE_NAV.get(role, [])}
+    pages = {page for _, page in ROLE_NAV.get(role, [])}
+    return pages & API_PAGES if uses_roomflow_api() else pages
 
 
 def ensure_allowed_internal_page(page, user):
@@ -199,6 +203,7 @@ def main():
     # USUÁRIO AUTENTICADO TENTANDO ACESSAR ROTA PÚBLICA
     # ---------------------------------------------------------
 
+    st.session_state.pop("login_password", None)
     if page in PUBLIC_ROUTES:
         page = get_dashboard_by_role(user)
         st.session_state.page = page

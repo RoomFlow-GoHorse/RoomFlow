@@ -1,6 +1,12 @@
+from html import escape
+
 import streamlit as st
 
+from application.services.authentication_service import TooManyLoginAttempts
+from application.services.password_recovery_service import InvalidRecoveryToken
 from controllers.app_state_service import go
+from controllers.streamlit_runtime import get_streamlit_runtime, uses_roomflow_api
+from models.domain.exceptions import DomainAuthorizationError
 from views.components.ui_components import logo
 
 
@@ -337,17 +343,45 @@ def forgot_password():
 
         if st.button("Enviar instruções →", key="forgot_password_submit", type="primary", width="stretch"):
             email = st.session_state.forgot_password_email.strip()
-            st.session_state.forgot_password_success = (
-                f"Se {email or 'este e-mail'} estiver cadastrado, as instruções serão enviadas."
-            )
+            try:
+                if uses_roomflow_api():
+                    get_streamlit_runtime().password_recovery.request(email)
+            except (DomainAuthorizationError, ValueError, TooManyLoginAttempts) as exc:
+                st.error(str(exc))
+            else:
+                st.session_state.forgot_password_success = (
+                    f"Se {email or 'este e-mail'} estiver cadastrado, as instruções serão enviadas."
+                )
 
         if st.session_state.forgot_password_success:
             st.markdown(
-                f'<div class="rf-forgot-success">{st.session_state.forgot_password_success}</div>',
+                f'<div class="rf-forgot-success">{escape(st.session_state.forgot_password_success)}</div>',
                 unsafe_allow_html=True,
             )
+            if uses_roomflow_api():
+                _reset_with_code()
 
         st.markdown(
             '<div class="rf-forgot-footer"><p>Lembrou sua senha? <a href="?page=login" target="_self">Entrar</a></p></div>',
             unsafe_allow_html=True,
         )
+
+
+def _reset_with_code():
+    with st.form("forgot_password_reset", clear_on_submit=True):
+        token = st.text_input("Código recebido por e-mail", type="password", max_chars=200)
+        password = st.text_input("Nova senha", type="password", max_chars=1024)
+        confirmation = st.text_input("Confirme a nova senha", type="password", max_chars=1024)
+        submitted = st.form_submit_button("Redefinir senha", type="primary")
+    if not submitted:
+        return
+    if password != confirmation:
+        st.error("As senhas não coincidem.")
+        return
+    try:
+        get_streamlit_runtime().password_recovery.reset(token.strip(), password)
+    except (InvalidRecoveryToken, DomainAuthorizationError, ValueError, TooManyLoginAttempts) as exc:
+        st.error(str(exc))
+    else:
+        st.session_state.pop("forgot_password_success", None)
+        st.success("Senha redefinida. Use a nova senha para entrar.")

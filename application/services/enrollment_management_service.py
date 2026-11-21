@@ -1,13 +1,14 @@
 import secrets
 import re
 from dataclasses import dataclass
-from threading import RLock
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from application.ports.authorized_enrollment_repository import AuthorizedEnrollmentRepository
 from application.services.admin_audit_service import AdminAuditService, audited_mutation
 from application.ports.institution_repository import InstitutionRepository
 from application.ports.enrollment_spreadsheet_parser import EnrollmentSpreadsheetParser
+from application.ports.enrollment_preview_repository import EnrollmentPreviewRepository
 from application.services.institution_invite_code_service import InstitutionInviteCodeService
 from application.services.login_attempt_limiter import LoginAttemptLimiter
 from models.domain.entities.authorized_enrollment import AuthorizedEnrollment, EnrollmentStatus
@@ -51,6 +52,7 @@ class EnrollmentManagementService:
         institutions: InstitutionRepository,
         invite_codes: InstitutionInviteCodeService,
         spreadsheet_parser: EnrollmentSpreadsheetParser,
+        previews: EnrollmentPreviewRepository,
         policy: PermissionPolicy | None = None,
         attempt_limiter: LoginAttemptLimiter | None = None,
         audit: AdminAuditService | None = None,
@@ -62,8 +64,7 @@ class EnrollmentManagementService:
         self._policy = policy or PermissionPolicy()
         self._attempt_limiter = attempt_limiter
         self._audit = audit
-        self._previews: dict[str, tuple[str, tuple[AuthorizedEnrollment, ...]]] = {}
-        self._preview_lock = RLock()
+        self._previews = previews
 
     @audited_mutation
     def add_manual(
@@ -157,22 +158,23 @@ class EnrollmentManagementService:
             valid.append(ImportRowResult(index, registration_number, name, email, "válido"))
 
         preview_id = secrets.token_urlsafe(24)
-        with self._preview_lock:
-            self._previews[preview_id] = (institution_id, tuple(new_enrollments))
+        self._previews.save(
+            preview_id, institution_id, tuple(new_enrollments),
+            datetime.now(timezone.utc) + timedelta(minutes=20),
+        )
         return EnrollmentImportPreview(preview_id, tuple(valid), tuple(duplicates), tuple(invalid))
 
     @audited_mutation
     def confirm_import(self, actor: User, preview_id: str) -> int:
         institution_id = self._admin_scope(actor)
-        with self._preview_lock:
-            preview = self._previews.get(preview_id)
-            if preview is None or preview[0] != institution_id:
-                raise ResourceNotFound("Prévia de importação não encontrada.")
-            enrollments = preview[1]
-            self._enrollments.add_many(enrollments)
-            for enrollment in enrollments:
-                self._record(actor, AdminAuditAction.ENROLLMENT_IMPORTED, "authorized_enrollment", enrollment.id)
-            del self._previews[preview_id]
+        now = datetime.now(timezone.utc)
+        enrollments = self._previews.find(preview_id, institution_id, now)
+        if enrollments is None:
+            raise ResourceNotFound("Prévia de importação não encontrada.")
+        self._enrollments.add_many(enrollments)
+        for enrollment in enrollments:
+            self._record(actor, AdminAuditAction.ENROLLMENT_IMPORTED, "authorized_enrollment", enrollment.id)
+        self._previews.consume(preview_id, institution_id, now)
         return len(enrollments)
 
     def preview_member_institution(

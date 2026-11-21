@@ -178,7 +178,7 @@ class SpaceService:
             f"s-{secrets.token_urlsafe(10)}", actor, building, floor,
             name, room_type, capacity, status,
         )
-        self._repository.add_space(space)
+        space = self._repository.add_space(space)
         self._record(actor, AdminAuditAction.SPACE_CREATED, "space", space.id)
         return space
 
@@ -196,21 +196,23 @@ class SpaceService:
         current = self.get_space(actor, space_id)
         if not current.active and status not in {None, "inativo"}:
             raise ValueError("Reative a sala antes de alterar seu status.")
-        target_floor = self._floor_for_space(actor, floor_id or current.floor_id)
-        building = self._building_for_space(actor, target_floor.building_id)
-        if not target_floor.active or not building.active:
-            raise ValueError("A sala precisa pertencer a prédio e andar ativos.")
-        updated = self._make_space(
-            current.id, actor, building, target_floor,
-            name if name is not None else current.name,
-            room_type if room_type is not None else current.type,
-            capacity if capacity is not None else current.capacity,
-            status if status is not None else current.status,
-            active=current.active,
-            resources=current.resources,
-            resource_ids=current.resource_ids,
-            occupancy=current.occupancy,
+        updated = replace(
+            current,
+            name=name.strip() if name is not None else current.name,
+            type=room_type.strip() if room_type is not None else current.type,
+            capacity=capacity if capacity is not None else current.capacity,
+            status=status if status is not None else current.status,
+            active=current.active and status != "inativo",
         )
+        if target_floor_id := floor_id or current.floor_id:
+            target_floor = self._floor_for_space(actor, target_floor_id)
+            building = self._building_for_space(actor, target_floor.building_id)
+            if not target_floor.active or not building.active:
+                raise ValueError("A sala precisa pertencer a prédio e andar ativos.")
+            updated = replace(
+                updated, building_id=building.id, building=building.name,
+                floor_id=target_floor.id, floor=target_floor.name, location=f"{building.name}, {target_floor.name}",
+            )
         self._repository.save_space(updated)
         if updated != current:
             action = AdminAuditAction.SPACE_DEACTIVATED if current.active and not updated.active else AdminAuditAction.SPACE_UPDATED
@@ -229,10 +231,11 @@ class SpaceService:
     @audited_mutation
     def activate_space(self, actor: User, space_id: str) -> Space:
         current = self.get_space(actor, space_id)
-        floor = self._floor_for_space(actor, current.floor_id)
-        building = self._building_for_space(actor, floor.building_id)
-        if not floor.active or not building.active:
-            raise ValueError("Ative o prédio e o andar antes de reativar a sala.")
+        if current.floor_id:
+            floor = self._floor_for_space(actor, current.floor_id)
+            building = self._building_for_space(actor, floor.building_id)
+            if not floor.active or not building.active:
+                raise ValueError("Ative o prédio e o andar antes de reativar a sala.")
         if current.active:
             return current
         updated = replace(current, active=True, status="disponivel")

@@ -5,6 +5,7 @@ from dataclasses import dataclass, replace
 
 from application.ports.clock import Clock
 from application.services.admin_audit_service import AdminAuditService, audited_mutation
+from application.services.institution_invite_code_service import InstitutionInviteCodeService
 from application.ports.institution_repository import InstitutionRepository
 from application.ports.password_hasher import PasswordHasher
 from application.ports.user_repository import UserRepository
@@ -69,6 +70,14 @@ class InstitutionManagementService:
         with self._audit.atomic() if self._audit is not None else nullcontext():
             return self._register(data)
 
+    def register_with_invitation(
+        self, data: InstitutionRegistration, invitation_codes: InstitutionInviteCodeService,
+    ) -> tuple[Institution, User, str]:
+        with self._audit.atomic() if self._audit is not None else nullcontext():
+            institution, owner = self._register(data)
+            code, _ = invitation_codes.issue_or_replace(owner)
+            return institution, owner, code
+
     def _register(self, data: InstitutionRegistration) -> tuple[Institution, User]:
         cnpj = normalize_cnpj(data.cnpj)
         if len(cnpj) != 14:
@@ -109,11 +118,12 @@ class InstitutionManagementService:
         account = UserAccount(owner, self._password_hasher.hash_password(data.password))
 
         # Compensating rollback keeps both in-memory writes together if user creation fails.
-        self._institutions.add(institution)
+        institution = self._institutions.add(institution)
         try:
-            self._users.add(account)
+            owner = self._users.add(replace(account, user=replace(owner, institution_id=institution.id))).user
         except Exception:
-            self._institutions.remove(institution.id)
+            if self._audit is None:
+                self._institutions.remove(institution.id)
             raise
         if self._audit is not None:
             self._audit.record(owner, AdminAuditAction.INSTITUTION_CREATED, "institution", institution.id)

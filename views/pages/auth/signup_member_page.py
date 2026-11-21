@@ -9,9 +9,9 @@ from application.services.enrollment_management_service import (
     TooManyEnrollmentAttempts,
 )
 from application.services.member_signup_service import InvalidEmailVerification
-from models.domain.exceptions import DuplicateResource
+from models.domain.exceptions import DomainAuthorizationError, DuplicateResource
 from controllers.app_state_service import go
-from controllers.streamlit_runtime import get_streamlit_runtime
+from controllers.streamlit_runtime import get_streamlit_runtime, uses_roomflow_api
 from views.components.ui_components import logo
 
 def _init_state():
@@ -230,6 +230,9 @@ def _render_validating():
     except MemberIdentityNotConfirmed:
         st.session_state.signup_member_error = "N\u00e3o foi poss\u00edvel confirmar os dados informados. Verifique com sua institui\u00e7\u00e3o."
         st.session_state.signup_member_screen = "error"
+    except (DomainAuthorizationError, ValueError) as exc:
+        st.session_state.signup_member_error = str(exc)
+        st.session_state.signup_member_screen = "error"
     else:
         st.session_state.signup_member_instituicao = preview.institution_name
         st.session_state.signup_member_screen = "confirm"
@@ -258,7 +261,7 @@ def _render_confirm():
                 email=st.session_state.signup_member_email.strip(),
                 attempt_key=st.session_state.signup_member_attempt_key,
             )
-        except (MemberIdentityNotConfirmed, TooManyEnrollmentAttempts):
+        except (MemberIdentityNotConfirmed, TooManyEnrollmentAttempts, DomainAuthorizationError, ValueError):
             st.session_state.signup_member_error = "N\u00e3o foi poss\u00edvel confirmar os dados informados. Verifique com sua institui\u00e7\u00e3o."
             st.session_state.signup_member_screen = "error"
         else:
@@ -274,9 +277,14 @@ def _render_confirm():
             except (MemberIdentityNotConfirmed, TooManyEnrollmentAttempts, DuplicateResource, ValueError):
                 st.session_state.signup_member_error = "N\u00e3o foi poss\u00edvel iniciar o cadastro. Verifique os dados e tente novamente."
                 st.session_state.signup_member_screen = "error"
+            except DomainAuthorizationError as exc:
+                st.session_state.signup_member_error = str(exc)
+                st.session_state.signup_member_screen = "error"
             else:
                 st.session_state.signup_member_instituicao = started.institution_name
                 st.session_state.signup_member_screen = "email_pending"
+                st.session_state.pop("signup_member_senha", None)
+                st.session_state.pop("signup_member_confirm_senha", None)
         st.rerun()
 
 
@@ -287,30 +295,34 @@ def _render_email_pending():
         icon=":material/mark_email_unread:",
     )
     environment = os.getenv("APP_ENV", "development").strip().lower()
-    if environment in {"development", "test"}:
+    token = ""
+    if uses_roomflow_api():
+        token = st.text_input("Código recebido por e-mail", type="password", max_chars=200).strip()
+    elif environment in {"development", "test"}:
         message = get_streamlit_runtime().simulated_email_sender.latest_for(
             st.session_state.signup_member_email
         )
         if message:
             st.caption("Caixa de e-mail simulada para desenvolvimento:")
             st.code(message.verification_token)
-            if st.button("Confirmar e-mail", type="primary", key="signup_member_verify_email"):
-                try:
-                    registered = get_streamlit_runtime().member_signup.verify_email(
-                        message.verification_token,
-                        st.session_state.signup_member_attempt_key,
-                    )
-                except InvalidEmailVerification:
-                    st.session_state.signup_member_error = "Token inv\u00e1lido, expirado ou j\u00e1 utilizado."
-                    st.session_state.signup_member_screen = "error"
-                except TooManyEnrollmentAttempts:
-                    st.session_state.signup_member_error = "Muitas tentativas. Aguarde e tente novamente."
-                    st.session_state.signup_member_screen = "error"
-                else:
-                    st.session_state.signup_member_nome = registered.user.name
-                    st.session_state.signup_member_email = registered.user.email
-                    st.session_state.signup_member_screen = "success"
-                st.rerun()
+            token = message.verification_token
+    if not st.button("Confirmar e-mail", type="primary", key="signup_member_verify_email", disabled=not token):
+        return
+    try:
+        registered = get_streamlit_runtime().member_signup.verify_email(
+            token, st.session_state.signup_member_attempt_key,
+        )
+    except InvalidEmailVerification:
+        st.error("Token inválido, expirado ou já utilizado.")
+    except TooManyEnrollmentAttempts:
+        st.error("Muitas tentativas. Aguarde e tente novamente.")
+    except (DomainAuthorizationError, ValueError) as exc:
+        st.error(str(exc))
+    else:
+        st.session_state.signup_member_nome = registered.user.name
+        st.session_state.signup_member_email = registered.user.email
+        st.session_state.signup_member_screen = "success"
+        st.rerun()
 
 
 def _render_success():

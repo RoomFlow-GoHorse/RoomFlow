@@ -79,30 +79,44 @@ Normalmente:
 http://localhost:8501
 ```
 
-## Tabelas no PostgreSQL
+## Executando com PostgreSQL
 
-O Streamlit e o FastAPI usam os repositórios em memória. A configuração do
-PostgreSQL atende às migrations e aos scripts de seed. Consulte o
-[estado da integração com o banco](docs/institutional-enrollment-data-model.md).
+Preencha o `.env` local conforme `.env.example`. O banco deve existir. Para
+aplicar as revisões somente ao banco de desenvolvimento escolhido, confirme
+`DB_HOST` e `DB_NAME` antes de executar:
 
-Para preparar um banco de desenvolvimento, use o `.env.example` como referência
-e informe no `DB_NAME` o nome de um banco existente. A porta padrão do PostgreSQL
-é `5432`. Com o ambiente virtual ativo:
-
-```bash
+```powershell
 python -m alembic upgrade head
-python -m scripts.seed_perfis
 ```
 
-O seed opcional de demonstração usa `python -m scripts.seed_demo` e pede a
-senha das quatro contas de demonstração.
+Em um terminal, inicie a API:
 
-Para mudanças futuras no modelo SQLAlchemy, revise a migration gerada antes
-de aplicá-la:
-
-```bash
-python -m alembic revision --autogenerate -m "descreva a mudança"
+```powershell
+$env:ROOMFLOW_PERSISTENCE = "postgres"
+python -m uvicorn api.main:app --host 127.0.0.1 --port 8000
 ```
+
+Em outro, aponte o Streamlit para essa API:
+
+```powershell
+$env:ROOMFLOW_API_URL = "http://127.0.0.1:8000"
+python -m streamlit run main.py
+```
+
+Use **Criar conta → Cadastrar instituição** para criar a primeira instituição e
+o administrador. O cadastro registra o perfil necessário no catálogo, junto com
+a conta e o vínculo. Os scripts `seed_perfis` e `seed_demo` continuam opcionais.
+
+Confirmação de e-mail e recuperação de senha usam SMTP com TLS implícito.
+Configure `ROOMFLOW_SMTP_HOST`, `ROOMFLOW_SMTP_PORT` (padrão 465),
+`ROOMFLOW_SMTP_FROM` e, se exigidos pelo servidor, `ROOMFLOW_SMTP_USERNAME` e
+`ROOMFLOW_SMTP_PASSWORD` somente no ambiente da API ou no `.env` local.
+
+O modo PostgreSQL inclui autenticação, usuários, instituições, convites,
+matrículas, estrutura física, recursos, plantas, painel e histórico administrativos.
+Os fluxos operacionais de reservas, conflitos e notificações permanecem no modo
+de demonstração. Com `ROOMFLOW_API_URL` configurado, o Streamlit usa a API para
+os fluxos liberados. O modo em memória continua disponível sem as duas variáveis.
 
 ### Arquitetura
 * **Views:** responsáveis pela interface da aplicação.
@@ -118,6 +132,11 @@ Mantenha as dependências diretas em `requirements.txt`. Para executar a suíte:
 ```bash
 python -m unittest discover -s tests -v
 ```
+
+Para incluir os testes PostgreSQL, prepare um banco local descartável com nome
+iniciado por `roomflow_test_`, aplique nele as revisões e rode a mesma suíte com
+`ROOMFLOW_TEST_DATABASE` apontando para esse banco. Os testes usam as credenciais
+locais do `.env` e criam dados próprios.
 
 ## Status
 

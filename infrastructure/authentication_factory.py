@@ -17,6 +17,7 @@ from infrastructure.in_memory_admin_transaction import InMemoryAdminTransaction
 from infrastructure.repositories.in_memory_institution_repository import InMemoryInstitutionRepository
 from infrastructure.repositories.in_memory_institution_invite_code_repository import InMemoryInstitutionInviteCodeRepository
 from infrastructure.repositories.in_memory_authorized_enrollment_repository import InMemoryAuthorizedEnrollmentRepository
+from infrastructure.repositories.in_memory_enrollment_preview_repository import InMemoryEnrollmentPreviewRepository
 from infrastructure.repositories.in_memory_session_repository import InMemorySessionRepository
 from infrastructure.repositories.in_memory_user_repository import InMemoryUserRepository
 from infrastructure.repositories.in_memory_space_repository import InMemorySpaceRepository
@@ -110,6 +111,7 @@ def build_application_runtime(environment: str) -> InMemoryApplicationRuntime:
         institutions=institution_repository,
         invite_codes=invite_code_service,
         spreadsheet_parser=OpenpyxlEnrollmentSpreadsheetParser(),
+        previews=InMemoryEnrollmentPreviewRepository(),
         attempt_limiter=LoginAttemptLimiter(max_attempts=8),
         audit=admin_audit,
     )

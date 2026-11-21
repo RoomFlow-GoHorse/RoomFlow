@@ -8,6 +8,7 @@ class UserSession:
     user_id: str
     expires_at: datetime
     revoked_at: datetime | None = None
+    institution_id: str | None = None
 
     def is_valid_at(self, instant: datetime) -> bool:
         return self.revoked_at is None and instant < self.expires_at

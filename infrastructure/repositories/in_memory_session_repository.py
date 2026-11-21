@@ -18,10 +18,14 @@ class InMemorySessionRepository:
         with self._lock:
             self._sessions[session.token_digest] = session
 
-    def revoke_user(self, user_id: str, at: datetime) -> None:
+    def revoke_user(self, user_id: str, at: datetime, institution_id: str | None = None) -> None:
         with self._lock:
             for digest, session in self._sessions.items():
-                if session.user_id == user_id and session.is_valid_at(at):
+                if (
+                    session.user_id == user_id
+                    and (institution_id is None or session.institution_id == institution_id)
+                    and session.is_valid_at(at)
+                ):
                     self._sessions[digest] = session.revoke(at)
 
     def find_by_digest(self, token_digest: str) -> UserSession | None:

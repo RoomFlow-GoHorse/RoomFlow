@@ -26,9 +26,16 @@ class InMemoryUserRepository:
         with self._lock:
             return self._by_email.get(normalize_email(email))
 
-    def find_by_id(self, user_id: str) -> UserAccount | None:
+    def list_login_accounts(self, email: str) -> tuple[UserAccount, ...]:
+        account = self.find_by_email(email)
+        return (account,) if account else ()
+
+    def find_by_id(self, user_id: str, institution_id: str | None = None) -> UserAccount | None:
         with self._lock:
-            return self._by_id.get(user_id)
+            account = self._by_id.get(user_id)
+            if account and institution_id is not None and account.user.institution_id != institution_id:
+                return None
+            return account
 
     def list_by_institution(self, institution_id: str) -> tuple[UserAccount, ...]:
         with self._lock:
@@ -37,7 +44,12 @@ class InMemoryUserRepository:
                 if account.user.institution_id == institution_id
             )
 
-    def add(self, account: UserAccount) -> None:
+    def has_other_memberships(self, user_id: str, institution_id: str) -> bool:
+        with self._lock:
+            account = self._by_id.get(user_id)
+            return bool(account and account.user.institution_id != institution_id)
+
+    def add(self, account: UserAccount) -> UserAccount:
         email = normalize_email(account.user.email)
         with self._lock:
             if email in self._by_email:
@@ -46,6 +58,7 @@ class InMemoryUserRepository:
                 raise DuplicateResource("O identificador da conta já está em uso.")
             self._by_email[email] = account
             self._by_id[account.user.id] = account
+            return account
 
     def save(self, account: UserAccount) -> None:
         with self._lock:
