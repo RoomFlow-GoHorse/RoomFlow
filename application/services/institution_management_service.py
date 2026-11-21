@@ -1,12 +1,15 @@
 import secrets
 import re
+from contextlib import nullcontext
 from dataclasses import dataclass, replace
 
 from application.ports.clock import Clock
+from application.services.admin_audit_service import AdminAuditService, audited_mutation
 from application.ports.institution_repository import InstitutionRepository
 from application.ports.password_hasher import PasswordHasher
 from application.ports.user_repository import UserRepository
 from models.domain.entities.institution import Institution, InstitutionPreferences
+from models.domain.entities.admin_audit_event import AdminAuditAction
 from models.domain.entities.permission import Permission
 from models.domain.entities.profile import Profile
 from models.domain.entities.user import User, UserStatus
@@ -52,20 +55,34 @@ class InstitutionManagementService:
         password_hasher: PasswordHasher,
         permission_policy: PermissionPolicy | None = None,
         clock: Clock | None = None,
+        audit: AdminAuditService | None = None,
     ) -> None:
         self._institutions = institutions
         self._users = users
         self._password_hasher = password_hasher
         self._permissions = permission_policy or PermissionPolicy()
         self._clock = clock
+        self._audit = audit
 
     def register(self, data: InstitutionRegistration) -> tuple[Institution, User]:
+        with self._audit.atomic() if self._audit is not None else nullcontext():
+            return self._register(data)
+
+    def _register(self, data: InstitutionRegistration) -> tuple[Institution, User]:
         cnpj = "".join(character for character in data.cnpj if character.isdigit())
         if len(cnpj) != 14:
             raise ValueError("O CNPJ deve conter 14 dígitos.")
         if self._institutions.find_by_cnpj(cnpj):
             raise DuplicateResource("Já existe uma instituição com este CNPJ.")
         email = data.responsible_email.strip().lower()
+        if len(email) > 255 or not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
+            raise ValueError("Informe um e-mail válido para o administrador.")
+        if not 8 <= len(data.password) <= 1024:
+            raise ValueError("A senha deve ter entre 8 e 1024 caracteres.")
+        if not data.institution_type.strip():
+            raise ValueError("Informe o tipo da instituição.")
+        if data.email.strip() and not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", data.email.strip()):
+            raise ValueError("Informe um e-mail institucional válido.")
         if self._users.find_by_email(email):
             raise DuplicateResource("Já existe uma conta com este e-mail.")
 
@@ -97,6 +114,9 @@ class InstitutionManagementService:
         except Exception:
             self._institutions.remove(institution.id)
             raise
+        if self._audit is not None:
+            self._audit.record(owner, AdminAuditAction.INSTITUTION_CREATED, "institution", institution.id)
+            self._audit.record(owner, AdminAuditAction.USER_CREATED, "user", owner.id)
         return institution, owner
 
     def get_own(self, actor: User) -> Institution:
@@ -109,6 +129,7 @@ class InstitutionManagementService:
         )
         return institution
 
+    @audited_mutation
     def update_own(self, actor: User, data: InstitutionUpdate) -> Institution:
         current = self.get_own(actor)
         name = data.name.strip()
@@ -137,4 +158,6 @@ class InstitutionManagementService:
             preferences=data.preferences if data.preferences is not None else current.preferences,
         )
         self._institutions.save(updated)
+        if self._audit is not None and updated != current:
+            self._audit.record(actor, AdminAuditAction.INSTITUTION_SETTINGS_UPDATED, "institution", updated.id)
         return updated

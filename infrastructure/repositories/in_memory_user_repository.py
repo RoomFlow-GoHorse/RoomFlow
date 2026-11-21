@@ -1,6 +1,7 @@
 from threading import RLock
 from collections.abc import Iterable
 
+from infrastructure.in_memory_admin_transaction import InMemoryAdminTransaction
 from models.domain.exceptions import DuplicateResource, LastActiveAdministrator, ResourceNotFound
 from models.domain.entities.user_account import UserAccount
 from models.domain.entities.profile import Profile
@@ -10,10 +11,12 @@ from models.domain.entities.user import UserStatus
 class InMemoryUserRepository:
     """Temporary process-local user store for development and tests."""
 
-    def __init__(self, accounts: Iterable[UserAccount] = ()) -> None:
-        self._lock = RLock()
+    def __init__(self, accounts: Iterable[UserAccount] = (), *, transaction: InMemoryAdminTransaction | None = None) -> None:
+        self._lock = transaction.lock if transaction is not None else RLock()
         self._by_email: dict[str, UserAccount] = {}
         self._by_id: dict[str, UserAccount] = {}
+        if transaction is not None:
+            transaction.register(self._by_email, self._by_id)
         for account in accounts:
             self._by_email[account.user.email.strip().lower()] = account
             self._by_id[account.user.id] = account

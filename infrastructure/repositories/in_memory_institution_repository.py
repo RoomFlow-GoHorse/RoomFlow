@@ -1,6 +1,7 @@
 from threading import RLock
 from collections.abc import Iterable
 
+from infrastructure.in_memory_admin_transaction import InMemoryAdminTransaction
 from models.domain.entities.institution import Institution
 from models.domain.exceptions import DuplicateResource
 
@@ -8,9 +9,11 @@ from models.domain.exceptions import DuplicateResource
 class InMemoryInstitutionRepository:
     """Temporary institution store; contents reset when the process stops."""
 
-    def __init__(self, institutions: Iterable[Institution] = ()) -> None:
-        self._lock = RLock()
+    def __init__(self, institutions: Iterable[Institution] = (), *, transaction: InMemoryAdminTransaction | None = None) -> None:
+        self._lock = transaction.lock if transaction is not None else RLock()
         self._institutions = {item.id: item for item in institutions}
+        if transaction is not None:
+            transaction.register(self._institutions)
 
     def find_by_id(self, institution_id: str) -> Institution | None:
         with self._lock:

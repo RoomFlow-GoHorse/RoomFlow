@@ -1,15 +1,19 @@
+from datetime import datetime
 from threading import RLock
 
+from infrastructure.in_memory_admin_transaction import InMemoryAdminTransaction
 from models.domain.entities.institution_invite_code import InstitutionInviteCode
 
 
 class InMemoryInstitutionInviteCodeRepository:
     """Stores only the current digest per institution; raw codes are never persisted."""
 
-    def __init__(self) -> None:
-        self._lock = RLock()
+    def __init__(self, *, transaction: InMemoryAdminTransaction | None = None) -> None:
+        self._lock = transaction.lock if transaction is not None else RLock()
         self._active_digest_by_institution: dict[str, str] = {}
         self._records_by_digest: dict[str, InstitutionInviteCode] = {}
+        if transaction is not None:
+            transaction.register(self._active_digest_by_institution, self._records_by_digest)
 
     def find_active(self, institution_id: str) -> InstitutionInviteCode | None:
         with self._lock:
@@ -35,3 +39,13 @@ class InMemoryInstitutionInviteCodeRepository:
                 self._records_by_digest[existing.digest] = existing.revoke(code.created_at)
             self._records_by_digest[code.digest] = code
             self._active_digest_by_institution[code.institution_id] = code.digest
+
+    def revoke(self, institution_id: str, at: datetime) -> InstitutionInviteCode | None:
+        with self._lock:
+            digest = self._active_digest_by_institution.pop(institution_id, None)
+            existing = self._records_by_digest.get(digest) if digest else None
+            if existing is None or not existing.is_active:
+                return None
+            revoked = existing.revoke(at)
+            self._records_by_digest[existing.digest] = revoked
+            return revoked

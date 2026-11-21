@@ -1,5 +1,6 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field, replace
 from datetime import datetime
+from uuid import uuid4
 
 
 @dataclass(frozen=True, slots=True)
@@ -8,6 +9,7 @@ class InstitutionInviteCode:
     digest: str
     created_at: datetime
     revoked_at: datetime | None = None
+    id: str = field(default_factory=lambda: f"invite-{uuid4().hex}")
 
     @property
     def is_active(self) -> bool:
@@ -16,5 +18,4 @@ class InstitutionInviteCode:
     def revoke(self, instant: datetime) -> "InstitutionInviteCode":
         if self.revoked_at is not None:
             return self
-        from dataclasses import replace
         return replace(self, revoked_at=instant)

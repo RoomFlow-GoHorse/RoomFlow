@@ -1,12 +1,16 @@
 import secrets
 import re
 from dataclasses import replace
+from datetime import datetime, timezone
 
 from application.ports.clock import Clock
+from application.services.admin_audit_service import AdminAuditService, audited_mutation
 from application.ports.institution_repository import InstitutionRepository
 from application.ports.password_hasher import PasswordHasher
+from application.ports.session_repository import SessionRepository
 from application.ports.user_repository import UserRepository
 from models.domain.entities.institution import Institution
+from models.domain.entities.admin_audit_event import AdminAuditAction
 from models.domain.entities.permission import Permission
 from models.domain.entities.profile import Profile
 from models.domain.entities.user import User, UserStatus
@@ -25,12 +29,16 @@ class UserManagementService:
         password_hasher: PasswordHasher,
         permission_policy: PermissionPolicy | None = None,
         clock: Clock | None = None,
+        audit: AdminAuditService | None = None,
+        sessions: SessionRepository | None = None,
     ) -> None:
         self._users = users
         self._institutions = institutions
         self._password_hasher = password_hasher
         self._permissions = permission_policy or PermissionPolicy()
         self._clock = clock
+        self._audit = audit
+        self._sessions = sessions
 
     def list_users(
         self,
@@ -62,6 +70,7 @@ class UserManagementService:
         )
         return account.user
 
+    @audited_mutation
     def create_user(
         self,
         actor: User,
@@ -97,8 +106,15 @@ class UserManagementService:
             created_at=self._clock.now() if self._clock is not None else None,
         )
         self._users.add(UserAccount(user, self._password_hasher.hash_password(password)))
+        self._record(actor, AdminAuditAction.USER_CREATED, "user", user.id)
         return user
 
+    @audited_mutation
+    def update_user(self, actor: User, user_id: str, name: str, email: str) -> User:
+        account = self._account_in_scope(actor, user_id)
+        return self._update_identity(actor, account, name, email)
+
+    @audited_mutation
     def update_profile(self, actor: User, user_id: str, profile: Profile) -> User:
         account = self._account_in_scope(actor, user_id)
         updated = replace(account.user, profile=Profile(profile))
@@ -109,8 +125,11 @@ class UserManagementService:
             )
         else:
             self._users.save(saved)
+        if account.user.profile is not updated.profile:
+            self._record(actor, AdminAuditAction.USER_PROFILE_CHANGED, "user", updated.id)
         return updated
 
+    @audited_mutation
     def set_status(self, actor: User, user_id: str, status: UserStatus) -> User:
         account = self._account_in_scope(actor, user_id)
         updated = replace(account.user, status=UserStatus(status))
@@ -121,6 +140,12 @@ class UserManagementService:
             )
         else:
             self._users.save(saved)
+        if account.user.is_active and not updated.is_active and self._sessions is not None:
+            now = self._clock.now() if self._clock else datetime.now(timezone.utc)
+            self._sessions.revoke_user(updated.id, now)
+        if account.user.status is not updated.status:
+            action = AdminAuditAction.USER_ACTIVATED if updated.is_active else AdminAuditAction.USER_DEACTIVATED
+            self._record(actor, action, "user", updated.id)
         return updated
 
     @staticmethod
@@ -134,20 +159,35 @@ class UserManagementService:
             )
         )
 
+    @audited_mutation
     def update_own_profile(self, actor: User, name: str, email: str) -> User:
         self._permissions.authorize_own_account(actor, actor.id)
         account = self._users.find_by_id(actor.id)
         if account is None:
             raise ResourceNotFound("Usuário não encontrado.")
+        return self._update_identity(actor, account, name, email)
+
+    def _update_identity(self, actor: User, account: UserAccount, name: str, email: str) -> User:
+        name = name.strip()
         normalized_email = email.strip().lower()
+        if not name or len(name) > 150 or len(normalized_email) > 255:
+            raise ValueError("Informe nome e e-mail dentro dos limites permitidos.")
+        if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", normalized_email):
+            raise ValueError("Informe um e-mail válido.")
         existing = self._users.find_by_email(normalized_email)
-        if existing is not None and existing.user.id != actor.id:
+        if existing is not None and existing.user.id != account.user.id:
             raise DuplicateResource("Já existe uma conta com este e-mail.")
         updated = replace(
             account.user, name=name.strip(), email=normalized_email
         )
         self._users.save(replace(account, user=updated))
+        if actor.institution_id and actor.profile is Profile.ADMIN and updated != account.user:
+            self._record(actor, AdminAuditAction.USER_ACCOUNT_UPDATED, "user", updated.id)
         return updated
+
+    def _record(self, actor: User, action: AdminAuditAction, resource_type: str, resource_id: str) -> None:
+        if self._audit is not None:
+            self._audit.record(actor, action, resource_type, resource_id)
 
     def _account_in_scope(self, actor: User, user_id: str) -> UserAccount:
         self._permissions.authorize_listing(actor, Permission.MANAGE_USERS)

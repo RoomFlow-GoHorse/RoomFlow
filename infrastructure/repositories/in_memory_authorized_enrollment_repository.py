@@ -3,6 +3,7 @@ from collections.abc import Callable
 from typing import TypeVar
 from collections.abc import Sequence
 
+from infrastructure.in_memory_admin_transaction import InMemoryAdminTransaction
 from models.domain.entities.authorized_enrollment import AuthorizedEnrollment
 from models.domain.exceptions import DuplicateResource, ResourceNotFound
 
@@ -12,10 +13,12 @@ T = TypeVar("T")
 class InMemoryAuthorizedEnrollmentRepository:
     """Thread-safe, institution-scoped temporary enrollment store."""
 
-    def __init__(self) -> None:
-        self._lock = RLock()
+    def __init__(self, *, transaction: InMemoryAdminTransaction | None = None) -> None:
+        self._lock = transaction.lock if transaction is not None else RLock()
         self._items: dict[tuple[str, str], AuthorizedEnrollment] = {}
         self._by_id: dict[tuple[str, str], tuple[str, str]] = {}
+        if transaction is not None:
+            transaction.register(self._items, self._by_id)
 
     def add(self, enrollment: AuthorizedEnrollment) -> None:
         self.add_many([enrollment])

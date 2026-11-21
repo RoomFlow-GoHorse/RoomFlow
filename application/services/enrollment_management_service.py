@@ -5,11 +5,13 @@ from threading import RLock
 from typing import Any
 
 from application.ports.authorized_enrollment_repository import AuthorizedEnrollmentRepository
+from application.services.admin_audit_service import AdminAuditService, audited_mutation
 from application.ports.institution_repository import InstitutionRepository
 from application.ports.enrollment_spreadsheet_parser import EnrollmentSpreadsheetParser
 from application.services.institution_invite_code_service import InstitutionInviteCodeService
 from application.services.login_attempt_limiter import LoginAttemptLimiter
 from models.domain.entities.authorized_enrollment import AuthorizedEnrollment, EnrollmentStatus
+from models.domain.entities.admin_audit_event import AdminAuditAction
 from models.domain.entities.permission import Permission
 from models.domain.entities.user import User
 from models.domain.exceptions import DuplicateResource, ResourceNotFound
@@ -51,6 +53,7 @@ class EnrollmentManagementService:
         spreadsheet_parser: EnrollmentSpreadsheetParser,
         policy: PermissionPolicy | None = None,
         attempt_limiter: LoginAttemptLimiter | None = None,
+        audit: AdminAuditService | None = None,
     ) -> None:
         self._enrollments = enrollments
         self._institutions = institutions
@@ -58,9 +61,11 @@ class EnrollmentManagementService:
         self._spreadsheet_parser = spreadsheet_parser
         self._policy = policy or PermissionPolicy()
         self._attempt_limiter = attempt_limiter
+        self._audit = audit
         self._previews: dict[str, tuple[str, tuple[AuthorizedEnrollment, ...]]] = {}
         self._preview_lock = RLock()
 
+    @audited_mutation
     def add_manual(
         self,
         actor: User,
@@ -79,6 +84,7 @@ class EnrollmentManagementService:
             email=email,
         )
         self._enrollments.add(enrollment)
+        self._record(actor, AdminAuditAction.ENROLLMENT_CREATED, "authorized_enrollment", enrollment.id)
         return enrollment
 
     def list_enrollments(
@@ -104,6 +110,7 @@ class EnrollmentManagementService:
             )
         ]
 
+    @audited_mutation
     def deactivate(self, actor: User, enrollment_id: str) -> AuthorizedEnrollment:
         institution_id = self._admin_scope(actor)
         enrollment = self._enrollments.find_by_id(institution_id, enrollment_id)
@@ -111,6 +118,7 @@ class EnrollmentManagementService:
             raise ResourceNotFound("Matrícula não encontrada.")
         updated = enrollment.deactivate()
         self._enrollments.save(updated)
+        self._record(actor, AdminAuditAction.ENROLLMENT_DEACTIVATED, "authorized_enrollment", updated.id)
         return updated
 
     def preview_import(self, actor: User, content: bytes) -> EnrollmentImportPreview:
@@ -153,6 +161,7 @@ class EnrollmentManagementService:
             self._previews[preview_id] = (institution_id, tuple(new_enrollments))
         return EnrollmentImportPreview(preview_id, tuple(valid), tuple(duplicates), tuple(invalid))
 
+    @audited_mutation
     def confirm_import(self, actor: User, preview_id: str) -> int:
         institution_id = self._admin_scope(actor)
         with self._preview_lock:
@@ -160,11 +169,9 @@ class EnrollmentManagementService:
             if preview is None or preview[0] != institution_id:
                 raise ResourceNotFound("Prévia de importação não encontrada.")
             enrollments = preview[1]
-            try:
-                self._enrollments.add_many(enrollments)
-            except DuplicateResource:
-                # The complete batch is rejected if the data changed after preview.
-                raise
+            self._enrollments.add_many(enrollments)
+            for enrollment in enrollments:
+                self._record(actor, AdminAuditAction.ENROLLMENT_IMPORTED, "authorized_enrollment", enrollment.id)
             del self._previews[preview_id]
         return len(enrollments)
 
@@ -202,6 +209,10 @@ class EnrollmentManagementService:
 
     def _admin_scope(self, actor: User) -> str:
         return self._policy.authorize_listing(actor, Permission.MANAGE_USERS)
+
+    def _record(self, actor: User, action: AdminAuditAction, resource_type: str, resource_id: str) -> None:
+        if self._audit is not None:
+            self._audit.record(actor, action, resource_type, resource_id)
 
     @staticmethod
     def _matches_if_present(expected: str | None, supplied: str) -> bool:

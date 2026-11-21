@@ -4,6 +4,7 @@ from enum import Enum
 class Permission(str, Enum):
     MANAGE_OWN_ACCOUNT = "account.manage.own"
     VIEW_ADMIN_DASHBOARD = "admin.dashboard.view"
+    VIEW_ADMIN_AUDIT = "admin.audit.view"
     MANAGE_USERS = "users.manage"
     VIEW_PERMISSIONS = "permissions.view"
     MANAGE_FLOOR_PLAN = "floor_plan.manage"

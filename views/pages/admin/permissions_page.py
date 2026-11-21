@@ -1,22 +1,28 @@
 import pandas as pd
 import streamlit as st
 
+from controllers.streamlit_runtime import get_streamlit_actor
+from models.domain.entities.permission import Permission
+from models.domain.entities.profile import Profile
+from models.domain.policies.permission_policy import PermissionPolicy
 from views.components.ui_components import page_header
 
 
-# A matriz distingue grants efetivos de acessos ainda sem escopo validado.
-PERMISSION_MATRIX = [
-    ("Acessar dashboard do administrador", "institution", "none", "none", "none"),
+EFFECTIVE_PERMISSIONS = [
+    ("Acessar dashboard do administrador", {Permission.VIEW_ADMIN_DASHBOARD}),
+    ("Consultar histórico administrativo", {Permission.VIEW_ADMIN_AUDIT}),
+    ("Gerenciar a própria conta", {Permission.MANAGE_OWN_ACCOUNT}),
+    ("Gerenciar usuários, códigos e matrículas", {Permission.MANAGE_USERS}),
+    ("Consultar permissões", {Permission.VIEW_PERMISSIONS}),
+    ("Gerenciar planta da instituição", {Permission.MANAGE_FLOOR_PLAN}),
+    ("Configurações da instituição", {Permission.EDIT_INSTITUTION_SETTINGS}),
+    ("Gerenciar salas e recursos", {Permission.MANAGE_FLOOR_PLAN, Permission.MANAGE_SPACES}),
+]
+
+PENDING_PERMISSIONS = [
     ("Acessar dashboard do gerente", "none", "pending", "none", "none"),
     ("Acessar dashboard do solicitante", "none", "none", "pending", "none"),
     ("Acessar dashboard do participante", "none", "none", "none", "pending"),
-    ("Gerenciar a própria conta", "own", "own", "own", "own"),
-    ("Gerenciar usuários", "institution", "none", "none", "none"),
-    ("Consultar permissões", "institution", "none", "none", "none"),
-    ("Gerenciar planta da instituição", "institution", "none", "none", "none"),
-    ("Configurações da instituição", "institution", "none", "none", "none"),
-    ("Gerenciar espaços", "none", "pending", "none", "none"),
-    ("Gerenciar recursos", "none", "pending", "none", "none"),
     ("Criar reservas", "none", "none", "pending", "none"),
     ("Aprovar / rejeitar reservas", "none", "pending", "none", "none"),
     ("Cancelar próprias reservas", "none", "none", "own_pending", "none"),
@@ -39,6 +45,13 @@ ACCESS_LABELS = {
 
 
 def _permission_dataframe() -> pd.DataFrame:
+    policy = PermissionPolicy()
+    profiles = (Profile.ADMIN, Profile.MANAGER, Profile.REQUESTER, Profile.PARTICIPANT)
+    grants = [policy.effective_permissions(profile) for profile in profiles]
+    effective_rows = []
+    for action, permissions in EFFECTIVE_PERMISSIONS:
+        scope = "own" if Permission.MANAGE_OWN_ACCOUNT in permissions else "institution"
+        effective_rows.append((action, *(scope if permissions & values else "none" for values in grants)))
     return pd.DataFrame(
         [
             {
@@ -48,17 +61,22 @@ def _permission_dataframe() -> pd.DataFrame:
                 "Solicitante": ACCESS_LABELS[requester],
                 "Participante": ACCESS_LABELS[participant],
             }
-            for action, admin, manager, requester, participant in PERMISSION_MATRIX
+            for action, admin, manager, requester, participant in [*effective_rows, *PENDING_PERMISSIONS]
         ]
     )
 
 
 def permissions(user):
+    actor = get_streamlit_actor(user)
+    if actor is None or Permission.VIEW_PERMISSIONS not in PermissionPolicy().effective_permissions(actor.profile):
+        st.error("Acesso não autorizado.")
+        return
+
     page_header("Permissões", "Matriz de permissões por perfil de usuário no sistema.")
 
     with st.container(border=True):
         st.caption(
-            ":material/info: Instituição do vínculo: escopo do admin autenticado · "
+            ":material/info: Instituição do vínculo: escopo da instituição do usuário autenticado · "
             "Próprio usuário: apenas a própria conta · "
             "Próprio*: somente registros do solicitante, escopo institucional pendente · "
             "A validar: não concede acesso efetivo pela API"
@@ -78,7 +96,7 @@ def permissions(user):
     )
 
     st.info(
-        "As permissões efetivas do admin se limitam à instituição vinculada. "
+        "As permissões institucionais se limitam à instituição vinculada. "
         "Os escopos marcados como 'A validar' aguardam decisão da equipe e não são grants da API.",
         icon=":material/shield:",
     )

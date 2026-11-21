@@ -1,7 +1,11 @@
-import time
+from html import escape
+
 import streamlit as st
 
+from application.services.institution_management_service import InstitutionRegistration
 from controllers.app_state_service import go
+from controllers.streamlit_runtime import get_streamlit_runtime
+from models.domain.exceptions import DuplicateResource
 from views.components.ui_components import logo
 
 INSTITUTION_TYPES = [
@@ -28,7 +32,6 @@ def _init_state():
         "signup_inst_email": "",
         "signup_inst_senha": "",
         "signup_inst_confirm_senha": "",
-        "signup_inst_telefone": "",
         "signup_inst_instituicao": "",
         "signup_inst_cnpj": "",
         "signup_inst_tipo": "",
@@ -40,8 +43,8 @@ def _init_state():
     }
 
     for key, value in defaults.items():
-        if key not in st.session_state:
-            st.session_state[key] = value
+        # The two steps render different widgets, so preserve their values between runs.
+        st.session_state[key] = st.session_state.get(key, value)
 
 def _reset():
     keys = [
@@ -51,7 +54,6 @@ def _reset():
         "signup_inst_email",
         "signup_inst_senha",
         "signup_inst_confirm_senha",
-        "signup_inst_telefone",
         "signup_inst_instituicao",
         "signup_inst_cnpj",
         "signup_inst_tipo",
@@ -60,6 +62,9 @@ def _reset():
         "signup_inst_telefone_inst",
         "signup_inst_email_inst",
         "signup_inst_error",
+        "signup_inst_created",
+        "signup_inst_tipo_select",
+        "signup_inst_estado_select",
     ]
 
     for key in keys:
@@ -77,8 +82,8 @@ def _validate_step_one():
         return "Informe seu e-mail."
     if not senha:
         return "Crie uma senha para continuar."
-    if len(senha) < 6:
-        return "A senha deve possuir pelo menos 6 caracteres."
+    if not 8 <= len(senha) <= 1024:
+        return "A senha deve ter entre 8 e 1024 caracteres."
     if not confirm:
         return "Confirme a senha para continuar."
     if senha != confirm:
@@ -125,12 +130,30 @@ def _submit():
         st.session_state.signup_inst_error = error
         return
 
-    st.session_state.signup_inst_error = ""
-    st.session_state.signup_inst_screen = "verifying"
-    st.rerun()
+    state = st.session_state
+    try:
+        created = get_streamlit_runtime().institution_management.register(
+            InstitutionRegistration(
+                name=state.signup_inst_instituicao,
+                cnpj=state.signup_inst_cnpj,
+                institution_type=state.signup_inst_tipo,
+                city=state.signup_inst_cidade,
+                state=state.signup_inst_estado,
+                phone=state.signup_inst_telefone_inst,
+                email=state.signup_inst_email_inst,
+                responsible_name=state.signup_inst_nome,
+                responsible_email=state.signup_inst_email,
+                password=state.signup_inst_senha,
+            )
+        )
+    except (DuplicateResource, ValueError) as exc:
+        state.signup_inst_error = str(exc)
+        return
 
-def _finish_verification():
-    st.session_state.signup_inst_screen = "success"
+    state.signup_inst_created = created
+    state.pop("signup_inst_senha", None)
+    state.pop("signup_inst_confirm_senha", None)
+    state.signup_inst_screen = "success"
     st.rerun()
 
 def _render_topbar():
@@ -215,16 +238,12 @@ def _render_form():
 
             st.text_input("Nome completo *", key="signup_inst_nome", placeholder="Seu nome completo")
 
-            c1, c2 = st.columns(2)
-            with c1:
-                st.text_input("E-mail *", key="signup_inst_email", placeholder="seu@email.com")
-            with c2:
-                st.text_input("Telefone", key="signup_inst_telefone", placeholder="(11) 99999-9999")
+            st.text_input("E-mail *", key="signup_inst_email", placeholder="seu@email.com")
 
             c3, c4 = st.columns(2)
             with c3:
                 st.text_input("Senha *", key="signup_inst_senha", placeholder="••••••••", type="password")
-                st.markdown('<span class="rf-field-help" style="font-size:12px; color:#A1A1AA;">Mínimo de 6 caracteres.</span>', unsafe_allow_html=True)
+                st.markdown('<span class="rf-field-help" style="font-size:12px; color:#A1A1AA;">Mínimo de 8 caracteres.</span>', unsafe_allow_html=True)
             with c4:
                 st.text_input("Confirmar senha *", key="signup_inst_confirm_senha", placeholder="••••••••", type="password")
 
@@ -262,47 +281,26 @@ def _render_form():
             with c6:
                 st.text_input("E-mail institucional", key="signup_inst_email_inst", placeholder="contato@instituicao.edu.br")
 
-    # Exibição de erros
-    error = st.session_state.signup_inst_error
-    if error:
-        st.markdown(
-            f'<div class="rf-form-error">{error}</div>',
-            unsafe_allow_html=True,
-        )
-
     # Botões de Ação
     if st.session_state.signup_inst_step == 1:
-        if st.button("Continuar →", key="signup_inst_continue", type="primary", use_container_width=True):
+        if st.button("Continuar →", key="signup_inst_continue", type="primary", width="stretch"):
             _next_step()
     else:
         bc1, bc2 = st.columns(2)
         with bc1:
-            if st.button("← Voltar", key="signup_inst_step_back", type="secondary", use_container_width=True):
+            if st.button("← Voltar", key="signup_inst_step_back", type="secondary", width="stretch"):
                 _go_back()
         with bc2:
-            if st.button("Criar instituição →", key="signup_inst_submit", type="primary", use_container_width=True):
+            if st.button("Criar instituição →", key="signup_inst_submit", type="primary", width="stretch"):
                 _submit()
+
+    if error := st.session_state.signup_inst_error:
+        st.markdown(f'<div class="rf-form-error">{escape(error)}</div>', unsafe_allow_html=True)
 
     st.markdown('<p class="rf-terms">Ao criar sua conta, você concorda com os termos de uso e a política de privacidade do RoomFlow.</p>', unsafe_allow_html=True)
 
-def _render_verifying():
-    st.markdown(
-        """
-        <div class="rf-state-wrapper">
-            <div class="rf-state-card">
-                <div class="rf-state-icon loading">
-                    <div class="rf-spinner"></div>
-                </div>
-                <h2>Verificando sua instituição</h2>
-                <p>Estamos consultando os dados informados. Isso leva apenas alguns segundos.</p>
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-    _finish_verification()
-
 def _render_success():
+    institution, owner = st.session_state.signup_inst_created
     check_circle_svg = '<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>'
     
     st.html(
@@ -318,15 +316,15 @@ def _render_success():
                 <div class="rf-summary">
                     <div>
                         <span>Instituição</span>
-                        <strong>{st.session_state.signup_inst_instituicao or "—"}</strong>
+                        <strong>{escape(institution.name)}</strong>
                     </div>
                     <div>
                         <span>Administrador</span>
-                        <strong>{st.session_state.signup_inst_nome or "—"}</strong>
+                        <strong>{escape(owner.name)}</strong>
                     </div>
                     <div>
                         <span>E-mail</span>
-                        <strong>{st.session_state.signup_inst_email or "—"}</strong>
+                        <strong>{escape(owner.email)}</strong>
                     </div>
                     <div>
                         <span>Status</span>
@@ -340,7 +338,7 @@ def _render_success():
 
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        if st.button("Acessar RoomFlow →", key="signup_inst_access", type="primary", use_container_width=True):
+        if st.button("Acessar RoomFlow →", key="signup_inst_access", type="primary", width="stretch"):
             _reset()
             go("login")
             st.rerun()
@@ -409,10 +407,6 @@ def signup_institution():
         """
     )
     screen = st.session_state.signup_inst_screen
-
-    if screen == "verifying":
-        _render_verifying()
-        return
 
     if screen == "success":
         _render_success()

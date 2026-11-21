@@ -2,6 +2,7 @@ import hashlib
 import io
 import secrets
 import warnings
+from contextlib import nullcontext
 from dataclasses import replace
 from xml.etree import ElementTree
 
@@ -9,6 +10,8 @@ from PIL import Image, UnidentifiedImageError
 
 from application.ports.floor_plan_repository import FloorPlanRepository
 from application.ports.plant_file_storage import PlantFileStorage
+from application.services.admin_audit_service import AdminAuditService, audited_mutation
+from models.domain.entities.admin_audit_event import AdminAuditAction
 from models.domain.entities.floor_plan import FloorPlan, RoomPosition
 from models.domain.entities.permission import Permission
 from models.domain.entities.user import User
@@ -27,11 +30,16 @@ class FloorPlanService:
         repository: FloorPlanRepository,
         files: PlantFileStorage,
         permission_policy: PermissionPolicy | None = None,
+        audit: AdminAuditService | None = None,
+        lock=None,
     ) -> None:
         self._repository = repository
         self._files = files
         self._permissions = permission_policy or PermissionPolicy()
+        self._audit = audit
+        self._lock = lock if lock is not None else nullcontext()
 
+    @audited_mutation
     def upload(
         self, actor: User, floor_id: str, filename: str, content: bytes
     ) -> FloorPlan:
@@ -62,14 +70,20 @@ class FloorPlanService:
             storage_key=storage_key,
             positions=positions,
         )
-        self._files.save(storage_key, content)
         try:
+            self._files.save(storage_key, content)
             self._repository.save_floor_plan(plan)
+            self._record(
+                actor,
+                AdminAuditAction.FLOOR_PLAN_REPLACED if existing else AdminAuditAction.FLOOR_PLAN_UPLOADED,
+                "floor_plan",
+                plan.id,
+            )
+            if existing:
+                self._files.delete(existing.storage_key)
         except Exception:
             self._files.delete(storage_key)
             raise
-        if existing and existing.storage_key != storage_key:
-            self._files.delete(existing.storage_key)
         return plan
 
     def get_for_floor(self, actor: User, floor_id: str) -> FloorPlan | None:
@@ -77,20 +91,26 @@ class FloorPlanService:
         return self._repository.find_floor_plan_by_floor(floor_id)
 
     def read_file(self, actor: User, floor_id: str) -> tuple[FloorPlan, bytes]:
-        plan = self.get_for_floor(actor, floor_id)
-        if plan is None:
-            raise ResourceNotFound("Planta não encontrada.")
-        content = self._files.read(plan.storage_key)
-        if content is None:
-            raise ResourceNotFound("Arquivo da planta não está disponível.")
-        return plan, content
+        with self._lock:
+            if self._audit is not None:
+                actor = self._audit.current_actor(actor)
+            plan = self.get_for_floor(actor, floor_id)
+            if plan is None:
+                raise ResourceNotFound("Planta não encontrada.")
+            content = self._files.read(plan.storage_key)
+            if content is None:
+                raise ResourceNotFound("Arquivo da planta não está disponível.")
+            return plan, content
 
+    @audited_mutation
     def remove(self, actor: User, floor_id: str) -> None:
         self._floor_in_scope(actor, floor_id)
         plan = self._repository.remove_floor_plan(floor_id)
         if plan:
+            self._record(actor, AdminAuditAction.FLOOR_PLAN_REMOVED, "floor_plan", plan.id)
             self._files.delete(plan.storage_key)
 
+    @audited_mutation
     def set_room_position(
         self, actor: User, floor_id: str, space_id: str, x: float, y: float
     ) -> FloorPlan:
@@ -106,11 +126,15 @@ class FloorPlanService:
         ):
             raise ResourceNotFound("Sala não encontrada neste andar.")
         positions = {item.space_id: item for item in plan.positions}
+        previous = positions.get(space_id)
         positions[space_id] = position
         updated = replace(plan, positions=tuple(sorted(positions.values(), key=lambda item: item.space_id)))
         self._repository.save_floor_plan(updated)
+        if previous != position:
+            self._record(actor, AdminAuditAction.FLOOR_PLAN_POSITION_SET, "space", space_id)
         return updated
 
+    @audited_mutation
     def remove_room_position(self, actor: User, floor_id: str, space_id: str) -> FloorPlan:
         self._floor_in_scope(actor, floor_id)
         plan = self._repository.find_floor_plan_by_floor(floor_id)
@@ -124,7 +148,13 @@ class FloorPlanService:
             positions=tuple(item for item in plan.positions if item.space_id != space_id),
         )
         self._repository.save_floor_plan(updated)
+        if updated.positions != plan.positions:
+            self._record(actor, AdminAuditAction.FLOOR_PLAN_POSITION_REMOVED, "space", space_id)
         return updated
+
+    def _record(self, actor: User, action: AdminAuditAction, resource_type: str, resource_id: str) -> None:
+        if self._audit is not None:
+            self._audit.record(actor, action, resource_type, resource_id)
 
     def _floor_in_scope(self, actor: User, floor_id: str):
         institution_id = self._scope(actor)

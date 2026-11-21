@@ -1,5 +1,6 @@
 import hashlib
 import secrets
+from contextlib import nullcontext
 from dataclasses import dataclass
 from datetime import timedelta
 from threading import RLock
@@ -10,6 +11,7 @@ from application.ports.email_sender import EmailSender
 from application.ports.pending_member_signup_repository import PendingMemberSignupRepository
 from application.ports.password_hasher import PasswordHasher
 from application.ports.user_repository import UserRepository
+from application.services.admin_audit_service import AdminAuditService
 from application.services.enrollment_management_service import (
     EnrollmentManagementService,
     MemberIdentityNotConfirmed,
@@ -17,6 +19,7 @@ from application.services.enrollment_management_service import (
 )
 from application.services.login_attempt_limiter import LoginAttemptLimiter
 from application.services.institution_invite_code_service import InstitutionInviteCodeService
+from models.domain.entities.admin_audit_event import AdminAuditAction
 from models.domain.entities.pending_member_signup import PendingMemberSignup
 from models.domain.entities.profile import Profile
 from models.domain.entities.user import User, UserStatus
@@ -51,6 +54,7 @@ class MemberSignupService:
         email_sender: EmailSender,
         attempt_limiter: LoginAttemptLimiter,
         clock: Clock,
+        audit: AdminAuditService | None = None,
     ) -> None:
         self._eligibility = eligibility
         self._enrollments = enrollments
@@ -61,6 +65,7 @@ class MemberSignupService:
         self._email_sender = email_sender
         self._attempt_limiter = attempt_limiter
         self._clock = clock
+        self._audit = audit
         self._lock = RLock()
 
     def start(
@@ -117,7 +122,7 @@ class MemberSignupService:
         rate_key = f"verify:{attempt_key}"
         if not self._attempt_limiter.register_attempt(rate_key, self._clock.now()):
             raise TooManyEnrollmentAttempts
-        with self._lock:
+        with self._lock, (self._audit.atomic() if self._audit is not None else nullcontext()):
             pending = self._pending.find_by_digest(digest)
             if pending is None or pending.expires_at <= self._clock.now():
                 raise InvalidEmailVerification
@@ -147,6 +152,8 @@ class MemberSignupService:
                 )
             except (DuplicateResource, ResourceNotFound):
                 raise InvalidEmailVerification from None
+            if self._audit is not None:
+                self._audit.record(user, AdminAuditAction.USER_CREATED, "user", user.id)
             self._pending.delete(digest)
             self._attempt_limiter.record_success(rate_key)
             return RegisteredMember(user)

@@ -1,5 +1,6 @@
 import hashlib
 import secrets
+from contextlib import nullcontext
 from dataclasses import dataclass, replace
 from datetime import datetime, timedelta, timezone
 
@@ -50,7 +51,9 @@ class AuthenticationService:
         clock: Clock | None = None,
         session_lifetime: timedelta = timedelta(hours=8),
         login_limiter: LoginAttemptLimiter | None = None,
+        lock=None,
     ) -> None:
+        self._lock = lock if lock is not None else nullcontext()
         self._users = users
         self._sessions = sessions
         self._password_hasher = password_hasher
@@ -77,22 +80,27 @@ class AuthenticationService:
             self._login_limiter.record_success(attempt_key)
         token = secrets.token_urlsafe(32)
         expires_at = now + self._session_lifetime
-        self._sessions.save(UserSession(
-            token_digest=self._digest(token),
-            user_id=account.user.id,
-            expires_at=expires_at,
-        ))
+        with self._lock:
+            current = self._users.find_by_id(account.user.id)
+            if current != account:
+                raise InvalidCredentials
+            self._sessions.save(UserSession(
+                token_digest=self._digest(token),
+                user_id=account.user.id,
+                expires_at=expires_at,
+            ))
         return LoginResult(token, expires_at, account.user)
 
     def authenticate(self, token: str) -> User:
-        session = self._sessions.find_by_digest(self._digest(token))
-        now = self._clock.now()
-        if session is None or not session.is_valid_at(now):
-            raise InvalidSession
-        account = self._users.find_by_id(session.user_id)
-        if account is None or not account.user.is_active:
-            raise InvalidSession
-        return account.user
+        with self._lock:
+            session = self._sessions.find_by_digest(self._digest(token))
+            now = self._clock.now()
+            if session is None or not session.is_valid_at(now):
+                raise InvalidSession
+            account = self._users.find_by_id(session.user_id)
+            if account is None or not account.user.is_active:
+                raise InvalidSession
+            return account.user
 
     def logout(self, token: str) -> None:
         digest = self._digest(token)
@@ -112,9 +120,12 @@ class AuthenticationService:
             )
         ):
             raise InvalidCredentials
-        self._users.save(
-            replace(account, password_hash=self._password_hasher.hash_password(new_password))
-        )
+        password_hash = self._password_hasher.hash_password(new_password)
+        with self._lock:
+            current = self._users.find_by_id(user_id)
+            if current is None or not current.user.is_active or current.password_hash != account.password_hash:
+                raise InvalidCredentials
+            self._users.save(replace(current, password_hash=password_hash))
 
     @staticmethod
     def _digest(token: str) -> str:

@@ -13,6 +13,7 @@ from application.services.authentication_service import AuthenticationService
 from controllers.http.auth import router as auth_router
 from controllers.http.admin_users import router as admin_users_router
 from controllers.http.admin_dashboard import router as admin_dashboard_router
+from controllers.http.admin_audit import router as admin_audit_router
 from controllers.http.health import router as health_router
 from controllers.http.institutions import router as institutions_router
 from controllers.http.institution_invite_codes import router as invite_code_router
@@ -43,6 +44,7 @@ def create_app(
     app.state.resource_management_service = runtime.resource_management
     app.state.floor_plan_management_service = runtime.floor_plan_management
     app.state.admin_dashboard_service = runtime.admin_dashboard
+    app.state.admin_audit_service = runtime.admin_audit
     app.state.authentication_service = authentication_service or runtime.authentication
     app.state.user_repository = runtime.users
     app.state.institution_repository = runtime.institutions
@@ -61,6 +63,7 @@ def create_app(
         app.include_router(structure_router)
         app.include_router(admin_users_router)
         app.include_router(admin_dashboard_router)
+        app.include_router(admin_audit_router)
         app.include_router(institutions_router)
         app.include_router(invite_code_router)
         app.include_router(enrollments_router)

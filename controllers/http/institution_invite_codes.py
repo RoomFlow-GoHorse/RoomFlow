@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel
 
 from application.services.institution_invite_code_service import InstitutionInviteCodeService
@@ -36,6 +36,7 @@ def get_invitation_code_status(
 
 @router.post("/rotate", response_model=IssuedInvitationCodeResponse)
 def rotate_invitation_code(
+    response: Response,
     institution_id: str | None = Query(default=None, max_length=100),
     actor: User = Depends(get_current_user),
     service: InstitutionInviteCodeService = Depends(get_institution_invite_code_service),
@@ -44,8 +45,22 @@ def rotate_invitation_code(
         raw_code, status = service.issue_or_replace(actor, institution_id)
     except DomainAuthorizationError as exc:
         raise HTTPException(status_code=403, detail=str(exc)) from None
+    response.headers["Cache-Control"] = "private, no-store"
     return IssuedInvitationCodeResponse(data={
         "code": raw_code,
         "active": status.active,
         "created_at": status.created_at,
     })
+
+
+@router.delete("", response_model=InvitationCodeStatusResponse)
+def revoke_invitation_code(
+    institution_id: str | None = Query(default=None, max_length=100),
+    actor: User = Depends(get_current_user),
+    service: InstitutionInviteCodeService = Depends(get_institution_invite_code_service),
+) -> InvitationCodeStatusResponse:
+    try:
+        status = service.revoke(actor, institution_id)
+    except DomainAuthorizationError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from None
+    return InvitationCodeStatusResponse(data={"active": status.active, "created_at": status.created_at})

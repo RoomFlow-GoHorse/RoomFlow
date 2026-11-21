@@ -14,6 +14,7 @@ class PermissionPolicy:
         Profile.ADMIN: frozenset(
             {
                 Permission.VIEW_ADMIN_DASHBOARD,
+                Permission.VIEW_ADMIN_AUDIT,
                 Permission.MANAGE_USERS,
                 Permission.VIEW_PERMISSIONS,
                 Permission.MANAGE_FLOOR_PLAN,

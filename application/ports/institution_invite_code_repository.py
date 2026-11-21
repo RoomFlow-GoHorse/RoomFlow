@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Protocol
 
 from models.domain.entities.institution_invite_code import InstitutionInviteCode
@@ -9,3 +10,5 @@ class InstitutionInviteCodeRepository(Protocol):
     def find_active_by_digest(self, digest: str) -> InstitutionInviteCode | None: ...
 
     def replace(self, code: InstitutionInviteCode) -> None: ...
+
+    def revoke(self, institution_id: str, at: datetime) -> InstitutionInviteCode | None: ...

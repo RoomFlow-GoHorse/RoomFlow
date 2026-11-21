@@ -5,7 +5,7 @@ from controllers.app_state_service import boot_state, current_user
 from views.components.app_shell import shell_end, shell_start
 from views.components.ui_components import load_auth_css, load_css, toast
 
-from views.pages.admin import admin_dashboard_page, floor_plan_page, permissions_page, settings_page, users_page
+from views.pages.admin import admin_audit_page, admin_dashboard_page, floor_plan_page, permissions_page, settings_page, users_page
 from views.pages.auth import forgot_password_page, login_page, signup_choice_page, signup_institution_page, signup_member_page
 from views.pages.manager import conflicts_page, manager_dashboard_page, occupancy_page, requests_page, spaces_page
 from views.pages.participant import find_space_page, participant_dashboard_page
@@ -61,6 +61,7 @@ PUBLIC_ROUTES = {
 APP_ROUTES = {
     # Dashboards
     "admin_dashboard": admin_dashboard_page.dashboard,
+    "historico_admin": admin_audit_page.admin_audit,
     "gerente_dashboard": manager_dashboard_page.dashboard,
     "solicitante_dashboard": requester_dashboard_page.dashboard,
     "participante_dashboard": participant_dashboard_page.dashboard,
@@ -101,6 +102,7 @@ APP_ROUTES = {
 # o mesmo container global das demais telas internas.
 WIDE_APP_ROUTES = {
     "admin_dashboard",
+    "historico_admin",
     "gerente_dashboard",
     "solicitante_dashboard",
     "participante_dashboard",

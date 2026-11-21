@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from threading import RLock
 
 from application.services.authentication_service import AuthenticationService
 from application.services.login_attempt_limiter import LoginAttemptLimiter
@@ -11,12 +12,15 @@ from application.services.space_service import SpaceService
 from application.services.resource_management_service import ResourceManagementService
 from application.services.floor_plan_service import FloorPlanService
 from application.services.admin_dashboard_service import AdminDashboardService
+from application.services.admin_audit_service import AdminAuditService
+from infrastructure.in_memory_admin_transaction import InMemoryAdminTransaction
 from infrastructure.repositories.in_memory_institution_repository import InMemoryInstitutionRepository
 from infrastructure.repositories.in_memory_institution_invite_code_repository import InMemoryInstitutionInviteCodeRepository
 from infrastructure.repositories.in_memory_authorized_enrollment_repository import InMemoryAuthorizedEnrollmentRepository
 from infrastructure.repositories.in_memory_session_repository import InMemorySessionRepository
 from infrastructure.repositories.in_memory_user_repository import InMemoryUserRepository
 from infrastructure.repositories.in_memory_space_repository import InMemorySpaceRepository
+from infrastructure.repositories.in_memory_admin_audit_repository import InMemoryAdminAuditRepository
 from infrastructure.storage.temporary_plant_file_storage import TemporaryPlantFileStorage
 from infrastructure.security.pbkdf2_password_hasher import Pbkdf2PasswordHasher
 from infrastructure.spreadsheets.openpyxl_enrollment_parser import OpenpyxlEnrollmentSpreadsheetParser
@@ -48,6 +52,8 @@ class InMemoryApplicationRuntime:
     floor_plan_management: FloorPlanService
     plant_file_storage: TemporaryPlantFileStorage
     admin_dashboard: AdminDashboardService
+    admin_audit: AdminAuditService
+    admin_audit_repository: InMemoryAdminAuditRepository
 
 
 def build_application_runtime(environment: str) -> InMemoryApplicationRuntime:
@@ -79,27 +85,33 @@ def build_application_runtime(environment: str) -> InMemoryApplicationRuntime:
             for user_id, name, email, password, profile in demo_accounts
         ]
     limiter = LoginAttemptLimiter() if environment in {"development", "test"} else None
-    user_repository = InMemoryUserRepository(accounts)
-    institution_repository = InMemoryInstitutionRepository(institutions)
-    spaces = InMemorySpaceRepository()
+    transaction = InMemoryAdminTransaction(RLock())
+    user_repository = InMemoryUserRepository(accounts, transaction=transaction)
+    institution_repository = InMemoryInstitutionRepository(institutions, transaction=transaction)
+    spaces = InMemorySpaceRepository(spaces=None if accounts else (), transaction=transaction)
     plant_file_storage = TemporaryPlantFileStorage()
-    invite_code_repository = InMemoryInstitutionInviteCodeRepository()
-    invite_code_service = InstitutionInviteCodeService(invite_code_repository)
-    enrollment_repository = InMemoryAuthorizedEnrollmentRepository()
+    admin_audit_repository = InMemoryAdminAuditRepository(transaction=transaction)
+    admin_audit = AdminAuditService(admin_audit_repository, clock, atomic=transaction.atomic, users=user_repository)
+    invite_code_repository = InMemoryInstitutionInviteCodeRepository(transaction=transaction)
+    invite_code_service = InstitutionInviteCodeService(invite_code_repository, audit=admin_audit)
+    enrollment_repository = InMemoryAuthorizedEnrollmentRepository(transaction=transaction)
+    sessions = InMemorySessionRepository(transaction=transaction)
     authentication = AuthenticationService(
         users=user_repository,
-        sessions=InMemorySessionRepository(),
+        sessions=sessions,
+        lock=transaction.lock,
         password_hasher=hasher,
         login_limiter=limiter,
     )
     if accounts:
-        invite_code_service.issue_or_replace(accounts[0].user)
+        InstitutionInviteCodeService(invite_code_repository).issue_or_replace(accounts[0].user)
     enrollment_management = EnrollmentManagementService(
         enrollments=enrollment_repository,
         institutions=institution_repository,
         invite_codes=invite_code_service,
         spreadsheet_parser=OpenpyxlEnrollmentSpreadsheetParser(),
         attempt_limiter=LoginAttemptLimiter(max_attempts=8),
+        audit=admin_audit,
     )
     simulated_email_sender = InMemoryEmailSender()
     pending_member_signups = InMemoryPendingMemberSignupRepository()
@@ -113,16 +125,18 @@ def build_application_runtime(environment: str) -> InMemoryApplicationRuntime:
         email_sender=simulated_email_sender,
         attempt_limiter=LoginAttemptLimiter(max_attempts=8),
         clock=clock,
+        audit=admin_audit,
     )
     return InMemoryApplicationRuntime(
         authentication=authentication,
         users=user_repository,
         institutions=institution_repository,
         user_management=UserManagementService(
-            user_repository, institution_repository, hasher, clock=clock
+            user_repository, institution_repository, hasher, clock=clock, audit=admin_audit,
+            sessions=sessions,
         ),
         institution_management=InstitutionManagementService(
-            institution_repository, user_repository, hasher, clock=clock
+            institution_repository, user_repository, hasher, clock=clock, audit=admin_audit
         ),
         invite_codes=invite_code_service,
         authorized_enrollments=enrollment_repository,
@@ -131,9 +145,11 @@ def build_application_runtime(environment: str) -> InMemoryApplicationRuntime:
         simulated_email_sender=simulated_email_sender,
         pending_member_signups=pending_member_signups,
         spaces=spaces,
-        space_management=SpaceService(spaces),
-        resource_management=ResourceManagementService(spaces, spaces),
-        floor_plan_management=FloorPlanService(spaces, plant_file_storage),
+        space_management=SpaceService(spaces, audit=admin_audit),
+        resource_management=ResourceManagementService(spaces, spaces, audit=admin_audit),
+        floor_plan_management=FloorPlanService(spaces, plant_file_storage, audit=admin_audit, lock=transaction.lock),
         plant_file_storage=plant_file_storage,
         admin_dashboard=AdminDashboardService(user_repository, spaces, spaces, clock),
+        admin_audit=admin_audit,
+        admin_audit_repository=admin_audit_repository,
     )

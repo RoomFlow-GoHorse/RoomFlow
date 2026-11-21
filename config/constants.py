@@ -8,6 +8,7 @@ ROLE_LABELS = {
 ROLE_NAV = {
     "admin": [
         ("Dashboard", "admin_dashboard"),
+        ("Historico administrativo", "historico_admin"),
         ("Usuarios", "usuarios"),
         ("Permissoes", "permissoes"),
         ("Planta da instituição", "planta_instituicao"),

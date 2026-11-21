@@ -246,6 +246,11 @@ class InstitutionEnrollmentApiTests(unittest.TestCase):
         self.assertEqual(data["profile"], "participante")
         self.assertEqual(data["institution_id"], "inst-demo")
         self.assertEqual(data["status"], "ativo")
+        audit = self.client.get("/admin/audit", headers=self.headers, params={"action": "user.created"})
+        self.assertEqual(audit.status_code, 200)
+        event = audit.json()["data"][0]
+        self.assertEqual(event["actor_user_id"], event["resource_id"])
+        self.assertNotIn(email.verification_token, audit.text)
         self.assertEqual(self.client.post("/auth/login", json={
             "email": "student@example.edu", "password": "secure-password-123",
         }).status_code, 200)

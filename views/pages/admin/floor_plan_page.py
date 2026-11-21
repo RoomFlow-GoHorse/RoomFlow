@@ -162,9 +162,6 @@ def _current_plan() -> dict:
     if floor is None or actor is None:
         return {"src": None, "positions": {}}
     runtime = get_streamlit_runtime()
-    plan = runtime.floor_plan_management.get_for_floor(actor, floor["id"])
-    if plan is None:
-        return {"src": None, "positions": {}}
     try:
         saved_plan, content = runtime.floor_plan_management.read_file(actor, floor["id"])
     except ResourceNotFound:
@@ -176,10 +173,10 @@ def _current_plan() -> dict:
     }
 
 
-def _rooms_for(building_name: str, floor_name: str) -> list[dict]:
+def _rooms_for(floor_id: str) -> list[dict]:
     return [
         s for s in st.session_state.get("spaces", [])
-        if s.get("building") == building_name and s.get("floor") == floor_name
+        if s["floor_id"] == floor_id
     ]
 
 
@@ -196,11 +193,11 @@ def _dialog_add_building():
 
     c1, c2 = st.columns(2)
     with c1:
-        if st.button("Cancelar", use_container_width=True):
+        if st.button("Cancelar", width="stretch"):
             st.session_state.pop("fp_add_building_err", None)
             st.rerun()
     with c2:
-        if st.button("Adicionar bloco", type="primary", use_container_width=True):
+        if st.button("Adicionar bloco", type="primary", width="stretch"):
             name = name.strip()
             if not name:
                 st.session_state.fp_add_building_err = "Nome do bloco é obrigatório."
@@ -229,11 +226,11 @@ def _dialog_rename_building(building: dict):
 
     c1, c2 = st.columns(2)
     with c1:
-        if st.button("Cancelar", use_container_width=True):
+        if st.button("Cancelar", width="stretch"):
             st.session_state.pop("fp_rename_building_err", None)
             st.rerun()
     with c2:
-        if st.button("Salvar", type="primary", use_container_width=True):
+        if st.button("Salvar", type="primary", width="stretch"):
             new_name = new_name.strip()
             if not new_name or new_name == building["name"]:
                 st.rerun()
@@ -266,10 +263,10 @@ def _dialog_confirm_remove_building(building: dict):
 
     c1, c2 = st.columns(2)
     with c1:
-        if st.button("Cancelar", use_container_width=True):
+        if st.button("Cancelar", width="stretch"):
             st.rerun()
     with c2:
-        if st.button("Inativar prédio", type="primary", use_container_width=True):
+        if st.button("Inativar prédio", type="primary", width="stretch"):
             try:
                 actor, service = _space_service()
                 service.deactivate_building(actor, building["id"])
@@ -294,11 +291,11 @@ def _dialog_add_floor(building: dict):
 
     c1, c2 = st.columns(2)
     with c1:
-        if st.button("Cancelar", use_container_width=True):
+        if st.button("Cancelar", width="stretch"):
             st.session_state.pop("fp_add_floor_err", None)
             st.rerun()
     with c2:
-        if st.button("Adicionar andar", type="primary", use_container_width=True):
+        if st.button("Adicionar andar", type="primary", width="stretch"):
             name = name.strip()
             if not name:
                 st.session_state.fp_add_floor_err = "Nome do andar é obrigatório."
@@ -326,11 +323,11 @@ def _dialog_rename_floor(floor: dict, building: dict):
 
     c1, c2 = st.columns(2)
     with c1:
-        if st.button("Cancelar", use_container_width=True):
+        if st.button("Cancelar", width="stretch"):
             st.session_state.pop("fp_rename_floor_err", None)
             st.rerun()
     with c2:
-        if st.button("Salvar", type="primary", use_container_width=True):
+        if st.button("Salvar", type="primary", width="stretch"):
             new_name = new_name.strip()
             if not new_name or new_name == floor["name"]:
                 st.rerun()
@@ -361,10 +358,10 @@ def _dialog_confirm_remove_floor(floor: dict, building: dict):
 
     c1, c2 = st.columns(2)
     with c1:
-        if st.button("Cancelar", use_container_width=True):
+        if st.button("Cancelar", width="stretch"):
             st.rerun()
     with c2:
-        if st.button("Inativar andar", type="primary", use_container_width=True):
+        if st.button("Inativar andar", type="primary", width="stretch"):
             try:
                 actor, service = _space_service()
                 service.deactivate_floor(actor, floor["id"])
@@ -390,11 +387,11 @@ def _dialog_add_room(building: dict, floor: dict):
 
     c1, c2 = st.columns(2)
     with c1:
-        if st.button("Cancelar", use_container_width=True):
+        if st.button("Cancelar", width="stretch"):
             st.session_state.pop("fp_add_room_err", None)
             st.rerun()
     with c2:
-        if st.button("Adicionar sala", type="primary", use_container_width=True):
+        if st.button("Adicionar sala", type="primary", width="stretch"):
             name = name.strip()
             if not name:
                 st.session_state.fp_add_room_err = "Nome da sala é obrigatório."
@@ -547,7 +544,7 @@ def _render_structure_config():
                                 f'{b["name"]}{" · Inativo" if not b["active"] else ""}',
                                 key=f"fp_sel_b_{b['id']}",
                                 type="primary" if is_sel else "tertiary",
-                                use_container_width=True,
+                                width="stretch",
                             ):
                                 if not is_sel:
                                     _select_building(b["id"])
@@ -598,7 +595,7 @@ def _render_structure_config():
                                     f'{f["name"]}{" · Inativo" if not f["active"] else ""}',
                                     key=f"fp_sel_f_{f['id']}",
                                     type="primary" if is_sel else "tertiary",
-                                    use_container_width=True,
+                                    width="stretch",
                                 ):
                                     if not is_sel:
                                         st.session_state.fp_sel_floor = f["id"]
@@ -723,7 +720,7 @@ def _render_floor_plan(current_b: dict | None, current_f: dict | None, plan: dic
                     st.rerun()
 
             st.write("")
-            if st.button("Usar planta de exemplo", key="fp_demo_plan", use_container_width=True):
+            if st.button("Usar planta de exemplo", key="fp_demo_plan", width="stretch"):
                 actor = get_streamlit_actor()
                 try:
                     get_streamlit_runtime().floor_plan_management.upload(
@@ -803,7 +800,7 @@ def _render_floor_plan(current_b: dict | None, current_f: dict | None, plan: dic
                 rname = room["name"] if room else room_id
                 mc1, mc2, mc3 = st.columns([3, 1, 1])
                 mc1.markdown(
-                    f'<span style="background:#EDE9FE; color:#6D28D9; padding:3px 10px; border-radius:999px; font-size:12px; font-weight:600;">📍 {rname}</span>',
+                    f'<span style="background:#EDE9FE; color:#6D28D9; padding:3px 10px; border-radius:999px; font-size:12px; font-weight:600;">📍 {html.escape(rname)}</span>',
                     unsafe_allow_html=True,
                 )
                 mc2.caption(f"x:{pos['x']:.0f}% y:{pos['y']:.0f}%")
@@ -853,7 +850,7 @@ def _render_rooms_panel(current_b: dict | None, current_f: dict | None, plan: di
                 r_head1, r_edit, r_status = st.columns([4, 1, 1])
                 with r_head1:
                     st.markdown(
-                        f'<div style="font-size:14px; font-weight:600; color:var(--graphite);">{room["name"]}</div>',
+                        f'<div style="font-size:14px; font-weight:600; color:var(--graphite);">{html.escape(room["name"])}</div>',
                         unsafe_allow_html=True,
                     )
                 with r_edit:
@@ -906,7 +903,7 @@ def _render_rooms_panel(current_b: dict | None, current_f: dict | None, plan: di
 
                     cb1, cb2 = st.columns(2)
                     with cb1:
-                        if st.button("Confirmar", key=f"fp_confirm_pos_{rid}", type="primary", use_container_width=True):
+                        if st.button("Confirmar", key=f"fp_confirm_pos_{rid}", type="primary", width="stretch"):
                             actor = get_streamlit_actor()
                             try:
                                 get_streamlit_runtime().floor_plan_management.set_room_position(
@@ -918,12 +915,12 @@ def _render_rooms_panel(current_b: dict | None, current_f: dict | None, plan: di
                                 st.session_state.fp_positioning = None
                                 st.rerun()
                     with cb2:
-                        if st.button("Cancelar", key=f"fp_cancel_pos_{rid}", type="tertiary", use_container_width=True):
+                        if st.button("Cancelar", key=f"fp_cancel_pos_{rid}", type="tertiary", width="stretch"):
                             st.session_state.fp_positioning = None
                             st.rerun()
                 else:
                     btn_label = "Editar posição" if is_positioned else "Posicionar"
-                    if st.button(btn_label, key=f"fp_pos_{rid}", use_container_width=True):
+                    if st.button(btn_label, key=f"fp_pos_{rid}", width="stretch"):
                         st.session_state.fp_positioning = rid
                         st.rerun()
 
@@ -931,6 +928,62 @@ def _render_rooms_panel(current_b: dict | None, current_f: dict | None, plan: di
 # =========================================================
 # PÁGINA PRINCIPAL
 # =========================================================
+
+def _render_resources(rooms: list[dict]) -> None:
+    actor = get_streamlit_actor()
+    if actor is None:
+        return
+    runtime = get_streamlit_runtime()
+    service = runtime.resource_management
+    with st.expander("Recursos institucionais"):
+        try:
+            resources = {
+                item.id: item for item in service.list_resources(actor, include_inactive=True)
+            }
+            with st.form("fp_create_resource", clear_on_submit=True):
+                name = st.text_input("Nome do novo recurso", max_chars=100)
+                if st.form_submit_button("Cadastrar recurso"):
+                    service.create_resource(actor, name)
+                    st.rerun()
+
+            if not resources:
+                st.info("Nenhum recurso cadastrado.")
+                return
+
+            def resource_label(resource_id: str) -> str:
+                resource = resources[resource_id]
+                return resource.name if resource.active else f"{resource.name} (inativo)"
+
+            selected = st.selectbox("Recurso", list(resources), format_func=resource_label)
+            resource = resources[selected]
+            with st.form(f"fp_edit_resource_{resource.id}"):
+                new_name = st.text_input("Nome do recurso", value=resource.name, max_chars=100)
+                if st.form_submit_button("Salvar nome"):
+                    service.update_resource(actor, resource.id, new_name)
+                    st.rerun()
+            if st.button("Inativar recurso" if resource.active else "Reativar recurso", key="fp_toggle_resource"):
+                service.set_resource_active(actor, resource.id, not resource.active)
+                st.rerun()
+
+            if rooms:
+                room_names = {room["id"]: room["name"] for room in rooms if room["active"]}
+                if room_names:
+                    room_id = st.selectbox("Sala para associar recursos", list(room_names), format_func=room_names.__getitem__)
+                    room = runtime.space_management.get_space(actor, room_id)
+                    available = [
+                        item.id for item in resources.values() if item.active or item.id in room.resource_ids
+                    ]
+                    with st.form(f"fp_assign_resources_{room.id}"):
+                        assigned = st.multiselect(
+                            "Recursos da sala", available, default=list(room.resource_ids),
+                            format_func=resource_label,
+                        )
+                        if st.form_submit_button("Salvar recursos da sala"):
+                            service.set_space_resources(actor, room.id, assigned)
+                            st.rerun()
+        except (DomainAuthorizationError, DuplicateResource, ResourceNotFound, ValueError) as exc:
+            st.error(str(exc))
+
 
 def floor_plan(user):
     _boot()
@@ -966,6 +1019,9 @@ def floor_plan(user):
     current_b = _current_building()
     current_f = _current_floor()
 
+    rooms = _rooms_for(current_f["id"]) if current_f else []
+    _render_resources(rooms)
+
     if not current_b:
         st.info("Adicione pelo menos um bloco para começar.")
         return
@@ -975,7 +1031,6 @@ def floor_plan(user):
         return
 
     plan = _current_plan()
-    rooms = _rooms_for(current_b["name"], current_f["name"])
 
     st.divider()
 
@@ -993,10 +1048,10 @@ def floor_plan(user):
     # ── Ações finais ───────────────────────────────────
     ac1, _, ac2 = st.columns([1, 4, 1])
     with ac1:
-        if st.button("Cancelar", key="fp_cancel", use_container_width=True):
+        if st.button("Cancelar", key="fp_cancel", width="stretch"):
             set_toast("Alterações descartadas.")
             st.rerun()
     with ac2:
-        if st.button("Salvar planta", key="fp_save", type="primary", use_container_width=True):
+        if st.button("Salvar planta", key="fp_save", type="primary", width="stretch"):
             set_toast("Planta e posições já estão salvas.")
             st.rerun()

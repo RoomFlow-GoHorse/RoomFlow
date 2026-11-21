@@ -15,8 +15,11 @@ class TemporaryPlantFileStorage:
     def save(self, storage_key: str, content: bytes) -> None:
         path = self._path_for(storage_key)
         temp_path = path.with_suffix(".tmp")
-        temp_path.write_bytes(content)
-        temp_path.replace(path)
+        try:
+            temp_path.write_bytes(content)
+            temp_path.replace(path)
+        finally:
+            temp_path.unlink(missing_ok=True)
 
     def read(self, storage_key: str) -> bytes | None:
         path = self._path_for(storage_key)
@@ -25,7 +28,6 @@ class TemporaryPlantFileStorage:
     def delete(self, storage_key: str) -> None:
         path = self._path_for(storage_key)
         path.unlink(missing_ok=True)
-        path.with_suffix(".tmp").unlink(missing_ok=True)
 
     def close(self) -> None:
         """Remove this process-local temporary store when its runtime is released."""

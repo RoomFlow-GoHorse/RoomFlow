@@ -2,11 +2,10 @@ import streamlit as st
 
 from config.constants import ROLE_LABELS
 from controllers import auth_service
-from models.mock_data import USERS
 from views.components.ui_components import page_header
 from application.services.authentication_service import InvalidCredentials
 from controllers.streamlit_runtime import get_streamlit_actor, get_streamlit_runtime
-from models.domain.exceptions import DomainAuthorizationError, DuplicateResource
+from models.domain.exceptions import DomainAuthorizationError, DuplicateResource, ResourceNotFound
 
 
 SECTIONS = {
@@ -374,35 +373,15 @@ def _profile(user):
                 st.error("Sua sessão expirou. Entre novamente.")
                 return
             try:
-                get_streamlit_runtime().user_management.update_own_profile(
+                updated = get_streamlit_runtime().user_management.update_own_profile(
                     actor, name, email
                 )
-            except (DomainAuthorizationError, DuplicateResource) as exc:
+            except (DomainAuthorizationError, DuplicateResource, ResourceNotFound, ValueError) as exc:
                 st.error(str(exc))
                 return
 
-            user.update(
-                {
-                    "name": name.strip(),
-                    "email": email.strip(),
-                }
-            )
-
-            for item in st.session_state.users:
-                if item["id"] == user["id"]:
-                    item.update(user)
-
-            for item in USERS:
-                if item["id"] == user["id"]:
-                    item.update(
-                        {
-                            "name": user["name"],
-                            "email": user["email"],
-                        }
-                    )
-
-            st.session_state.account_name = user["name"]
-            st.session_state.account_email = user["email"]
+            st.session_state.account_name = updated.name
+            st.session_state.account_email = updated.email
             st.session_state.account_phone = phone
             st.session_state.account_editing = False
 

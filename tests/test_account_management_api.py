@@ -308,17 +308,17 @@ class AccountManagementApiTests(unittest.TestCase):
         )
         runtime = self.client_context.app.state.user_management_service
         admin = self.client_context.app.state.user_repository.find_by_email("admin@gmail.com").user
-        second_id = self.client_context.app.state.user_repository.find_by_email("concurrent.admin@example.edu").user.id
+        second_admin = self.client_context.app.state.user_repository.find_by_email("concurrent.admin@example.edu").user
 
-        def disable(user_id: str):
+        def disable(actor):
             try:
-                runtime.set_status(admin, user_id, UserStatus.INACTIVE)
+                runtime.set_status(actor, actor.id, UserStatus.INACTIVE)
                 return "disabled"
             except LastActiveAdministrator:
                 return "blocked"
 
         with ThreadPoolExecutor(max_workers=2) as executor:
-            results = list(as_completed([executor.submit(disable, "u1"), executor.submit(disable, second_id)]))
+            results = list(as_completed([executor.submit(disable, admin), executor.submit(disable, second_admin)]))
             outcomes = [future.result() for future in results]
         active_admins = [
             account for account in self.client_context.app.state.user_repository.list_by_institution("inst-demo")

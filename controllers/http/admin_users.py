@@ -40,6 +40,11 @@ class CreateUserRequest(BaseModel):
     profile: Profile = Profile.REQUESTER
 
 
+class UpdateUserRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=150)
+    email: str = Field(min_length=5, max_length=255)
+
+
 class UpdateProfileRequest(BaseModel):
     profile: Profile
 
@@ -93,6 +98,26 @@ def get_user(
         _raise_http_error(403, str(exc))
     except ResourceNotFound as exc:
         _raise_http_error(404, str(exc))
+    return SingleUserResponse(data=_user_response(user))
+
+
+@router.patch("/{user_id}", response_model=SingleUserResponse)
+def update_user(
+    user_id: str,
+    payload: UpdateUserRequest,
+    actor: User = Depends(get_current_user),
+    service: UserManagementService = Depends(get_user_management_service),
+) -> SingleUserResponse:
+    try:
+        user = service.update_user(actor, user_id, payload.name, payload.email)
+    except DomainAuthorizationError as exc:
+        _raise_http_error(403, str(exc))
+    except ResourceNotFound as exc:
+        _raise_http_error(404, str(exc))
+    except DuplicateResource as exc:
+        _raise_http_error(409, str(exc))
+    except ValueError as exc:
+        _raise_http_error(422, str(exc))
     return SingleUserResponse(data=_user_response(user))
 
 

@@ -2,6 +2,7 @@ from collections.abc import Sequence
 from dataclasses import replace
 from threading import RLock
 
+from infrastructure.in_memory_admin_transaction import InMemoryAdminTransaction
 from models.domain.entities.building import Building
 from models.domain.entities.floor import Floor
 from models.domain.entities.floor_plan import FloorPlan, RoomPosition
@@ -20,8 +21,10 @@ class InMemorySpaceRepository:
         floors: Sequence[Floor] | None = None,
         resources: Sequence[Resource] | None = None,
         floor_plans: Sequence[FloorPlan] | None = None,
+        *,
+        transaction: InMemoryAdminTransaction | None = None,
     ) -> None:
-        self._lock = RLock()
+        self._lock = transaction.lock if transaction is not None else RLock()
         if spaces is None:
             (
                 self._buildings,
@@ -36,6 +39,8 @@ class InMemorySpaceRepository:
             self._floors = {item.id: item for item in (floors or ())}
             self._resources = {item.id: item for item in (resources or ())}
             self._floor_plans = {item.id: item for item in (floor_plans or ())}
+        if transaction is not None:
+            transaction.register(self._spaces, self._buildings, self._floors, self._resources, self._floor_plans)
 
     def list_all(self) -> tuple[Space, ...]:
         with self._lock:

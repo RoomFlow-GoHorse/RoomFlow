@@ -2,6 +2,8 @@ import secrets
 from dataclasses import replace
 
 from application.ports.space_repository import SpaceRepository
+from application.services.admin_audit_service import AdminAuditService, audited_mutation
+from models.domain.entities.admin_audit_event import AdminAuditAction
 from models.domain.entities.building import Building
 from models.domain.entities.floor import Floor
 from models.domain.entities.permission import Permission
@@ -19,9 +21,11 @@ class SpaceService:
         self,
         repository: SpaceRepository,
         permission_policy: PermissionPolicy | None = None,
+        audit: AdminAuditService | None = None,
     ) -> None:
         self._repository = repository
         self._permissions = permission_policy or PermissionPolicy()
+        self._audit = audit
 
     def list_spaces(
         self,
@@ -63,30 +67,41 @@ class SpaceService:
     def get_building(self, actor: User, building_id: str) -> Building:
         return self._building_in_scope(actor, building_id)
 
+    @audited_mutation
     def create_building(self, actor: User, name: str) -> Building:
         institution_id = self._admin_scope(actor)
         building = Building(f"b-{secrets.token_urlsafe(10)}", institution_id, name.strip())
         self._repository.add_building(building)
+        self._record(actor, AdminAuditAction.BUILDING_CREATED, "building", building.id)
         return building
 
+    @audited_mutation
     def update_building(self, actor: User, building_id: str, name: str) -> Building:
         building = self._building_in_scope(actor, building_id)
         updated = replace(building, name=name.strip())
         self._repository.save_building(updated)
+        if updated != building:
+            self._record(actor, AdminAuditAction.BUILDING_UPDATED, "building", updated.id)
         return updated
 
+    @audited_mutation
     def deactivate_building(self, actor: User, building_id: str) -> Building:
         building = self._building_in_scope(actor, building_id)
         if self._repository.count_active_floors(building.id):
             raise ValueError("Inative os andares deste prédio antes de inativá-lo.")
         updated = replace(building, active=False)
         self._repository.save_building(updated)
+        if building.active:
+            self._record(actor, AdminAuditAction.BUILDING_DEACTIVATED, "building", updated.id)
         return updated
 
+    @audited_mutation
     def activate_building(self, actor: User, building_id: str) -> Building:
         building = self._building_in_scope(actor, building_id)
         updated = replace(building, active=True)
         self._repository.save_building(updated)
+        if not building.active:
+            self._record(actor, AdminAuditAction.BUILDING_ACTIVATED, "building", updated.id)
         return updated
 
     def list_floors(self, actor: User, building_id: str, include_inactive: bool = False) -> list[Floor]:
@@ -96,28 +111,37 @@ class SpaceService:
     def get_floor(self, actor: User, floor_id: str) -> Floor:
         return self._floor_in_scope(actor, floor_id)
 
+    @audited_mutation
     def create_floor(self, actor: User, building_id: str, name: str) -> Floor:
         building = self._building_in_scope(actor, building_id)
         if not building.active:
             raise ValueError("Não é possível adicionar andar a um prédio inativo.")
         floor = Floor(f"f-{secrets.token_urlsafe(10)}", building.id, name.strip())
         self._repository.add_floor(floor)
+        self._record(actor, AdminAuditAction.FLOOR_CREATED, "floor", floor.id)
         return floor
 
+    @audited_mutation
     def update_floor(self, actor: User, floor_id: str, name: str) -> Floor:
         floor = self._floor_in_scope(actor, floor_id)
         updated = replace(floor, name=name.strip())
         self._repository.save_floor(updated)
+        if updated != floor:
+            self._record(actor, AdminAuditAction.FLOOR_UPDATED, "floor", updated.id)
         return updated
 
+    @audited_mutation
     def deactivate_floor(self, actor: User, floor_id: str) -> Floor:
         floor = self._floor_in_scope(actor, floor_id)
         if self._repository.count_active_spaces(floor.id):
             raise ValueError("Inative as salas deste andar antes de inativá-lo.")
         updated = replace(floor, active=False)
         self._repository.save_floor(updated)
+        if floor.active:
+            self._record(actor, AdminAuditAction.FLOOR_DEACTIVATED, "floor", updated.id)
         return updated
 
+    @audited_mutation
     def activate_floor(self, actor: User, floor_id: str) -> Floor:
         floor = self._floor_in_scope(actor, floor_id)
         building = self._building_in_scope(actor, floor.building_id)
@@ -125,14 +149,18 @@ class SpaceService:
             raise ValueError("Ative o prédio antes de reativar o andar.")
         updated = replace(floor, active=True)
         self._repository.save_floor(updated)
+        if not floor.active:
+            self._record(actor, AdminAuditAction.FLOOR_ACTIVATED, "floor", updated.id)
         return updated
 
     def get_space(self, actor: User, space_id: str) -> Space:
+        institution_id = self._space_listing_scope(actor)
         space = self._repository.find_space(space_id)
-        if space is None or space.institution_id != self._space_listing_scope(actor):
+        if space is None or space.institution_id != institution_id:
             raise ResourceNotFound("Sala não encontrada.")
         return space
 
+    @audited_mutation
     def create_space(
         self,
         actor: User,
@@ -151,8 +179,10 @@ class SpaceService:
             name, room_type, capacity, status,
         )
         self._repository.add_space(space)
+        self._record(actor, AdminAuditAction.SPACE_CREATED, "space", space.id)
         return space
 
+    @audited_mutation
     def update_space(
         self,
         actor: User,
@@ -182,23 +212,37 @@ class SpaceService:
             occupancy=current.occupancy,
         )
         self._repository.save_space(updated)
+        if updated != current:
+            action = AdminAuditAction.SPACE_DEACTIVATED if current.active and not updated.active else AdminAuditAction.SPACE_UPDATED
+            self._record(actor, action, "space", updated.id)
         return updated
 
+    @audited_mutation
     def deactivate_space(self, actor: User, space_id: str) -> Space:
         current = self.get_space(actor, space_id)
         updated = replace(current, active=False, status="inativo")
         self._repository.save_space(updated)
+        if current.active:
+            self._record(actor, AdminAuditAction.SPACE_DEACTIVATED, "space", updated.id)
         return updated
 
+    @audited_mutation
     def activate_space(self, actor: User, space_id: str) -> Space:
         current = self.get_space(actor, space_id)
         floor = self._floor_for_space(actor, current.floor_id)
         building = self._building_for_space(actor, floor.building_id)
         if not floor.active or not building.active:
             raise ValueError("Ative o prédio e o andar antes de reativar a sala.")
+        if current.active:
+            return current
         updated = replace(current, active=True, status="disponivel")
         self._repository.save_space(updated)
+        self._record(actor, AdminAuditAction.SPACE_ACTIVATED, "space", updated.id)
         return updated
+
+    def _record(self, actor: User, action: AdminAuditAction, resource_type: str, resource_id: str) -> None:
+        if self._audit is not None:
+            self._audit.record(actor, action, resource_type, resource_id)
 
     def _admin_scope(self, actor: User) -> str:
         return self._permissions.authorize_listing(actor, Permission.MANAGE_FLOOR_PLAN)
@@ -212,12 +256,14 @@ class SpaceService:
         return self._permissions.authorize_listing(actor, permission)
 
     def _building_in_scope(self, actor: User, building_id: str) -> Building:
+        institution_id = self._admin_scope(actor)
         building = self._repository.find_building(building_id)
-        if building is None or building.institution_id != self._admin_scope(actor):
+        if building is None or building.institution_id != institution_id:
             raise ResourceNotFound("Prédio não encontrado.")
         return building
 
     def _floor_in_scope(self, actor: User, floor_id: str) -> Floor:
+        self._admin_scope(actor)
         floor = self._repository.find_floor(floor_id)
         if floor is None:
             raise ResourceNotFound("Andar não encontrado.")
@@ -231,6 +277,7 @@ class SpaceService:
         return building
 
     def _floor_for_space(self, actor: User, floor_id: str) -> Floor:
+        self._space_listing_scope(actor)
         floor = self._repository.find_floor(floor_id)
         if floor is None:
             raise ResourceNotFound("Andar não encontrado.")

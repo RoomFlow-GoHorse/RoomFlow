@@ -15,12 +15,12 @@ def _user_dialog(actor: User, editing_user: User | None = None):
     runtime = get_streamlit_runtime()
     is_edit = editing_user is not None
     st.subheader("Editar usuario" if is_edit else "Novo usuario")
-    name = st.text_input("Nome completo", value=editing_user.name if is_edit else "", disabled=is_edit)
-    email = st.text_input("E-mail", value=editing_user.email if is_edit else "", disabled=is_edit)
+    name = st.text_input("Nome completo", value=editing_user.name if is_edit else "")
+    email = st.text_input("E-mail", value=editing_user.email if is_edit else "")
     profile_values = [profile.value for profile in Profile]
     labels = [ROLE_LABELS[value] for value in profile_values]
     current = editing_user.profile.value if is_edit else Profile.REQUESTER.value
-    selected_label = st.selectbox("Perfil de acesso", labels, index=profile_values.index(current))
+    selected_label = st.selectbox("Perfil de acesso", labels, index=profile_values.index(current), disabled=is_edit)
     selected_profile = Profile(profile_values[labels.index(selected_label)])
     password = "" if is_edit else st.text_input("Senha inicial", type="password")
     st.caption("Somente um administrador da instituicao pode atribuir o perfil admin.")
@@ -30,7 +30,7 @@ def _user_dialog(actor: User, editing_user: User | None = None):
     if save.button("Salvar" if is_edit else "Criar usuario", type="primary", width="stretch"):
         try:
             if is_edit:
-                runtime.user_management.update_profile(actor, editing_user.id, selected_profile)
+                runtime.user_management.update_user(actor, editing_user.id, name, email)
             else:
                 if not name.strip() or not email.strip() or len(password) < 8:
                     st.error("Informe nome, e-mail e uma senha com pelo menos 8 caracteres.")
@@ -61,13 +61,22 @@ def _invitation_codes(actor: User) -> None:
     st.caption("Codigo ativo" if status.active else "Nenhum codigo ativo")
     if status.created_at:
         st.caption(f"Criado em {status.created_at.astimezone().strftime('%d/%m/%Y %H:%M')}")
-    state_key = f"new_invitation_code:{actor.institution_id}"
     if st.button("Gerar / substituir codigo", icon=":material/key:", key="rotate_institution_code"):
-        code, _ = runtime.invite_codes.issue_or_replace(actor)
-        st.session_state[state_key] = code
-    if st.session_state.get(state_key):
-        st.code(st.session_state[state_key], language=None)
-        st.caption("O valor completo aparece somente nesta sessao. Compartilhe apenas com membros autorizados.")
+        try:
+            code, _ = runtime.invite_codes.issue_or_replace(actor)
+        except DomainAuthorizationError as exc:
+            st.error(str(exc))
+        else:
+            st.code(code, language=None)
+            st.caption("Compartilhe o código apenas com membros autorizados.")
+    if status.active and st.button("Revogar codigo", key="revoke_institution_code", type="secondary"):
+        try:
+            runtime.invite_codes.revoke(actor)
+        except (DomainAuthorizationError, ValueError) as exc:
+            st.error(str(exc))
+        else:
+            st.success("Codigo institucional revogado.")
+            st.rerun()
 
 
 def _enrollments(actor: User) -> None:
@@ -166,8 +175,12 @@ def _enrollments(actor: User) -> None:
             choices = {f"{item.registration_number} — {item.name or 'sem nome'}": item.id for item in available}
             selected = st.selectbox("Desativar matricula ainda disponivel", list(choices), key="enrollment_deactivate_select")
             if st.button("Desativar matricula", key="deactivate_enrollment"):
-                service.deactivate(actor, choices[selected])
-                st.rerun()
+                try:
+                    service.deactivate(actor, choices[selected])
+                except (DomainAuthorizationError, ResourceNotFound, ValueError) as exc:
+                    st.error(str(exc))
+                else:
+                    st.rerun()
     else:
         st.info("Nenhuma matricula encontrada.")
 
@@ -198,8 +211,21 @@ def users_page(user):
             selected = st.selectbox("Usuario", list(choices), key="managed_user_select")
             selected_user = choices[selected]
             edit_col, status_col = st.columns(2)
-            if edit_col.button("Editar perfil", width="stretch"):
+            if edit_col.button("Editar usuário", width="stretch"):
                 _user_dialog(actor, selected_user)
+            profiles = list(Profile)
+            new_profile = st.selectbox(
+                "Perfil de acesso", profiles, index=profiles.index(selected_user.profile),
+                format_func=lambda profile: ROLE_LABELS[profile.value],
+                key=f"managed_profile_{selected_user.id}",
+            )
+            if st.button("Alterar perfil", disabled=new_profile is selected_user.profile):
+                try:
+                    runtime.user_management.update_profile(actor, selected_user.id, new_profile)
+                except (DomainAuthorizationError, LastActiveAdministrator, ResourceNotFound) as exc:
+                    st.error(str(exc))
+                else:
+                    st.rerun()
             label = "Desativar" if selected_user.is_active else "Ativar"
             next_status = UserStatus.INACTIVE if selected_user.is_active else UserStatus.ACTIVE
             if status_col.button(label, width="stretch"):
