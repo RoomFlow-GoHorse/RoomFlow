@@ -121,7 +121,11 @@ $env:ROOMFLOW_API_URL = "http://127.0.0.1:8000"
 
 Use **Criar conta → Cadastrar instituição** para criar a primeira instituição e
 o administrador. O cadastro registra o perfil necessário no catálogo, junto com
-a conta e o vínculo. Os scripts `seed_perfis` e `seed_demo` continuam opcionais.
+a conta e o vínculo. Para inserir os perfis manualmente, execute
+`python -m db.seeds`; para criar também a instituição e os dados de
+demonstração, execute `python -m db.seeds --demo`. As quatro contas de
+demonstração recebem a senha inicial `123456789`. O seed é opcional e não altera uma
+instituição de demonstração que já exista.
 
 Confirmação de e-mail e recuperação de senha usam SMTP com TLS implícito.
 Configure `ROOMFLOW_SMTP_HOST`, `ROOMFLOW_SMTP_PORT` (padrão 465),
