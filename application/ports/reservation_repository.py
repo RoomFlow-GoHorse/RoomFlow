@@ -1,3 +1,4 @@
+import builtins
 from typing import Protocol
 
 from models.domain.entities.reservation import Reservation, ReservationDetails, ReservationHistoryEvent, ReservationPeriod
@@ -16,13 +17,13 @@ class ReservationRepository(Protocol):
 
     def list_for_period(
         self, institution_id: str, period: ReservationPeriod, space_ids: frozenset[str],
-    ) -> list[ReservationDetails]: ...
+   ) -> builtins.list[ReservationDetails]: ...
 
     def find_many(self, institution_id: str, reservation_ids: set[str]) -> dict[str, ReservationDetails]: ...
 
     def find_with_history(
         self, institution_id: str, reservation_id: str, requester_id: str | None = None,
-    ) -> tuple[ReservationDetails, list[ReservationHistoryEvent]] | None: ...
+    ) -> tuple[ReservationDetails, builtins.list[ReservationHistoryEvent]] | None: ...
 
     def append_history(self, reservation: Reservation, event: ReservationHistoryEvent) -> None: ...
 

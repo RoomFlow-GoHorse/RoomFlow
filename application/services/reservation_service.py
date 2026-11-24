@@ -86,6 +86,36 @@ class ReservationService:
         scope = self._permissions.authorize_listing(actor, Permission.REVIEW_RESERVATIONS)
         return self._repository.list(scope)
 
+    def list_agenda(
+        self,
+        actor: User,
+        period: ReservationPeriod | None = None,
+    ) -> list[ReservationDetails]:
+        scope = self._permissions.authorize_listing(
+            actor,
+            Permission.VIEW_AGENDA,
+        )
+
+        reservations = self._repository.list(scope)
+
+        agenda = [
+            item
+            for item in reservations
+            if item.reservation.status is ReservationStatus.APPROVED
+        ]
+
+        if period is not None:
+            agenda = [
+                item
+                for item in agenda
+                if (
+                    item.reservation.request.period.start < period.end
+                    and item.reservation.request.period.end > period.start
+                )
+            ]
+
+        return agenda
+
     def list_for_operations(
         self, actor: User, period: ReservationPeriod, space_ids: frozenset[str],
     ) -> list[ReservationDetails]:

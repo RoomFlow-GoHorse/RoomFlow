@@ -97,6 +97,23 @@ def list_own(actor: User = Depends(get_current_user), service: ReservationServic
 def list_institution(actor: User = Depends(get_current_user), service: ReservationService = Depends(get_service)):
     return {"data": [reservation_response(item) for item in run_reservation_action(lambda: service.list_institution(actor))]}
 
+@router.get("/agenda")
+def list_agenda(
+    start: datetime | None = None,
+    end: datetime | None = None,
+    actor: User = Depends(get_current_user),
+    service: ReservationService = Depends(get_service),
+):
+    if (start is None) != (end is None):
+        raise HTTPException(422, "Informe início e fim juntos.")
+
+    period = ReservationPeriod(start, end) if start is not None else None
+
+    items = run_reservation_action(
+        lambda: service.list_agenda(actor, period)
+    )
+
+    return {"data": [reservation_response(item) for item in items]}
 
 @router.get("/mine/{reservation_id}")
 def detail_own(

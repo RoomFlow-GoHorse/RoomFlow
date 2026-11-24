@@ -1,6 +1,8 @@
 from sqlalchemy import distinct, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import aliased
+import builtins
+from datetime import datetime
 
 from application.ports.reservation_dashboard_query import ReservationDashboardMetrics
 from infrastructure.persistence.records import reservation_history
@@ -57,7 +59,7 @@ class PostgresReservationRepository:
 
     def list_for_period(
         self, institution_id: str, period: ReservationPeriod, space_ids: frozenset[str],
-    ) -> list[ReservationDetails]:
+    ) -> builtins.list[ReservationDetails]:
         if not space_ids:
             return []
         ids = [to_database_identity_id(item, bits=64) for item in space_ids]
@@ -115,11 +117,7 @@ class PostgresReservationRepository:
 
     def find_with_history(
         self, institution_id: str, reservation_id: str, requester_id: str | None = None,
-    ) -> tuple[ReservationDetails, list[ReservationHistoryEvent]] | None:
-        try:
-            database_id = to_database_identity_id(reservation_id, bits=64)
-        except ValueError:
-            return None
+    ) -> tuple[ReservationDetails, builtins.list[ReservationHistoryEvent]] | None:
         columns = reservation_history.c
         statement = (
             self._listing(institution_id, requester_id)
