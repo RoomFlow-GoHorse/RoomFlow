@@ -83,7 +83,7 @@ def build_postgres_runtime(
         PostgresNotificationRepository(transaction), institutions, users, clock, transaction.snapshot,
     )
     reservation_service = ReservationService(
-        reservations, structure, institutions, clock, transaction.atomic, audit.current_actor, conflicts, notifications,
+        reservations, structure, institutions, clock, transaction.atomic, audit.current_actor, conflicts, notifications, users,
     )
     enrollment_management = EnrollmentManagementService(
         enrollments, institutions, invites, OpenpyxlEnrollmentSpreadsheetParser(),

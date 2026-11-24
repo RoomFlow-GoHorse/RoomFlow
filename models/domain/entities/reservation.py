@@ -66,6 +66,7 @@ class ReservationRequest:
     period: ReservationPeriod
     participants: int
     justification: str | None = None
+    participant_ids: frozenset[str] = frozenset()
 
     def validated(self) -> "ReservationRequest":
         title = self.title.strip()
@@ -77,6 +78,8 @@ class ReservationRequest:
             raise ValueError("Informe entre 1 e 10000 participantes.")
         if len(reason) > 600:
             raise ValueError("A justificativa deve ter até 600 caracteres.")
+        if len(self.participant_ids) >= self.participants:
+            raise ValueError("A quantidade de participantes vinculados deve ser menor que a quantidade prevista.")
         return replace(self, title=title, activity_type=activity, justification=reason or None)
 
 

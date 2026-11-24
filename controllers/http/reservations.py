@@ -26,11 +26,12 @@ class ReservationPayload(BaseModel):
     end: datetime
     participants: int = Field(strict=True, ge=1, le=10000)
     justification: str | None = Field(default=None, max_length=600)
+    participant_ids: list[str] = Field(default_factory=list, max_length=9999)
 
     def to_request(self) -> ReservationRequest:
         return ReservationRequest(
             self.space_id, self.title, self.activity_type, ReservationPeriod(self.start, self.end),
-            self.participants, self.justification,
+            self.participants, self.justification, frozenset(self.participant_ids),
         )
 
 
@@ -86,6 +87,17 @@ def create(
     service: ReservationService = Depends(get_service),
 ):
     return {"data": reservation_response(run_reservation_action(lambda: service.create(actor, payload.to_request())))}
+
+
+@router.get("/participants")
+def eligible_participants(actor: User = Depends(get_current_user), service: ReservationService = Depends(get_service)):
+    return {"data": [{"id": user.id, "name": user.name, "email": user.email}
+                     for user in run_reservation_action(lambda: service.eligible_participants(actor))]}
+
+
+@router.get("/participating")
+def participating(actor: User = Depends(get_current_user), service: ReservationService = Depends(get_service)):
+    return {"data": [reservation_response(item) for item in run_reservation_action(lambda: service.list_participating(actor))]}
 
 
 @router.get("/mine")
