@@ -45,11 +45,7 @@ class AdminDashboardService:
         accounts = tuple(self._users.list_by_institution(institution_id))
         people = tuple(account.user for account in accounts)
         buildings = tuple(self._spaces.list_buildings(institution_id, include_inactive=True))
-        floors = tuple(
-            floor
-            for building in buildings
-            for floor in self._spaces.list_floors(building.id, include_inactive=True)
-        )
+        floors = self._spaces.list_institution_floors(institution_id, include_inactive=True)
         spaces = tuple(self._spaces.list_spaces(institution_id, include_inactive=True))
         resources = tuple(self._resources.list_resources(institution_id, include_inactive=True))
 

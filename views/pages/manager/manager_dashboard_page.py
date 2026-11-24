@@ -2,7 +2,7 @@ import pandas as pd
 import streamlit as st
 
 from config.constants import STATUS_LABELS
-from controllers.app_state_service import go
+from controllers.app_state_service import set_page
 from views.components.manager_operations import ROOM_STATUS_LABELS, dashboard_dates, operations_api, space_filters
 from views.components.reservation_forms import RESERVATION_ERRORS, local_times
 from views.components.ui_components import page_header
@@ -13,11 +13,6 @@ QUICK_ACTIONS = [
     ("Espaços", "Gerenciar capacidade e recursos das salas", "espacos", ":material/home_work:"),
     ("Conflitos", "Resolver conflitos de reservas e horários", "gerente_conflitos", ":material/warning:"),
 ]
-
-
-def _navigate(page: str) -> None:
-    go(page)
-    st.rerun()
 
 
 def _render_stats(report: dict) -> None:
@@ -43,8 +38,10 @@ def _render_quick_actions() -> None:
             with col_info:
                 st.markdown(f"{icon} **{label}**")
             with col_btn:
-                if st.button("Abrir", key=f"quick_action_{page}", icon=":material/arrow_forward:", width="stretch"):
-                    _navigate(page)
+                st.button(
+                    "Abrir", key=f"quick_action_{page}", icon=":material/arrow_forward:", width="stretch",
+                    on_click=set_page, args=(page,),
+                )
             st.caption(description)
 
 
@@ -55,8 +52,10 @@ def _render_reservations(reservations: list[dict], timezone: str, status: str | 
         st.subheader(f"Solicitações · {STATUS_LABELS[status]}" if status else "Solicitações pendentes")
 
     with header_columns[1]:
-        if st.button("Ver todas", key="manager_dashboard_ver_reservas", icon=":material/arrow_forward:", width="stretch"):
-            _navigate("gerente_reservas")
+        st.button(
+            "Ver todas", key="manager_dashboard_ver_reservas", icon=":material/arrow_forward:", width="stretch",
+            on_click=set_page, args=("gerente_reservas",),
+        )
 
     with st.container(border=True):
         if not reservations:
@@ -114,8 +113,10 @@ def _render_space_status_and_occupancy(report: dict) -> None:
         with header_columns[0]:
             st.subheader("Status dos espaços")
         with header_columns[1]:
-            if st.button("Gerenciar", key="manager_dashboard_gerenciar_espacos", icon=":material/home_work:", width="stretch"):
-                _navigate("espacos")
+            st.button(
+                "Gerenciar", key="manager_dashboard_gerenciar_espacos", icon=":material/home_work:", width="stretch",
+                on_click=set_page, args=("espacos",),
+            )
 
         with st.container(border=True):
             if not spaces:
@@ -146,8 +147,10 @@ def _render_space_status_and_occupancy(report: dict) -> None:
         with header_columns[0]:
             st.subheader("Ocupação dos espaços")
         with header_columns[1]:
-            if st.button("Ver mais", key="manager_dashboard_ver_ocupacao", icon=":material/arrow_forward:", width="stretch"):
-                _navigate("ocupacao")
+            st.button(
+                "Ver mais", key="manager_dashboard_ver_ocupacao", icon=":material/arrow_forward:", width="stretch",
+                on_click=set_page, args=("ocupacao",),
+            )
 
         with st.container(border=True):
             _occupancy_bar("Disponíveis", counts["available"], counts["total"])

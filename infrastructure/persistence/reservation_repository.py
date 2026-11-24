@@ -59,14 +59,14 @@ class PostgresReservationRepository:
 
     def list_for_participant(self, institution_id: str, participant_id: str) -> list[ReservationDetails]:
         with self._transaction.session() as session:
-            statement = self._listing(institution_id).join(
+            statement = self._listing(institution_id).add_columns(ReservaParticipante.status).join(
                 ReservaParticipante,
                 (ReservaParticipante.reserva_id == Reserva.id)
                 & (ReservaParticipante.instituicao_id == Reserva.instituicao_id),
             ).where(ReservaParticipante.usuario_id == to_database_identity_id(participant_id)).order_by(
                 Reserva.inicio.desc(), Reserva.id.desc(),
             )
-            return [self._details(row) for row in session.execute(statement)]
+            return [self._details(row[:4], row[4]) for row in session.execute(statement)]
 
     def participants(self, institution_id: str, reservation_id: str) -> list[ReservationParticipant]:
         with self._transaction.session() as session:
@@ -276,7 +276,7 @@ class PostgresReservationRepository:
         return statement
 
     @staticmethod
-    def _details(result) -> ReservationDetails:
+    def _details(result, participation_status: str | None = None) -> ReservationDetails:
         row, space_name, requester_name, has_overlap = result
         reservation = Reservation(
             id=str(row.id), institution_id=str(row.instituicao_id), requester_id=str(row.solicitante_id),
@@ -288,7 +288,7 @@ class PostgresReservationRepository:
             reviewed_by=str(row.avaliado_por) if row.avaliado_por is not None else None,
             reviewed_at=row.avaliado_em, decision_reason=row.motivo_decisao,
         )
-        return ReservationDetails(reservation, space_name, requester_name, has_overlap)
+        return ReservationDetails(reservation, space_name, requester_name, has_overlap, participation_status)
 
     @staticmethod
     def _history_event(row) -> ReservationHistoryEvent:

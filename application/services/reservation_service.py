@@ -70,9 +70,12 @@ class ReservationService:
         self._users = users
         self._permissions = PermissionPolicy()
 
-    def catalog(self, actor: User, period: ReservationPeriod | None = None) -> tuple[Institution, list[Space]]:
+    def catalog_settings(self, actor: User) -> Institution:
         permission = Permission.REVIEW_RESERVATIONS if actor.profile is Profile.MANAGER else Permission.CREATE_RESERVATION
-        institution = self._institution(actor, permission)
+        return self._institution(actor, permission)
+
+    def catalog(self, actor: User, period: ReservationPeriod | None = None) -> tuple[Institution, list[Space]]:
+        institution = self.catalog_settings(actor)
         unavailable = (
             self._repository.overlapping_spaces(institution.id, period, approved_only=True) if period else set()
         )

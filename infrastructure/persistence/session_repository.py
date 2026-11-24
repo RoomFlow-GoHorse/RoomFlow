@@ -5,7 +5,9 @@ from sqlalchemy.dialects.postgresql import insert
 
 from infrastructure.persistence.records import sessions
 from infrastructure.persistence.transaction import PostgresTransaction
-from infrastructure.persistence.user_mapping import to_database_identity_id
+from infrastructure.persistence.user_mapping import to_database_identity_id, to_user_account
+from models.database_models import Instituicao, Usuario, UsuarioInstituicao
+from models.domain.entities.user import User
 from models.domain.entities.user_session import UserSession
 
 
@@ -36,10 +38,30 @@ class PostgresSessionRepository:
             row = session.execute(select(sessions).where(sessions.c.token_digest == token_digest)).first()
             if row is None:
                 return None
-            return UserSession(
-                row.token_digest, str(row.usuario_id), row.expira_em,
-                revoked_at=row.revogada_em, institution_id=str(row.instituicao_id),
-            )
+            return self._session(row)
+
+    @staticmethod
+    def _session(row) -> UserSession:
+        return UserSession(
+            row.token_digest, str(row.usuario_id), row.expira_em,
+            revoked_at=row.revogada_em, institution_id=str(row.instituicao_id),
+        )
+
+    def find_user_session(self, token_digest: str) -> tuple[UserSession, User] | None:
+        statement = (
+            select(sessions, Usuario, UsuarioInstituicao, Instituicao)
+            .select_from(sessions)
+            .join(Usuario, Usuario.id == sessions.c.usuario_id)
+            .join(UsuarioInstituicao, (UsuarioInstituicao.user_id == sessions.c.usuario_id)
+                  & (UsuarioInstituicao.institution_id == sessions.c.instituicao_id))
+            .join(Instituicao, Instituicao.id == sessions.c.instituicao_id)
+            .where(sessions.c.token_digest == token_digest)
+        )
+        with self._transaction.session() as session:
+            row = session.execute(statement).one_or_none()
+            if row is None:
+                return None
+            return self._session(row), to_user_account(row.Usuario, row.UsuarioInstituicao, row.Instituicao).user
 
     def revoke_user(self, user_id: str, at: datetime, institution_id: str | None = None) -> None:
         statement = update(sessions).where(

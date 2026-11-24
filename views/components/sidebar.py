@@ -4,7 +4,7 @@ import streamlit as st
 
 from config.constants import ROLE_NAV
 from controllers import auth_service
-from controllers.app_state_service import go
+from controllers.app_state_service import set_page
 from controllers.streamlit_runtime import PERSISTENT_PAGES, get_streamlit_runtime, uses_persistent_runtime
 from controllers.runtime_errors import RuntimeUnavailable
 from models.domain.exceptions import DomainAuthorizationError
@@ -59,10 +59,6 @@ def _sidebar_items(role):
         )
 
 
-def _navigate(page):
-    go(page)
-
-
 def _sidebar_logo_variant():
     theme = getattr(st.context, "theme", None)
     theme_type = getattr(theme, "type", None) or getattr(theme, "base", None)
@@ -80,10 +76,7 @@ def render_sidebar(user):
     if uses_persistent_runtime():
         allowed_pages &= PERSISTENT_PAGES
         try:
-            inbox = get_streamlit_runtime().notifications.inbox(
-                unread_only=True, limit=1, offset=0,
-            )
-            unread = inbox["unread_count"]
+            unread = get_streamlit_runtime().notifications.unread_count()
             notifications_unavailable = False
         except (DomainAuthorizationError, RuntimeUnavailable) as error:
             LOGGER.warning("Could not load the sidebar notification count: %s", error)
@@ -107,14 +100,15 @@ def render_sidebar(user):
             is_active = current_page == page
             notification_suffix = f" ({unread})" if page == "notificacoes" and unread else ""
             button_key = "rf_nav_active" if is_active else f"rf_nav_{page}"
-            if st.button(
+            st.button(
                 f"{label}{notification_suffix}",
                 key=button_key,
                 icon=icon,
                 type="primary" if is_active else "tertiary",
                 width="stretch",
-            ):
-                _navigate(page)
+                on_click=set_page,
+                args=(page,),
+            )
             if page == "notificacoes" and notifications_unavailable:
                 st.caption("Notificações indisponíveis no momento.")
 
@@ -131,14 +125,15 @@ def render_sidebar(user):
                     st.markdown(f"**{user.get('name', 'Usuário')}**")
                     st.caption(role_label(role))
             if "conta" in allowed_pages:
-                if st.button(
+                st.button(
                     "Configurações da conta",
                     key="rf_account",
                     icon=NAV_ICONS["conta"],
                     type="tertiary",
                     width="stretch",
-                ):
-                    _navigate("conta")
+                    on_click=set_page,
+                    args=("conta",),
+                )
             if st.button(
                 "Sair",
                 key="rf_logout",

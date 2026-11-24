@@ -370,13 +370,12 @@ def dashboard(user: dict) -> None:
             for item in reservations:
                 start = datetime.fromisoformat(item["start"])
                 end = datetime.fromisoformat(item["end"])
-                participation = reservation_api.participating_detail(item["id"])
                 agenda_events.append(AgendaEvent(
                     id=item["id"], title=item["title"], start_time=f"{start:%H:%M}", end_time=f"{end:%H:%M}",
                     space=item["space_name"], location=item["space_name"], color="#6D28D9",
                     weekday=("Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom")[start.weekday()],
                     formatted_date=f"{start:%d/%m}", event_date=start.date(),
-                    participation_status=participation["participation_status"],
+                    participation_status=item["participation_status"],
                 ))
             for item in notifications:
                 changes_log.append(ChangeLog(item["id"], item["title"], item["message"], None, None, item["category"]))

@@ -54,7 +54,7 @@ def minhas_reservas(user):
         go("nova_reserva")
     try:
         items = api.list_own()
-        timezone = api.catalog()["timezone"]
+        timezone = api.catalog_settings()["timezone"]
     except RESERVATION_ERRORS as error:
         st.error(str(error))
         return

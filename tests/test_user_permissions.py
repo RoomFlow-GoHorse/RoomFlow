@@ -66,7 +66,10 @@ class UserPermissionTests(unittest.TestCase):
         }))
         self.assertEqual(
             self.permission_policy.effective_permissions(Profile.PARTICIPANT),
-            frozenset({Permission.MANAGE_OWN_ACCOUNT, Permission.VIEW_NOTIFICATIONS}),
+            frozenset({
+                Permission.MANAGE_OWN_ACCOUNT, Permission.VIEW_NOTIFICATIONS,
+                Permission.VIEW_PARTICIPANT_DASHBOARD, Permission.LOCATE_SPACES,
+            }),
         )
 
     def test_manager_can_manage_rooms_but_not_institution_structure(self) -> None:

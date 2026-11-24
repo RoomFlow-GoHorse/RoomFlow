@@ -176,22 +176,17 @@ def localizar(user: dict):
     if uses_roomflow_api():
         try:
             runtime = get_streamlit_runtime()
-            b_list = [
-                {"id": item.id, "name": item.name}
-                for item in runtime.space_management.list_buildings(None)
-            ]
-            for building in b_list:
-                f_list_by_building[building["id"]] = [
-                    {"id": item.id, "name": item.name}
-                    for item in runtime.space_management.list_floors(None, building["id"])
-                ]
+            catalog_buildings, catalog_floors, catalog_spaces = runtime.space_management.location_catalog(None)
+            b_list = [{"id": item.id, "name": item.name} for item in catalog_buildings]
+            for item in catalog_floors:
+                f_list_by_building.setdefault(item.building_id, []).append({"id": item.id, "name": item.name})
             all_spaces = [
                 {
                     "id": item.id, "name": item.name, "building": item.building,
                     "floor": item.floor, "location": item.location, "type": item.type,
                     "capacity": item.capacity, "status": item.status,
                 }
-                for item in runtime.space_management.list_spaces(None)
+                for item in catalog_spaces
             ]
         except RuntimeUnavailable as error:
             st.error(str(error))

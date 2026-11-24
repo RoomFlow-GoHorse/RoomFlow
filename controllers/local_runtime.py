@@ -143,6 +143,11 @@ class ReservationController:
         self.runtime = runtime
         self.service = runtime._services.reservation_service
 
+    def catalog_settings(self):
+        institution = self.service.catalog_settings(self.runtime.actor())
+        return {'timezone': institution.timezone,
+                'justification_required': institution.preferences.reservations.justification_required}
+
     def catalog(self, start=None, end=None):
         if (start is None) != (end is None):
             raise ValueError('Informe início e fim juntos.')
@@ -164,7 +169,10 @@ class ReservationController:
         return presentation([reservation_response(item) for item in self.service.list_institution(self.runtime.actor())])
 
     def list_participating(self):
-        return presentation([reservation_response(item) for item in self.service.list_participating(self.runtime.actor())])
+        return presentation([
+            {**reservation_response(item), "participation_status": item.participation_status}
+            for item in self.service.list_participating(self.runtime.actor())
+        ])
 
     def participating_detail(self, reservation_id):
         item, status = self.service.participating_detail(self.runtime.actor(), reservation_id)

@@ -43,11 +43,15 @@ def boot_state():
             st.session_state[key] = copy.deepcopy(source)
 
 
-def go(page):
-    """Navega imediatamente para uma rota pública ou interna."""
+def set_page(page):
     st.session_state.page = page
     clear_operational_dialogs()
     st.query_params["page"] = page
+
+
+def go(page):
+    """Navega imediatamente para uma rota pública ou interna."""
+    set_page(page)
     st.rerun()
 
 

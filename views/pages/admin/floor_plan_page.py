@@ -76,13 +76,10 @@ def _boot():
         {"id": item.id, "name": item.name, "active": item.active}
         for item in buildings
     ]
-    floors = []
-    for building in buildings:
-        floors.extend(
-            {"id": item.id, "buildingId": item.building_id, "name": item.name, "active": item.active}
-            for item in runtime.space_management.list_floors(actor, building.id, include_inactive=True)
-        )
-    st.session_state.floors = floors
+    st.session_state.floors = [
+        {"id": item.id, "buildingId": item.building_id, "name": item.name, "active": item.active}
+        for item in runtime.space_management.list_institution_floors(actor, include_inactive=True)
+    ]
     st.session_state.spaces = [
         {
             "id": item.id, "name": item.name, "building": item.building,

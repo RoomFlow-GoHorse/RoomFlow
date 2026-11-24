@@ -90,6 +90,37 @@ class PostgresIntegrationTests(unittest.TestCase):
             "justification": "Atividade com a turma",
         }
 
+    def test_participant_navigation_renders_only_its_institution_and_reservations(self):
+        admin = self.register()
+        requester = self.role_login(admin, Profile.REQUESTER)
+        participant = self.role_login(admin, Profile.PARTICIPANT)
+        other_participant = self.role_login(admin, Profile.PARTICIPANT)
+        room = self._structure_room(admin, "Sala da instituição")
+        other_room = self._structure_room(self.register(), "Sala de outra instituição")
+        reservation = self.runtime(requester).reservation_service.create({
+            **self._reservation_payload(room), "participant_ids": [participant.user.id],
+        })
+        api = self.runtime(participant).reservation_service
+        self.assertEqual(
+            [(item["id"], item["participation_status"]) for item in api.list_participating()],
+            [(reservation["id"], "pendente")],
+        )
+        self.assertEqual(self.runtime(other_participant).reservation_service.list_participating(), [])
+        _, _, rooms = self.runtime(participant).space_management.location_catalog(None)
+        self.assertEqual([item.id for item in rooms], [room.id])
+        self.assertNotIn(other_room.id, {item.id for item in rooms})
+
+        with self.streamlit_runtime():
+            app = AppTest.from_file(str(PROJECT / "main.py"), default_timeout=20)
+            app.query_params["page"] = "participante_dashboard"
+            app.session_state["auth_token"] = participant.access_token
+            app.run()
+            self.assertFalse(app.exception or app.error)
+            for page in ("agenda", "localizar"):
+                app.button(key=f"rf_nav_{page}").click().run()
+                self.assertEqual(app.query_params["page"], [page])
+                self.assertFalse(app.exception or app.error)
+
     def test_reservation_streamlit_submission_reaches_manager_directly(self):
         admin = self.register()
         requester = self.role_login(admin, Profile.REQUESTER)
