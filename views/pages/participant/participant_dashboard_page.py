@@ -24,6 +24,7 @@ class AgendaEvent:
     weekday: str
     formatted_date: str
     event_date: date
+    participation_status: Optional[str] = None
 
 
 @dataclass
@@ -272,7 +273,7 @@ def _render_hero_banner(event: AgendaEvent) -> None:
                 st.rerun()
 
 
-def _render_event_item(event: AgendaEvent) -> None:
+def _render_event_item(event: AgendaEvent, reservation_api=None) -> None:
     """Renderiza a linha do evento na lista da agenda."""
     st.markdown(
         f"""
@@ -300,6 +301,17 @@ def _render_event_item(event: AgendaEvent) -> None:
         """,
         unsafe_allow_html=True,
     )
+    if reservation_api is not None and event.participation_status == "pendente":
+        confirm, decline = st.columns(2)
+        try:
+            if confirm.button("Confirmar", key=f"confirm_participation_{event.id}", use_container_width=True):
+                reservation_api.respond_participation(event.id, "confirmada")
+                st.rerun()
+            if decline.button("Recusar", key=f"decline_participation_{event.id}", type="secondary", use_container_width=True):
+                reservation_api.respond_participation(event.id, "recusada")
+                st.rerun()
+        except ApiUnavailable as error:
+            st.error(str(error))
 
 
 def _render_change_item(change: ChangeLog) -> None:
@@ -347,20 +359,24 @@ def dashboard(user: dict) -> None:
     )
 
     agenda_events: List[AgendaEvent] = []
+    reservation_api = None
     changes_log: List[ChangeLog] = []
     if uses_roomflow_api():
         try:
             runtime = get_streamlit_runtime()
-            reservations = runtime.reservation_service.list_participating()
+            reservation_api = runtime.reservation_service
+            reservations = reservation_api.list_participating()
             notifications = runtime.notifications.inbox(unread_only=False, category=None, limit=4, offset=0)["items"]
             for item in reservations:
                 start = datetime.fromisoformat(item["start"])
                 end = datetime.fromisoformat(item["end"])
+                participation = reservation_api.participating_detail(item["id"])
                 agenda_events.append(AgendaEvent(
                     id=item["id"], title=item["title"], start_time=f"{start:%H:%M}", end_time=f"{end:%H:%M}",
                     space=item["space_name"], location=item["space_name"], color="#6D28D9",
                     weekday=("Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom")[start.weekday()],
                     formatted_date=f"{start:%d/%m}", event_date=start.date(),
+                    participation_status=participation["participation_status"],
                 ))
             for item in notifications:
                 changes_log.append(ChangeLog(item["id"], item["title"], item["message"], None, None, item["category"]))
@@ -389,7 +405,7 @@ def dashboard(user: dict) -> None:
                     st.rerun()
 
             for event in agenda_events:
-                _render_event_item(event)
+                _render_event_item(event, reservation_api)
 
     # 2. Coluna de Alterações Recentes
     with col_changes:
