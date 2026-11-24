@@ -176,6 +176,28 @@ class ReservationService:
         scope = self._permissions.authorize_listing(actor, Permission.VIEW_PARTICIPANT_DASHBOARD)
         return self._repository.list_for_participant(scope, actor.id)
 
+    def participating_detail(self, actor: User, reservation_id: str) -> tuple[ReservationDetails, str]:
+        scope = self._permissions.authorize_listing(actor, Permission.VIEW_PARTICIPANT_DASHBOARD)
+        details = self._repository.find(scope, reservation_id)
+        if details is None:
+            raise ResourceNotFound("Reserva não encontrada.")
+        status = self._repository.participation_status(scope, reservation_id, actor.id)
+        if status is None:
+            raise ResourceNotFound("Reserva não encontrada.")
+        return details, status
+
+    def respond_participation(self, actor: User, reservation_id: str, status: str) -> tuple[ReservationDetails, str]:
+        if status not in {"confirmada", "recusada"}:
+            raise ValueError("Resposta de participação inválida.")
+        details, _ = self.participating_detail(actor, reservation_id)
+        if details.reservation.status is ReservationStatus.CANCELLED:
+            raise DuplicateResource("Não é possível responder a uma reserva cancelada.")
+        if not self._repository.set_participation_status(
+            details.reservation.institution_id, reservation_id, actor.id, status, self._clock.now(),
+        ):
+            raise ResourceNotFound("Reserva não encontrada.")
+        return details, status
+
     def _replace_participants(self, institution_id: str, reservation: Reservation, participant_ids: frozenset[str]) -> None:
         if not participant_ids:
             self._repository.replace_participants(institution_id, reservation.id, participant_ids)

@@ -1,4 +1,4 @@
-from sqlalchemy import distinct, func, select
+from sqlalchemy import distinct, func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import aliased
 
@@ -76,6 +76,23 @@ class PostgresReservationRepository:
             )
             return [ReservationParticipant(str(link.usuario_id), user.name, user.email, link.status, link.criado_em, link.respondido_em)
                     for link, user in rows]
+
+    def participation_status(self, institution_id: str, reservation_id: str, participant_id: str) -> str | None:
+        with self._transaction.session() as session:
+            return session.scalar(select(ReservaParticipante.status).where(
+                ReservaParticipante.instituicao_id == to_database_identity_id(institution_id),
+                ReservaParticipante.reserva_id == to_database_identity_id(reservation_id, bits=64),
+                ReservaParticipante.usuario_id == to_database_identity_id(participant_id),
+            ))
+
+    def set_participation_status(self, institution_id, reservation_id, participant_id, status, responded_at) -> bool:
+        with self._transaction.session() as session:
+            result = session.execute(update(ReservaParticipante).where(
+                ReservaParticipante.instituicao_id == to_database_identity_id(institution_id),
+                ReservaParticipante.reserva_id == to_database_identity_id(reservation_id, bits=64),
+                ReservaParticipante.usuario_id == to_database_identity_id(participant_id),
+            ).values(status=status, respondido_em=responded_at, atualizado_em=responded_at))
+            return result.rowcount == 1
 
     def replace_participants(self, institution_id: str, reservation_id: str, participant_ids: frozenset[str]) -> None:
         with self._transaction.session() as session:

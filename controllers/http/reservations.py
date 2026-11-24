@@ -52,6 +52,11 @@ class CancellationPayload(BaseModel):
     reason: str | None = Field(default=None, max_length=600)
 
 
+class ParticipationPayload(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    status: str = Field(pattern="^(confirmada|recusada)$")
+
+
 def get_service(request: Request) -> ReservationService:
     return request.app.state.reservation_service
 
@@ -98,6 +103,18 @@ def eligible_participants(actor: User = Depends(get_current_user), service: Rese
 @router.get("/participating")
 def participating(actor: User = Depends(get_current_user), service: ReservationService = Depends(get_service)):
     return {"data": [reservation_response(item) for item in run_reservation_action(lambda: service.list_participating(actor))]}
+
+
+@router.get("/participating/{reservation_id}")
+def participating_detail(reservation_id: str, actor: User = Depends(get_current_user), service: ReservationService = Depends(get_service)):
+    details, status = run_reservation_action(lambda: service.participating_detail(actor, reservation_id))
+    return {"data": {**reservation_response(details), "participation_status": status}}
+
+
+@router.patch("/participating/{reservation_id}")
+def respond_participation(reservation_id: str, payload: ParticipationPayload, actor: User = Depends(get_current_user), service: ReservationService = Depends(get_service)):
+    details, status = run_reservation_action(lambda: service.respond_participation(actor, reservation_id, payload.status))
+    return {"data": {**reservation_response(details), "participation_status": status}}
 
 
 @router.get("/mine")

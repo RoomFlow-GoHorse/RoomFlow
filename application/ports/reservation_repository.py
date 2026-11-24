@@ -32,6 +32,10 @@ class ReservationRepository(Protocol):
 
     def list_for_participant(self, institution_id: str, participant_id: str) -> list[ReservationDetails]: ...
 
+    def participation_status(self, institution_id: str, reservation_id: str, participant_id: str) -> str | None: ...
+
+    def set_participation_status(self, institution_id: str, reservation_id: str, participant_id: str, status: str, responded_at) -> bool: ...
+
     def overlapping_spaces(
         self, institution_id: str, period: ReservationPeriod, *,
         approved_only: bool, space_id: str | None = None, exclude_id: str | None = None,
