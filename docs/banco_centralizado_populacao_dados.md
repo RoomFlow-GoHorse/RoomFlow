@@ -31,3 +31,16 @@ Auditar migrations e preparar testes PostgreSQL isolados.
 
 - A conexão aceita `DATABASE_URL` remota ou `DB_*`, com `DB_SSLMODE`, timeout e pool configuráveis sem credenciais fixas.
 - Testes de regressão da API e mapeamento: 13 aprovados.
+- A cadeia Alembic é linear, com `c8d15a6e2f91` como única revisão head e `reserva_participantes` no topo.
+
+## Validação de migrations e testes isolados
+
+- O serviço PostgreSQL local está disponível, mas `ROOMFLOW_TEST_DATABASE` não foi informado.
+- Para impedir alteração de um banco principal ou compartilhado, a validação de migrations e os testes PostgreSQL continuam bloqueados até que um banco cujo nome comece por `roomflow_test_` seja explicitamente configurado.
+- Com esse banco criado e as mesmas credenciais locais autorizadas, execute:
+
+```powershell
+$env:ROOMFLOW_TEST_DATABASE = "roomflow_test_roomflow"
+.\.venv\Scripts\python.exe -m alembic upgrade head
+.\.venv\Scripts\python.exe -m unittest tests.test_postgres_integration -v
+```
