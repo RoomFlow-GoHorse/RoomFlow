@@ -41,6 +41,11 @@ Auditar migrations e preparar testes PostgreSQL isolados.
 
 ```powershell
 $env:ROOMFLOW_TEST_DATABASE = "roomflow_test_roomflow"
+$env:DB_NAME = $env:ROOMFLOW_TEST_DATABASE
 .\.venv\Scripts\python.exe -m alembic upgrade head
 .\.venv\Scripts\python.exe -m unittest tests.test_postgres_integration -v
 ```
+
+O `DB_NAME` temporário garante que o Alembic use o banco isolado, pois a variável
+`ROOMFLOW_TEST_DATABASE` é lida somente pela suíte de integração. Não execute esses
+comandos sem confirmar que o nome possui o prefixo `roomflow_test_`.

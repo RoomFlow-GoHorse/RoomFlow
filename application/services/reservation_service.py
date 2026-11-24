@@ -128,7 +128,7 @@ class ReservationService:
                 "", institution.id, actor.id, request, status, now,
                 reviewed_at=now if status is ReservationStatus.APPROVED else None,
             ))
-            self._replace_participants(institution.id, result.reservation, request.participant_ids)
+            self._replace_participants(institution.id, result.reservation, request.participant_ids or frozenset())
             self._record_event(result.reservation, ReservationHistoryEvent(
                 ReservationHistoryAction.CREATE, None, ReservationStatus.PENDING, now,
                 actor.id, actor.name, request.justification,
@@ -162,7 +162,8 @@ class ReservationService:
                 reviewed_by=None, reviewed_at=None, decision_reason=None,
             )
             result = self._save_change(actor, current, updated, ReservationHistoryAction.EDIT, now, reason)
-            self._replace_participants(institution.id, result.reservation, request.participant_ids)
+            if request.participant_ids is not None:
+                self._replace_participants(institution.id, result.reservation, request.participant_ids)
             return result
 
     def eligible_participants(self, actor: User) -> list[User]:

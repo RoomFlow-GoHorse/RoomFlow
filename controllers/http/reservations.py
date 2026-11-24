@@ -26,14 +26,15 @@ class ReservationPayload(BaseModel):
     end: datetime
     participants: int = Field(strict=True, ge=1, le=10000)
     justification: str | None = Field(default=None, max_length=600)
-    participant_ids: list[str] = Field(default_factory=list, max_length=9999)
+    participant_ids: list[str] | None = Field(default=None, max_length=9999)
 
     def to_request(self) -> ReservationRequest:
-        if len(self.participant_ids) != len(set(self.participant_ids)):
+        if self.participant_ids is not None and len(self.participant_ids) != len(set(self.participant_ids)):
             raise ValueError("Não informe o mesmo participante mais de uma vez.")
         return ReservationRequest(
             self.space_id, self.title, self.activity_type, ReservationPeriod(self.start, self.end),
-            self.participants, self.justification, frozenset(self.participant_ids),
+            self.participants, self.justification,
+            frozenset(self.participant_ids) if self.participant_ids is not None else None,
         )
 
 

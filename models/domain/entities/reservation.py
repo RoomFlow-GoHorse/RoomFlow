@@ -66,7 +66,9 @@ class ReservationRequest:
     period: ReservationPeriod
     participants: int
     justification: str | None = None
-    participant_ids: frozenset[str] = frozenset()
+    # ``None`` representa um campo omitido numa edição. Assim, uma edição feita
+    # por um perfil que não manipula participantes não remove vínculos existentes.
+    participant_ids: frozenset[str] | None = None
 
     def validated(self) -> "ReservationRequest":
         title = self.title.strip()
@@ -78,7 +80,7 @@ class ReservationRequest:
             raise ValueError("Informe entre 1 e 10000 participantes.")
         if len(reason) > 600:
             raise ValueError("A justificativa deve ter até 600 caracteres.")
-        if len(self.participant_ids) > self.participants:
+        if self.participant_ids is not None and len(self.participant_ids) > self.participants:
             raise ValueError("A quantidade de participantes vinculados excede a quantidade prevista.")
         return replace(self, title=title, activity_type=activity, justification=reason or None)
 

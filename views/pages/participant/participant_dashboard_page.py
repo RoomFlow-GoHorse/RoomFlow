@@ -351,7 +351,7 @@ def dashboard(user: dict) -> None:
     if uses_roomflow_api():
         try:
             runtime = get_streamlit_runtime()
-            reservations = runtime.reservations.list_participating()
+            reservations = runtime.reservation_service.list_participating()
             notifications = runtime.notifications.inbox(unread_only=False, category=None, limit=4, offset=0)["items"]
             for item in reservations:
                 start = datetime.fromisoformat(item["start"])

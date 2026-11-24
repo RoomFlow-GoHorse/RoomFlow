@@ -18,54 +18,6 @@ PT_MONTHS = [
 
 PT_WEEKDAYS = ["Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado", "Domingo"]
 
-AGENDA_EVENTS = [
-    {
-        "id": "e1",
-        "title": "Aula de Metodologia",
-        "startTime": "08:00",
-        "endTime": "10:00",
-        "space": "Sala 101",
-        "location": "Bloco A - 1º andar",
-        "type": "Aula",
-        "color": "#6D28D9",
-        "date": date(2026, 8, 21),
-    },
-    {
-        "id": "e2",
-        "title": "Banca de TCC",
-        "startTime": "09:30",
-        "endTime": "11:00",
-        "space": "Sala 204",
-        "location": "Bloco B - 2º andar",
-        "type": "Banca",
-        "color": "#B45309",
-        "date": date(2026, 8, 21),
-    },
-    {
-        "id": "e3",
-        "title": "Workshop de Pesquisa",
-        "startTime": "14:00",
-        "endTime": "17:00",
-        "space": "Auditório Principal",
-        "location": "Bloco Central",
-        "type": "Workshop",
-        "color": "#16A34A",
-        "date": date(2026, 8, 22),
-    },
-    {
-        "id": "e4",
-        "title": "Reunião de Coordenação",
-        "startTime": "10:00",
-        "endTime": "11:30",
-        "space": "Sala de Reuniões B",
-        "location": "Administrativo",
-        "type": "Reunião",
-        "color": "#2563EB",
-        "date": date(2026, 8, 24),
-    },
-]
-
-
 def _api_events():
     if not uses_roomflow_api():
         return []
@@ -74,9 +26,9 @@ def _api_events():
         actor = st.session_state.get("user") or {}
         role = actor.get("role")
         if role == "participante":
-            reservations = runtime.reservations.list_participating()
+            reservations = runtime.reservation_service.list_participating()
         elif role == "solicitante":
-            reservations = runtime.reservations.list_own()
+            reservations = runtime.reservation_service.list_own()
         else:
             return []
     except ApiUnavailable as error:
