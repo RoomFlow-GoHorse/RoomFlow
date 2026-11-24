@@ -8,6 +8,7 @@ class Permission(str, Enum):
     MANAGE_USERS = "users.manage"
     VIEW_PERMISSIONS = "permissions.view"
     MANAGE_FLOOR_PLAN = "floor_plan.manage"
+    MANAGE_RESERVATION_TYPES = "reservation_types.manage"
     EDIT_INSTITUTION_SETTINGS = "institution.settings.edit"
 
     VIEW_MANAGER_DASHBOARD = "manager.dashboard.view"
