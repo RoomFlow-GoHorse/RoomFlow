@@ -6,7 +6,7 @@ import streamlit as st
 
 from config.constants import STATUS_LABELS
 from controllers.app_state_service import set_toast
-from controllers.streamlit_runtime import get_streamlit_runtime, uses_roomflow_api
+from controllers.streamlit_runtime import get_streamlit_runtime, uses_persistent_runtime
 from views.components.reservation_forms import RESERVATION_ERRORS, local_times
 from views.components.ui_components import page_header
 
@@ -115,7 +115,7 @@ def _resolution_form(api, conflict):
 
 def conflicts(user=None):
     page_header("Conflitos", "Analise sobreposições de horários e aplique uma decisão às reservas.")
-    if not uses_roomflow_api():
+    if not uses_persistent_runtime():
         st.info("Esta área está indisponível no momento.")
         return
     api = get_streamlit_runtime().conflict_service

@@ -6,6 +6,8 @@ Sistema de gerenciamento e reserva de salas desenvolvido em **Python** com **Str
 
 * Python
 * Streamlit
+* SQLAlchemy e Alembic
+* PostgreSQL (local ou Supabase)
 
 ## Requisitos
 
@@ -25,7 +27,6 @@ git clone <URL_DO_REPOSITORIO>
 Entre na pasta do projeto:
 
 ```bash
-cd reserva_salas_GoHorse
 cd RoomFlow
 ```
 
@@ -49,15 +50,18 @@ No Prompt de Comando (CMD):
 
 ```cmd
 .venv\Scripts\activate
+```
 
-No linux 
+No Linux:
+
+```bash
 source .venv/bin/activate
 ```
 
 ### 4. Instale as dependências
 
 Na raiz do RoomFlow, com o ambiente virtual ativado, instale as dependências
-do frontend, da API, do banco e dos testes:
+da aplicação e do banco:
 
 ```bash
 python -m pip install -r requirements.txt
@@ -68,7 +72,7 @@ python -m pip install -r requirements.txt
 Com o ambiente virtual ativado, execute:
 
 ```bash
-streamlit run main.py
+APP_ENV=development ROOMFLOW_PERSISTENCE=memory streamlit run main.py
 ```
 
 O Streamlit iniciará o sistema e exibirá no terminal o endereço para acessar a aplicação pelo navegador.
@@ -81,60 +85,78 @@ http://localhost:8501
 
 ## Executando com PostgreSQL
 
-Preencha o `.env` local conforme `.env.example`. Configure os cinco campos
-`DB_*` ou uma `DATABASE_URL` PostgreSQL. Se as duas formas estiverem presentes,
-`DATABASE_URL` tem precedência. Em uma URL, codifique caracteres especiais da
-senha. O banco deve existir. Para
-aplicar as revisões somente ao banco de desenvolvimento escolhido, confirme
-`DB_HOST` e `DB_NAME` antes de executar:
+### Streamlit Community Cloud + Supabase (sem API separada)
 
-```powershell
+Em **App settings → Secrets** do Streamlit, configure as chaves na raiz do TOML:
+
+```toml
+APP_ENV = "production"
+ROOMFLOW_PERSISTENCE = "postgres"
+DATABASE_URL = "postgresql+psycopg://USUARIO:SENHA@HOST-DO-POOLER:5432/postgres"
+```
+
+Use a conexão real do Supabase nesse campo privado e codifique caracteres especiais
+da senha na URL. Não publique o `.env` no Git. Remova `ROOMFLOW_API_URL`, que não é usada pelo Streamlit. O `.env` local não é enviado ao Community Cloud.
+
+O Streamlit chama controllers locais e os serviços do runtime PostgreSQL no
+mesmo processo. Não usa HTTP interno, ASGI, Uvicorn ou `ROOMFLOW_API_URL`.
+O runtime valida a conexão e o esquema antes de exibir os formulários; uma falha
+interrompe a operação com erro explícito, sem fallback para memória.
+
+### Execução local
+
+Preencha `.env` conforme `.env.example`. `DATABASE_URL` tem precedência sobre
+os cinco campos `DB_*`; o carregamento não sobrescreve variáveis do ambiente.
+O PostgreSQL é o padrão em todos os ambientes. Uma demonstração exige tanto
+`APP_ENV=development` (ou `test`) quanto `ROOMFLOW_PERSISTENCE=memory`.
+
+Depois de conferir o banco de destino, aplique as migrations existentes:
+
+```bash
 python -m alembic upgrade head
+streamlit run main.py
 ```
 
-No Windows, na pasta `RoomFlow`, inicie ambos os processos com o Python do
-ambiente virtual. O comando aguarda a API confirmar a conexão e o esquema
-PostgreSQL em `/ready` antes de iniciar o Streamlit. Ele usa as portas 8000
-e 8501 e não aplica migrations.
+Abra `http://localhost:8501`. O script `python -m scripts.start_local`
+é uma alternativa que inicia apenas o Streamlit; aceita `--streamlit-port`.
 
-```powershell
-.\.venv\Scripts\python.exe -m scripts.start_local
-```
+### Implantação
 
-Abra `http://127.0.0.1:8501`. Use `--api-port` e `--streamlit-port` para
-escolher portas livres se já houver outro processo usando as padrões.
+Instale `requirements.txt`, configure `DATABASE_URL` nos Secrets/variáveis
+privadas e execute as migrations em uma etapa de implantação controlada.
+Configure SMTP para confirmação de e-mail e recuperação de senha. Inicie
+`streamlit run main.py` (ou selecione `main.py` no Community Cloud) e reinicie o
+app após atualizar a configuração. Não é preciso publicar uma API ou abrir a
+porta 8000. Verifique login e leitura dos dados após o reinício.
 
-Para iniciar separadamente, mantenha a API rodando no primeiro terminal:
+### API opcional preservada
 
-```powershell
-$env:ROOMFLOW_PERSISTENCE = "postgres"
-.\.venv\Scripts\python.exe -m uvicorn api.main:app --host 127.0.0.1 --port 8000
-```
-
-Em outro, confirme que `Invoke-RestMethod http://127.0.0.1:8000/ready` retorna
-`ready` e `postgres`. Depois aponte o Streamlit para essa API:
-
-```powershell
-$env:ROOMFLOW_API_URL = "http://127.0.0.1:8000"
-.\.venv\Scripts\python.exe -m streamlit run main.py
-```
+`api/`, `controllers/http/`, os clientes `controllers/*_api.py` e
+`controllers/embedded_api.py` não participam do runtime Streamlit. Foram
+preservados para compatibilidade e cobertura HTTP; o transporte embutido ficou
+obsoleto. Se houver consumidores externos, instale `requirements-api.txt` e
+inicie a API separadamente com `uvicorn api.main:app`. O Streamlit continua
+acessando os serviços diretamente, mesmo se `ROOMFLOW_API_URL` estiver definida.
+FastAPI, Starlette, Uvicorn, python-multipart, httpx2 e anyio foram retirados das
+dependências diretas do monólito e mantidos nesse arquivo opcional.
 
 Use **Criar conta → Cadastrar instituição** para criar a primeira instituição e
 o administrador. O cadastro registra o perfil necessário no catálogo, junto com
 a conta e o vínculo. Para inserir os perfis manualmente, execute
 `python -m db.seeds`; para criar também a instituição e os dados de
 demonstração, execute `python -m db.seeds --demo`. As quatro contas de
-demonstração recebem a senha inicial `123456789`. O seed é opcional e não altera uma
-instituição de demonstração que já exista.
+demonstração recebem a senha `123456789`. Se a instituição com o CNPJ reservado
+para a demo já existir, o seed cria ou atualiza essas contas e seus vínculos,
+sem duplicar os demais dados de demonstração.
 
 Confirmação de e-mail e recuperação de senha usam SMTP com TLS implícito.
 Configure `ROOMFLOW_SMTP_HOST`, `ROOMFLOW_SMTP_PORT` (padrão 465),
 `ROOMFLOW_SMTP_FROM` e, se exigidos pelo servidor, `ROOMFLOW_SMTP_USERNAME` e
-`ROOMFLOW_SMTP_PASSWORD` somente no ambiente da API ou no `.env` local.
+`ROOMFLOW_SMTP_PASSWORD` no ambiente do Streamlit ou no `.env` local.
 
 O modo PostgreSQL inclui autenticação, usuários, instituições, convites,
 matrículas, estrutura física, recursos, plantas, painel e histórico administrativos.
-Com `ROOMFLOW_API_URL` configurado, solicitantes podem criar, acompanhar, alterar
+Solicitantes podem criar, acompanhar, alterar
 e cancelar suas reservas. Gerentes podem consultar e avaliar as solicitações da
 própria instituição. A disponibilidade considera salas ativas e desbloqueadas
 e reservas aprovadas no PostgreSQL. Solicitações abertas com horários
@@ -159,28 +181,42 @@ as demais partes envolvidas.
 A leitura é individual por vínculo, e o solicitante pode consultar o histórico
 em **Minhas reservas**.
 
-A tela de agenda continua no modo de demonstração. O modo em memória continua
-disponível sem as duas variáveis.
+A tela de agenda continua no modo de demonstração e não integra as rotas do modo
+persistente. O modo em memória exige um ambiente explícito de desenvolvimento ou teste.
 
 ### Arquitetura
-* **Views:** responsáveis pela interface da aplicação.
-* **Controllers:** responsáveis pela lógica e controle das ações.
-* **Models:** representam os dados e entidades do sistema.
-* **Config:** contém as configurações da aplicação.
-* **main.py:** ponto de entrada da aplicação.
+
+`Views (Streamlit) → Controllers locais → Application Services → Repositories
+→ Models SQLAlchemy → PostgreSQL`
+
+* `views/`: apresentação e interação.
+* `controllers/local_runtime.py`: coordenação, identidade e adaptação para as telas.
+* `application/services/`: casos de uso, autorização e transações existentes.
+* `infrastructure/persistence/`: repositórios PostgreSQL e runtime compartilhado.
+* `models/`: entidades, políticas e mapeamento SQLAlchemy.
+* `config/database.py`: único engine e SessionLocal; `config/runtime.py`: seleção explícita de persistência.
+
+O cache compartilha serviços e pool, nunca uma sessão SQLAlchemy ou o usuário
+atual. `PostgresTransaction` abre/fecha sessões por operação e mantém transações
+aninhadas no contexto da execução. Cada ação autenticada resolve o token da
+`st.session_state` atual; sessões de autenticação e vínculos ficam no banco.
+As correções `from __future__ import annotations` dos repositórios de reservas
+foram preservadas para compatibilidade com Python 3.12.
 
 ## Desenvolvimento
 
 Mantenha as dependências diretas em `requirements.txt`. Para executar a suíte:
 
 ```bash
-python -m unittest discover -s tests -v
+python -m pip install -r requirements-api.txt
+python -m unittest discover -s tests -t . -v
 ```
 
 Para incluir os testes PostgreSQL, prepare um banco local descartável com nome
 iniciado por `roomflow_test_`, aplique nele as revisões e rode a mesma suíte com
-`ROOMFLOW_TEST_DATABASE` apontando para esse banco. Os testes usam as credenciais
-locais do `.env` e criam dados próprios.
+`ROOMFLOW_TEST_DATABASE` apontando para esse banco. Os testes usam `DB_*` do ambiente (com fallback ao `.env`) e criam dados próprios.
+Nunca aponte os testes de escrita para o Supabase real. As telas são testadas
+com controllers locais, inclusive em processos Streamlit distintos, sem Uvicorn.
 
 ## Status
 

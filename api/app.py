@@ -2,6 +2,7 @@ import os
 
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
+from config.runtime import persistence_mode
 from sqlalchemy.orm import Session, sessionmaker
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
@@ -53,7 +54,7 @@ def create_app(
     app.add_exception_handler(StarletteHTTPException, http_exception_handler)
     app.add_exception_handler(RequestValidationError, validation_exception_handler)
     app.add_exception_handler(Exception, unhandled_exception_handler)
-    if postgres_session_factory is not None or os.getenv("ROOMFLOW_PERSISTENCE", "memory") == "postgres":
+    if postgres_session_factory is not None or persistence_mode(active_environment) == "postgres":
         from infrastructure.persistence.readiness import check_postgres_readiness
         from infrastructure.persistence.runtime import build_postgres_runtime
 

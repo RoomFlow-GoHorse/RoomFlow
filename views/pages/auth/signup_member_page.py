@@ -10,7 +10,7 @@ from application.services.enrollment_management_service import (
 from application.services.member_signup_service import InvalidEmailVerification
 from models.domain.exceptions import DomainAuthorizationError, DuplicateResource
 from controllers.app_state_service import go
-from controllers.streamlit_runtime import get_streamlit_runtime, uses_roomflow_api
+from controllers.streamlit_runtime import get_streamlit_runtime, uses_persistent_runtime
 from views.components.ui_components import logo
 
 def _init_state():
@@ -288,7 +288,7 @@ def _render_confirm():
 
 
 def _render_email_pending():
-    if not uses_roomflow_api():
+    if not uses_persistent_runtime():
         st.error("A confirmação de cadastro não está disponível neste ambiente. Tente novamente mais tarde.")
         if st.button("Voltar ao cadastro", key="signup_member_back_from_email"):
             st.session_state.signup_member_screen = "form"

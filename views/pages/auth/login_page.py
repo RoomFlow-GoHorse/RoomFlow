@@ -4,7 +4,7 @@ import streamlit as st
 
 from controllers import auth_service
 from controllers.app_state_service import go, go_authenticated
-from controllers.streamlit_runtime import uses_roomflow_api
+from controllers.streamlit_runtime import uses_persistent_runtime
 from views.components.ui_components import logo
 
 
@@ -26,7 +26,7 @@ def _init_state():
 
 
 def _target_for(user):
-    if uses_roomflow_api():
+    if uses_persistent_runtime():
         return {"admin": "admin_dashboard", "gerente": "gerente_dashboard", "solicitante": "minhas_reservas"}.get(user["role"], "conta")
     return ROLE_REDIRECT.get(user["role"], "participante_dashboard")
 

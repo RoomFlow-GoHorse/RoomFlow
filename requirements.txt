@@ -3,12 +3,8 @@ streamlit>=1.62,<2.0
 streamlit-calendar>=1.5,<2.0
 pandas>=2.2,<4.0
 
-# Backend HTTP
-fastapi>=0.165,<1.0
-starlette>=1.6,<2.0
+# Validação dos dados recebidos pelos controllers
 pydantic>=2.9,<3.0
-uvicorn>=0.30,<1.0
-python-multipart>=0.0.18,<1.0
 
 # Banco de dados e configuração
 SQLAlchemy>=2.0,<3.0
@@ -20,6 +16,3 @@ tzdata
 # Planilhas e imagens
 openpyxl>=3.1,<4.0
 Pillow>=10,<13
-
-# TestClient do FastAPI/Starlette
-httpx2>=2,<3
