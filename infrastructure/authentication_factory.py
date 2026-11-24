@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from threading import RLock
 
+from application.services.reservation_type_service import ReservationTypeService
 from application.services.authentication_service import AuthenticationService
 from application.services.login_attempt_limiter import LoginAttemptLimiter
 from application.services.institution_management_service import InstitutionManagementService
@@ -17,6 +18,7 @@ from infrastructure.in_memory_admin_transaction import InMemoryAdminTransaction
 from infrastructure.repositories.in_memory_institution_repository import InMemoryInstitutionRepository
 from infrastructure.repositories.in_memory_institution_invite_code_repository import InMemoryInstitutionInviteCodeRepository
 from infrastructure.repositories.in_memory_authorized_enrollment_repository import InMemoryAuthorizedEnrollmentRepository
+from infrastructure.repositories.in_memory_reservation_type_repository import InMemoryReservationTypeRepository
 from infrastructure.repositories.in_memory_enrollment_preview_repository import InMemoryEnrollmentPreviewRepository
 from infrastructure.repositories.in_memory_session_repository import InMemorySessionRepository
 from infrastructure.repositories.in_memory_user_repository import InMemoryUserRepository
@@ -50,6 +52,7 @@ class InMemoryApplicationRuntime:
     spaces: InMemorySpaceRepository
     space_management: SpaceService
     resource_management: ResourceManagementService
+    reservation_type_management: ReservationTypeService
     floor_plan_management: FloorPlanService
     plant_file_storage: TemporaryPlantFileStorage
     admin_dashboard: AdminDashboardService
@@ -87,16 +90,61 @@ def build_application_runtime(environment: str) -> InMemoryApplicationRuntime:
         ]
     limiter = LoginAttemptLimiter() if environment in {"development", "test"} else None
     transaction = InMemoryAdminTransaction(RLock())
-    user_repository = InMemoryUserRepository(accounts, transaction=transaction)
-    institution_repository = InMemoryInstitutionRepository(institutions, transaction=transaction)
-    spaces = InMemorySpaceRepository(spaces=None if accounts else (), transaction=transaction)
+
+    user_repository = InMemoryUserRepository(
+        accounts,
+        transaction=transaction,
+    )
+
+    institution_repository = InMemoryInstitutionRepository(
+        institutions,
+        transaction=transaction,
+    )
+
+    spaces = InMemorySpaceRepository(
+        spaces=None if accounts else (),
+        transaction=transaction,
+    )
+
+    reservation_type_repository = InMemoryReservationTypeRepository(
+        transaction=transaction,
+    )
+
     plant_file_storage = TemporaryPlantFileStorage()
-    admin_audit_repository = InMemoryAdminAuditRepository(transaction=transaction)
-    admin_audit = AdminAuditService(admin_audit_repository, clock, atomic=transaction.atomic, users=user_repository)
-    invite_code_repository = InMemoryInstitutionInviteCodeRepository(transaction=transaction)
-    invite_code_service = InstitutionInviteCodeService(invite_code_repository, audit=admin_audit)
-    enrollment_repository = InMemoryAuthorizedEnrollmentRepository(transaction=transaction)
-    sessions = InMemorySessionRepository(transaction=transaction)
+
+    admin_audit_repository = InMemoryAdminAuditRepository(
+        transaction=transaction,
+    )
+
+    admin_audit = AdminAuditService(
+        admin_audit_repository,
+        clock,
+        atomic=transaction.atomic,
+        users=user_repository,
+    )
+
+    reservation_type_management = ReservationTypeService(
+        reservation_type_repository,
+        audit=admin_audit,
+    )
+
+    invite_code_repository = InMemoryInstitutionInviteCodeRepository(
+        transaction=transaction,
+    )
+
+    invite_code_service = InstitutionInviteCodeService(
+        invite_code_repository,
+        audit=admin_audit,
+    )
+
+    enrollment_repository = InMemoryAuthorizedEnrollmentRepository(
+        transaction=transaction,
+    )
+
+    sessions = InMemorySessionRepository(
+        transaction=transaction,
+    )
+
     authentication = AuthenticationService(
         users=user_repository,
         sessions=sessions,
@@ -104,8 +152,12 @@ def build_application_runtime(environment: str) -> InMemoryApplicationRuntime:
         password_hasher=hasher,
         login_limiter=limiter,
     )
+
     if accounts:
-        InstitutionInviteCodeService(invite_code_repository).issue_or_replace(accounts[0].user)
+        InstitutionInviteCodeService(
+            invite_code_repository
+        ).issue_or_replace(accounts[0].user)
+
     enrollment_management = EnrollmentManagementService(
         enrollments=enrollment_repository,
         institutions=institution_repository,
@@ -147,8 +199,9 @@ def build_application_runtime(environment: str) -> InMemoryApplicationRuntime:
         simulated_email_sender=simulated_email_sender,
         pending_member_signups=pending_member_signups,
         spaces=spaces,
-        space_management=SpaceService(spaces, audit=admin_audit),
+               space_management=SpaceService(spaces, audit=admin_audit),
         resource_management=ResourceManagementService(spaces, spaces, audit=admin_audit),
+        reservation_type_management=reservation_type_management,
         floor_plan_management=FloorPlanService(spaces, plant_file_storage, audit=admin_audit, lock=transaction.lock),
         plant_file_storage=plant_file_storage,
         admin_dashboard=AdminDashboardService(user_repository, spaces, spaces, clock),

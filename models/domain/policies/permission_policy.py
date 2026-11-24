@@ -22,18 +22,34 @@ class PermissionPolicy:
                 Permission.EDIT_INSTITUTION_SETTINGS,
             }
         ) | _COMMON_PERMISSIONS,
-        Profile.MANAGER: frozenset({
-    Permission.MANAGE_SPACES,
-    Permission.MANAGE_RESERVATION_TYPES,
-    Permission.REVIEW_RESERVATIONS,
-    Permission.RESOLVE_CONFLICTS,
-    Permission.VIEW_MANAGER_DASHBOARD,
-}) | _COMMON_PERMISSIONS,
-   Profile.PARTICIPANT: frozenset({
-    Permission.VIEW_PARTICIPANT_DASHBOARD,
-    Permission.VIEW_AGENDA,
-    Permission.LOCATE_SPACES,
-}) | _COMMON_PERMISSIONS, }
+
+        Profile.MANAGER: frozenset(
+            {
+                Permission.MANAGE_SPACES,
+                Permission.MANAGE_RESERVATION_TYPES,
+                Permission.REVIEW_RESERVATIONS,
+                Permission.RESOLVE_CONFLICTS,
+                Permission.VIEW_MANAGER_DASHBOARD,
+            }
+        ) | _COMMON_PERMISSIONS,
+
+        Profile.REQUESTER: frozenset(
+            {
+                Permission.CREATE_RESERVATION,
+                Permission.VIEW_OWN_RESERVATIONS,
+                Permission.CANCEL_OWN_RESERVATION,
+            }
+        ) | _COMMON_PERMISSIONS,
+
+        Profile.PARTICIPANT: frozenset(
+            {
+                Permission.VIEW_PARTICIPANT_DASHBOARD,
+                Permission.VIEW_AGENDA,
+                Permission.LOCATE_SPACES,
+            }
+        ) | _COMMON_PERMISSIONS,
+    }
+
 
     def __init__(self, institution_access: InstitutionAccessPolicy | None = None):
         self._institution_access = institution_access or InstitutionAccessPolicy()
