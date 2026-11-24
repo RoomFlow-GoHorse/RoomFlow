@@ -29,6 +29,8 @@ class ReservationPayload(BaseModel):
     participant_ids: list[str] = Field(default_factory=list, max_length=9999)
 
     def to_request(self) -> ReservationRequest:
+        if len(self.participant_ids) != len(set(self.participant_ids)):
+            raise ValueError("Não informe o mesmo participante mais de uma vez.")
         return ReservationRequest(
             self.space_id, self.title, self.activity_type, ReservationPeriod(self.start, self.end),
             self.participants, self.justification, frozenset(self.participant_ids),
@@ -134,7 +136,11 @@ def detail_own(
 ):
     item, history = run_reservation_action(lambda: service.detail_own(actor, reservation_id))
     response.headers["Cache-Control"] = "private, no-store"
-    return {"data": {**reservation_response(item), "history": [asdict(event) for event in history]}}
+    return {"data": {
+        **reservation_response(item),
+        "participant_ids": [participant.user_id for participant in service.participants(actor, reservation_id)],
+        "history": [asdict(event) for event in history],
+    }}
 
 
 @router.get("/{reservation_id}")

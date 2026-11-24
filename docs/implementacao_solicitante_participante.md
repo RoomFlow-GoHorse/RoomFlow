@@ -38,6 +38,7 @@
 | Dashboard do participante por API | Concluída | Compilação Python; preserva os componentes visuais existentes | Pendente |
 | Agenda compartilhada por API | Concluída | Compilação Python; preserva os componentes visuais existentes | Pendente |
 | Regressão sem PostgreSQL | Concluída | `127` testes aprovados; `27` PostgreSQL ignorados por ausência de `ROOMFLOW_TEST_DATABASE` | Pendente |
+| Seleção de participantes | Concluída | Compilação Python; `tests.test_api` e `tests.test_api_availability`: 12 aprovados | Pendente |
 
 ## Aplicação da migration
 
