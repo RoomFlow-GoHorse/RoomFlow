@@ -12,7 +12,7 @@ def new_reservation(user):
         return
 
     try:
-        settings = api.catalog()
+        settings = api.catalog_settings()
         eligible_participants = api.eligible_participants()
         timezone = settings["timezone"]
         start, end = period_inputs(timezone, "new_reservation")

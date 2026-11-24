@@ -93,7 +93,7 @@ def build_postgres_runtime(
     return PostgresRuntime(
         authentication=AuthenticationService(
             users, sessions, hasher, clock=clock, login_limiter=LoginAttemptLimiter(),
-            atomic=transaction.atomic,
+            atomic=transaction.atomic, session_user_lookup=sessions.find_user_session,
         ),
         user_management=UserManagementService(
             users, institutions, hasher, clock=clock, audit=audit, sessions=sessions,

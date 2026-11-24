@@ -1,5 +1,6 @@
 import hashlib
 import secrets
+from collections.abc import Callable
 from contextlib import nullcontext
 from dataclasses import dataclass, replace
 from datetime import datetime, timedelta, timezone
@@ -59,11 +60,13 @@ class AuthenticationService:
         login_limiter: LoginAttemptLimiter | None = None,
         lock=None,
         atomic=None,
+        session_user_lookup: Callable[[str], tuple[UserSession, User] | None] | None = None,
     ) -> None:
         self._lock = lock if lock is not None else nullcontext()
         self._atomic = atomic if atomic is not None else lambda: self._lock
         self._users = users
         self._sessions = sessions
+        self._session_user_lookup = session_user_lookup
         self._password_hasher = password_hasher
         self._clock = clock or UtcSystemClock()
         self._session_lifetime = session_lifetime
@@ -115,8 +118,18 @@ class AuthenticationService:
         return LoginResult(token, expires_at, account.user)
 
     def authenticate(self, token: str) -> User:
+        digest = self._digest(token)
         with self._lock:
-            session = self._sessions.find_by_digest(self._digest(token))
+            if self._session_user_lookup is not None:
+                result = self._session_user_lookup(digest)
+                if result is None:
+                    raise InvalidSession
+                session, user = result
+                if not session.is_valid_at(self._clock.now()) or not user.is_active:
+                    raise InvalidSession
+                return user
+
+            session = self._sessions.find_by_digest(digest)
             now = self._clock.now()
             if session is None or not session.is_valid_at(now):
                 raise InvalidSession

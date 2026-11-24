@@ -123,16 +123,16 @@ class ManagerOperationsService:
             reservations = self._reservations.list_for_operations(actor, period, ids)
             metrics = self._dashboard.get_metrics(institution_id, period.start, period.end, space_ids=ids)
             blocks = self._blocks.block_periods(institution_id, period) if rooms else {}
-            approved = defaultdict(list)
-            for item in reservations:
-                booking = item.reservation
-                if booking.status is ReservationStatus.APPROVED:
-                    approved[booking.request.space_id].append(booking.request.period)
-            return ManagerOperations(
-                context.timezone, start, end, opens, closes, metrics,
-                tuple(room_occupancy(room, windows, approved[room.id], blocks.get(room.id, ())) for room in rooms),
-                tuple(item for item in reservations if status is None or item.reservation.status is status),
-            )
+        approved = defaultdict(list)
+        for item in reservations:
+            booking = item.reservation
+            if booking.status is ReservationStatus.APPROVED:
+                approved[booking.request.space_id].append(booking.request.period)
+        return ManagerOperations(
+            context.timezone, start, end, opens, closes, metrics,
+            tuple(room_occupancy(room, windows, approved[room.id], blocks.get(room.id, ())) for room in rooms),
+            tuple(item for item in reservations if status is None or item.reservation.status is status),
+        )
 
     def _scope(self, actor: User) -> str:
         return self._permissions.authorize_listing(actor, Permission.VIEW_MANAGER_DASHBOARD)

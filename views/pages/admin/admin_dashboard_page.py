@@ -2,7 +2,7 @@ import pandas as pd
 import streamlit as st
 
 from config.constants import ROLE_LABELS
-from controllers.app_state_service import go
+from controllers.app_state_service import set_page
 from controllers.streamlit_runtime import get_streamlit_actor, get_streamlit_runtime
 from models.domain.exceptions import DomainAuthorizationError
 from views.components.ui_components import page_header
@@ -20,11 +20,6 @@ QUICK_ACTIONS = [
     ("Permissões", "Matriz de permissões por perfil de acesso", "permissoes", ":material/shield:"),
     ("Configurações", "Políticas, regras e preferências do sistema", "configuracoes_instituicao", ":material/settings:"),
 ]
-
-
-def _navigate(page: str) -> None:
-    go(page)
-    st.rerun()
 
 
 def _render_user_stats(metrics) -> None:
@@ -64,8 +59,10 @@ def _render_quick_actions() -> None:
             with col_info:
                 st.markdown(f"{icon} **{label}**")
             with col_btn:
-                if st.button("Abrir", key=f"quick_action_{page}", icon=":material/arrow_forward:", use_container_width=True):
-                    _navigate(page)
+                st.button(
+                    "Abrir", key=f"quick_action_{page}", icon=":material/arrow_forward:", use_container_width=True,
+                    on_click=set_page, args=(page,),
+                )
             st.caption(description)
 
 
@@ -89,8 +86,10 @@ def _render_role_distribution(metrics) -> None:
     """)
     header, action = st.columns([1, 0.3], vertical_alignment="center")
     header.subheader("Distribuição por perfil")
-    if action.button("Gerenciar", key="distribution_manage", icon=":material/group:", type="primary", use_container_width=True):
-        _navigate("usuarios")
+    action.button(
+        "Gerenciar", key="distribution_manage", icon=":material/group:", type="primary", use_container_width=True,
+        on_click=set_page, args=("usuarios",),
+    )
 
     with st.container(border=True):
         counts = {
@@ -113,8 +112,10 @@ def _render_role_distribution(metrics) -> None:
 def _render_recent_users(metrics) -> None:
     header, action = st.columns([5, 1], vertical_alignment="center")
     header.subheader("Usuários recentes")
-    if action.button("Ver todos", key="recent_users_all", icon=":material/arrow_forward:", use_container_width=True):
-        _navigate("usuarios")
+    action.button(
+        "Ver todos", key="recent_users_all", icon=":material/arrow_forward:", use_container_width=True,
+        on_click=set_page, args=("usuarios",),
+    )
 
     if not metrics.recent_users:
         st.info(

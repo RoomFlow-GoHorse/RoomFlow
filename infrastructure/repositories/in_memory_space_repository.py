@@ -95,6 +95,14 @@ class InMemorySpaceRepository:
                         location=f"{building.name}, {space.floor}",
                     )
 
+    def list_institution_floors(self, institution_id: str, include_inactive: bool = False) -> tuple[Floor, ...]:
+        with self._lock:
+            return tuple(
+                floor
+                for building in self.list_buildings(institution_id, include_inactive)
+                for floor in self.list_floors(building.id, include_inactive)
+            )
+
     def list_floors(self, building_id: str, include_inactive: bool = False) -> tuple[Floor, ...]:
         with self._lock:
             values = (

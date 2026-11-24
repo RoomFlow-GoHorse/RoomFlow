@@ -104,6 +104,7 @@ class ReservationDetails:
     space_name: str
     requester_name: str
     has_overlap: bool
+    participation_status: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

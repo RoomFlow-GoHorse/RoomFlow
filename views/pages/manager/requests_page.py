@@ -42,7 +42,7 @@ def manager_reservations(user=None):
         return
     try:
         items = api.list_institution()
-        timezone = api.catalog()["timezone"]
+        timezone = api.catalog_settings()["timezone"]
     except RESERVATION_ERRORS as error:
         st.error(str(error))
         return

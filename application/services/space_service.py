@@ -69,6 +69,14 @@ class SpaceService:
             max_capacity=max_capacity,
         ))
 
+    def location_catalog(self, actor: User) -> tuple[list[Building], list[Floor], list[Space]]:
+        scope = self._permissions.authorize_listing(actor, Permission.LOCATE_SPACES)
+        return (
+            list(self._repository.list_buildings(scope)),
+            list(self._repository.list_institution_floors(scope)),
+            list(self._repository.list_spaces(scope)),
+        )
+
     def list_buildings(self, actor: User, include_inactive: bool = False) -> list[Building]:
         institution_id = self._admin_scope(actor)
         return list(self._repository.list_buildings(institution_id, include_inactive))
@@ -112,6 +120,9 @@ class SpaceService:
         if not building.active:
             self._record(actor, AdminAuditAction.BUILDING_ACTIVATED, "building", updated.id)
         return updated
+
+    def list_institution_floors(self, actor: User, include_inactive: bool = False) -> list[Floor]:
+        return list(self._repository.list_institution_floors(self._admin_scope(actor), include_inactive))
 
     def list_floors(self, actor: User, building_id: str, include_inactive: bool = False) -> list[Floor]:
         building = self._building_in_scope(actor, building_id)

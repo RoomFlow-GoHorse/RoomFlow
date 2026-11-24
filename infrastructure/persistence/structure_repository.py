@@ -58,6 +58,15 @@ class PostgresStructureRepository:
             statement = predios.insert().values(id=building.id) if new else update(predios).where(predios.c.id == building.id)
             session.execute(statement.values(**values))
 
+    def list_institution_floors(self, institution_id: str, include_inactive: bool = False) -> tuple[Floor, ...]:
+        query = select(andares).join(predios, andares.c.predio_id == predios.c.id).where(
+            predios.c.instituicao_id == to_database_identity_id(institution_id),
+        )
+        if not include_inactive:
+            query = query.where(predios.c.ativo, andares.c.ativo)
+        with self._transaction.session() as session:
+            return tuple(self._floor(row) for row in session.execute(query.order_by(andares.c.nome, andares.c.id)))
+
     def list_floors(self, building_id, include_inactive=False):
         query = select(andares).where(andares.c.predio_id == building_id)
         if not include_inactive:
