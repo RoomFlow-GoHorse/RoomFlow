@@ -21,3 +21,6 @@ Thumbs.db
 
 # Banco de dados
 .env
+
+# Node
+node_modules/
