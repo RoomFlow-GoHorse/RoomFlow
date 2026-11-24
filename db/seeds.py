@@ -10,7 +10,6 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from config.constants import ROLE_LABELS
-from config.database import SessionLocal
 from controllers.password_service import hash_password
 from models.database_models import (
     ConflitoReserva,
@@ -37,6 +36,8 @@ def cadastrar_perfis(sessao: Session) -> None:
 
 
 def semear_perfis() -> None:
+    from config.database import SessionLocal
+
     with SessionLocal.begin() as sessao:
         cadastrar_perfis(sessao)
 
@@ -193,6 +194,8 @@ def criar_agenda(sessao: Session, sala: Espaco, contas: dict[str, Usuario]) -> N
 
 
 def semear_demo(senhas: dict[str, str] | None = None) -> str:
+    from config.database import SessionLocal
+
     senhas = senhas or {perfil: "123456789" for perfil in ROLE_LABELS}
     with SessionLocal.begin() as sessao:
         cadastrar_perfis(sessao)
