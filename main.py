@@ -8,6 +8,7 @@ load_dotenv(Path(__file__).resolve().parent / ".env", override=False)
 from config.constants import ROLE_NAV
 from controllers.app_state_service import boot_state, clear_operational_dialogs, current_user
 from controllers.runtime_errors import RuntimeUnavailable
+from controllers.navigation_service import dashboard_for_role
 from controllers.streamlit_runtime import PERSISTENT_PAGES, get_streamlit_runtime, render_runtime_error, uses_persistent_runtime
 from views.components.app_shell import shell_end, shell_start
 from views.components.ui_components import load_css, load_public_css, toast
@@ -149,19 +150,7 @@ def sync_page_from_query():
 # =========================================================
 
 def get_dashboard_by_role(user):
-    if uses_persistent_runtime():
-        return {"admin": "admin_dashboard", "gerente": "gerente_dashboard", "solicitante": "minhas_reservas"}.get(user.get("role"), "conta")
-    dashboard_by_role = {
-        "admin": "admin_dashboard",
-        "gerente": "gerente_dashboard",
-        "solicitante": "solicitante_dashboard",
-        "participante": "participante_dashboard",
-    }
-
-    return dashboard_by_role.get(
-        user.get("role"),
-        "participante_dashboard",
-    )
+    return dashboard_for_role(user.get("role"), persistent=uses_persistent_runtime())
 
 
 def get_allowed_pages_by_role(role):

@@ -5,15 +5,9 @@ import streamlit as st
 from controllers import auth_service
 from controllers.app_state_service import go, go_authenticated
 from controllers.streamlit_runtime import uses_persistent_runtime
+from controllers.navigation_service import dashboard_for_role
 from views.components.ui_components import logo
 
-
-ROLE_REDIRECT = {
-    "admin": "admin_dashboard",
-    "gerente": "gerente_dashboard",
-    "solicitante": "solicitante_dashboard",
-    "participante": "participante_dashboard",
-}
 
 def _init_state():
     defaults = {
@@ -26,9 +20,7 @@ def _init_state():
 
 
 def _target_for(user):
-    if uses_persistent_runtime():
-        return {"admin": "admin_dashboard", "gerente": "gerente_dashboard", "solicitante": "minhas_reservas"}.get(user["role"], "conta")
-    return ROLE_REDIRECT.get(user["role"], "participante_dashboard")
+    return dashboard_for_role(user["role"], persistent=uses_persistent_runtime())
 
 
 def _attempt_login(email, password, institution_id=None):
