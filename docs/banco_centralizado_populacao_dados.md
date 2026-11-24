@@ -36,6 +36,7 @@ Auditar migrations e preparar testes PostgreSQL isolados.
 ## Validação de migrations e testes isolados
 
 - O serviço PostgreSQL local está disponível, mas `ROOMFLOW_TEST_DATABASE` não foi informado.
+- A suíte PostgreSQL cobre agora participantes vinculados: criação, consulta isolada por instituição, rejeição de duplicidade e confirmação. Ela permanece pendente de execução no banco isolado.
 - Para impedir alteração de um banco principal ou compartilhado, a validação de migrations e os testes PostgreSQL continuam bloqueados até que um banco cujo nome comece por `roomflow_test_` seja explicitamente configurado.
 - Com esse banco criado e as mesmas credenciais locais autorizadas, execute:
 

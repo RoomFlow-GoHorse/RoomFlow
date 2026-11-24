@@ -18,7 +18,7 @@ from threading import Barrier
 from unittest.mock import patch
 from zoneinfo import ZoneInfo
 
-import httpx2
+import httpx
 from dotenv import dotenv_values
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, select, update
@@ -117,6 +117,14 @@ class PostgresIntegrationTests(unittest.TestCase):
         self.assertEqual(created.status_code, 201, created.text)
         return self.login(email)
 
+    def _participant_login(self, admin):
+        email = f"{secrets.token_hex(5)}@example.test"
+        created = self.client.post("/admin/users", headers=admin, json={
+            "name": "Participante Teste", "email": email, "password": PASSWORD, "profile": "participante",
+        })
+        self.assertEqual(created.status_code, 201, created.text)
+        return self.login(email)
+
     @staticmethod
     def _reservation_payload(room):
         start = (datetime.now(ZoneInfo("America/Sao_Paulo")) + timedelta(days=3)).replace(
@@ -128,6 +136,45 @@ class PostgresIntegrationTests(unittest.TestCase):
             "start": start.isoformat(), "end": end.isoformat(), "participants": 20,
             "justification": "Atividade com a turma",
         }
+
+    def test_reservation_participants_are_isolated_and_can_respond(self):
+        own, _ = self.register()
+        other, _ = self.register()
+        admin = self.headers(self.login(own["responsible_email"]))
+        foreign_admin = self.headers(self.login(other["responsible_email"]))
+        requester = self.headers(self._requester_login(admin))
+        participant_login = self._participant_login(admin)
+        participant = self.headers(participant_login)
+        foreign_participant = self.headers(self._participant_login(foreign_admin))
+        room = self._structure_room(admin, "Sala com participantes")
+
+        eligible = self.client.get("/reservations/participants", headers=requester)
+        self.assertEqual(eligible.status_code, 200, eligible.text)
+        participant_id = participant_login.json()["data"]["user"]["id"]
+        self.assertIn(participant_id, [item["id"] for item in eligible.json()["data"]])
+
+        payload = {**self._reservation_payload(room), "participant_ids": [participant_id]}
+        created = self.client.post("/reservations", headers=requester, json=payload)
+        self.assertEqual(created.status_code, 201, created.text)
+        reservation_id = created.json()["data"]["id"]
+
+        self.assertEqual(self.client.post("/reservations", headers=requester, json={
+            **payload, "title": "Duplicada", "participant_ids": [participant_id, participant_id],
+        }).status_code, 422)
+        self.assertEqual(self.client.get("/reservations/participating", headers=foreign_participant)
+                         .json()["data"], [])
+        linked = self.client.get("/reservations/participating", headers=participant)
+        self.assertEqual([item["id"] for item in linked.json()["data"]], [reservation_id])
+
+        detail = self.client.get(f"/reservations/participating/{reservation_id}", headers=participant)
+        self.assertEqual(detail.status_code, 200, detail.text)
+        self.assertEqual(detail.json()["data"]["participation_status"], "pendente")
+        self.assertEqual(self.client.patch(f"/reservations/participating/{reservation_id}", headers=foreign_participant,
+                                           json={"status": "confirmada"}).status_code, 404)
+        confirmed = self.client.patch(f"/reservations/participating/{reservation_id}", headers=participant,
+                                      json={"status": "confirmada"})
+        self.assertEqual(confirmed.status_code, 200, confirmed.text)
+        self.assertEqual(confirmed.json()["data"]["participation_status"], "confirmada")
 
     def test_reservations_are_scoped_validated_and_persisted(self):
         own, _ = self.register()
@@ -1242,10 +1289,10 @@ class PostgresIntegrationTests(unittest.TestCase):
                 if process.poll() is not None:
                     break
                 try:
-                    if httpx2.get(url + "/ready", timeout=1, trust_env=False).is_success:
+                    if httpx.get(url + "/ready", timeout=1, trust_env=False).is_success:
                         yield url
                         return
-                except httpx2.HTTPError:
+                except httpx.HTTPError:
                     pass
                 time.sleep(0.1)
             self.fail("O processo FastAPI de teste não ficou disponível.")
@@ -1386,7 +1433,7 @@ class PostgresIntegrationTests(unittest.TestCase):
                 assert not app.exception
                 assert next(field for field in app.text_input if field.label == "Telefone").value == fixture["phone"]
             """)
-            with httpx2.Client(base_url=manager_api, headers=manager, trust_env=False) as client:
+            with httpx.Client(base_url=manager_api, headers=manager, trust_env=False) as client:
                 self.assertEqual(client.get("/admin/users").status_code, 403)
                 self.assertEqual(client.get("/structure/buildings").status_code, 403)
                 self.assertEqual(client.get("/reservations/institution").json()["data"][0]["status"], "aprovada")
@@ -1401,7 +1448,7 @@ class PostgresIntegrationTests(unittest.TestCase):
                 next(button for button in app.button if button.label == "Marcar como lida").click().run()
                 assert not app.exception
             """)
-            with httpx2.Client(base_url=restarted_api, trust_env=False) as client:
+            with httpx.Client(base_url=restarted_api, trust_env=False) as client:
                 available = client.get(f"/structure/spaces/{room['id']}", headers=manager).json()["data"]
                 self.assertEqual((available["capacity"], available["resource_ids"]), (25, [fixture["resource"]]))
                 account = client.get("/auth/me", headers=manager).json()["data"]
@@ -1418,7 +1465,7 @@ class PostgresIntegrationTests(unittest.TestCase):
     def test_streamlit_uses_separate_api_process(self):
         payload, _ = self.register()
         with self.api_process() as url, patch.dict(os.environ, {"ROOMFLOW_API_URL": url}):
-            status = httpx2.get(url + "/ready", trust_env=False)
+            status = httpx.get(url + "/ready", trust_env=False)
             self.assertEqual(status.json()["data"], {"status": "ready", "persistence": "postgres"})
             app = AppTest.from_file(str(PROJECT / "main.py"), default_timeout=20)
             app.query_params["page"] = "login"
@@ -1437,7 +1484,7 @@ class PostgresIntegrationTests(unittest.TestCase):
             app.button(key="cfg_salvar").click().run()
             self.assertFalse(app.exception)
             token = app.session_state["auth_token"]
-            result = httpx2.get(url + "/institutions/me", headers={"Authorization": f"Bearer {token}"})
+            result = httpx.get(url + "/institutions/me", headers={"Authorization": f"Bearer {token}"})
             self.assertEqual(result.json()["data"]["address"], "Endereço salvo pelo Streamlit")
             app.query_params["page"] = "permissoes"
             app.run()

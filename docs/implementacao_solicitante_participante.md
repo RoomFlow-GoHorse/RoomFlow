@@ -40,6 +40,7 @@
 | Regressão sem PostgreSQL | Concluída | `127` testes aprovados; `27` PostgreSQL ignorados por ausência de `ROOMFLOW_TEST_DATABASE` | Pendente |
 | Seleção de participantes | Concluída | Compilação Python; `tests.test_api` e `tests.test_api_availability`: 12 aprovados | Pendente |
 | Integração real de agenda, dashboard e Localizar | Concluída | Compilação Python; 16 testes de API/persistência aprovados; removidos dados demonstrativos inativos da agenda | Pendente |
+| Integração PostgreSQL de participantes | Implementada; execução pendente | Cobre isolamento institucional, consulta, duplicidade e confirmação; 28 testes PostgreSQL ignorados sem `ROOMFLOW_TEST_DATABASE` | Pendente |
 
 ## Aplicação da migration
 
