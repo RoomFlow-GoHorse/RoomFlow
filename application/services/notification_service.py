@@ -4,6 +4,7 @@ from datetime import datetime
 
 from application.ports.clock import Clock
 from application.ports.institution_repository import InstitutionRepository
+from application.ports.reservation_repository import ReservationRepository
 from application.ports.notification_repository import NotificationRepository
 from application.ports.user_repository import UserRepository
 from models.domain.entities.institution import Institution
@@ -18,7 +19,7 @@ from models.domain.policies.permission_policy import PermissionPolicy
 class NotificationService:
     def __init__(
         self, repository: NotificationRepository, institutions: InstitutionRepository, users: UserRepository,
-        clock: Clock, snapshot: Callable[[], AbstractContextManager],
+        clock: Clock, snapshot: Callable[[], AbstractContextManager], reservations: ReservationRepository | None = None,
     ) -> None:
         self._repository = repository
         self._institutions = institutions
@@ -26,6 +27,7 @@ class NotificationService:
         self._clock = clock
         self._snapshot = snapshot
         self._permissions = PermissionPolicy()
+        self._reservations = reservations
 
     def inbox(
         self, actor: User, *, unread_only: bool, category: str | None, limit: int, offset: int,
@@ -95,6 +97,11 @@ class NotificationService:
             account = self._users.find_by_id(current.requester_id, institution_id)
             if account is not None and account.user.is_active:
                 recipients.add(account.user.id)
+        if self._reservations is not None:
+            recipients.update(
+                participant.user_id for participant in self._reservations.participants(institution_id, current.id)
+                if participant.user_id != event.actor_id
+            )
         if recipients:
             self._repository.add(institution_id, Notification(
                 title, message, category, event.occurred_at, reservation_id=current.id,

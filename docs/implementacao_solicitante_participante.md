@@ -34,3 +34,4 @@
 | Repositório de participantes | Concluída | Compilação Python; validação PostgreSQL pendente de banco isolado | Pendente |
 | Serviço/API de vínculos na reserva | Concluída | `tests.test_api`: 9 aprovados; testes PostgreSQL: 27 ignorados sem banco isolado | Pendente |
 | Consulta e resposta do participante | Concluída | Compilação Python; validação PostgreSQL pendente de banco isolado | Pendente |
+| Notificações para participantes | Concluída | Compilação Python; validação PostgreSQL pendente de banco isolado | Pendente |

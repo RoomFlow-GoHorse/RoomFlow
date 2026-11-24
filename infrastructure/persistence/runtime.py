@@ -80,7 +80,7 @@ def build_postgres_runtime(
     conflicts = PostgresConflictRepository(transaction)
     reservations = PostgresReservationRepository(transaction)
     notifications = NotificationService(
-        PostgresNotificationRepository(transaction), institutions, users, clock, transaction.snapshot,
+        PostgresNotificationRepository(transaction), institutions, users, clock, transaction.snapshot, reservations,
     )
     reservation_service = ReservationService(
         reservations, structure, institutions, clock, transaction.atomic, audit.current_actor, conflicts, notifications, users,
