@@ -1,14 +1,19 @@
+import logging
+
 import streamlit as st
 
 from config.constants import ROLE_NAV
 from controllers import auth_service
 from controllers.app_state_service import go
-from controllers.mock_data_service import notifications_for
-from views.components.ui_components import ASSETS_DIR, LOGO_FILES, role_label
+from controllers.streamlit_runtime import PERSISTENT_PAGES, get_streamlit_runtime, uses_persistent_runtime
+from controllers.runtime_errors import RuntimeUnavailable
+from models.domain.exceptions import DomainAuthorizationError
+from views.components.ui_components import is_dark_theme, logo, role_label
 
 
 NAV_ICONS = {
     "admin_dashboard": ":material/home:",
+    "historico_admin": ":material/history:",
     "gerente_dashboard": ":material/home:",
     "solicitante_dashboard": ":material/home:",
     "participante_dashboard": ":material/home:",
@@ -29,6 +34,7 @@ NAV_ICONS = {
 }
 
 NAV_LABEL_OVERRIDES = {
+    "historico_admin": "Histórico administrativo",
     "admin_dashboard": "Início",
     "gerente_dashboard": "Início",
     "solicitante_dashboard": "Início",
@@ -40,6 +46,8 @@ NAV_LABEL_OVERRIDES = {
     "notificacoes": "Notificações",
     "localizar": "Localizar espaço",
 }
+
+LOGGER = logging.getLogger(__name__)
 
 
 def _sidebar_items(role):
@@ -55,22 +63,45 @@ def _navigate(page):
     go(page)
 
 
+def _sidebar_logo_variant():
+    theme = getattr(st.context, "theme", None)
+    theme_type = getattr(theme, "type", None) or getattr(theme, "base", None)
+    if not theme_type and hasattr(theme, "get"):
+        theme_type = theme.get("type") or theme.get("base")
+
+    return "light" if theme_type == "dark" or is_dark_theme() else "dark"
+
+
 def render_sidebar(user):
     current_page = st.session_state.get("page", "landing")
     role = user.get("role", "participante")
     allowed_pages = {page for _, page in ROLE_NAV.get(role, [])}
-    unread = sum(not item["read"] for item in notifications_for(role) if item.get("category") != "sistema")
+    notifications_unavailable = not uses_persistent_runtime()
+    if uses_persistent_runtime():
+        allowed_pages &= PERSISTENT_PAGES
+        try:
+            inbox = get_streamlit_runtime().notifications.inbox(
+                unread_only=True, limit=1, offset=0,
+            )
+            unread = inbox["unread_count"]
+            notifications_unavailable = False
+        except (DomainAuthorizationError, RuntimeUnavailable) as error:
+            LOGGER.warning("Could not load the sidebar notification count: %s", error)
+            unread = 0
+            notifications_unavailable = True
+    else:
+        unread = 0
 
     with st.sidebar:
         with st.container(key="rf_sidebar_logo"):
-            st.image(ASSETS_DIR / LOGO_FILES["dark"], width=150)
+            st.html(logo(size="small", variant=_sidebar_logo_variant()))
 
         st.divider()
         with st.container(key="rf_sidebar_navigation_label"):
             st.caption("Navegação")
 
         for label, page, icon in _sidebar_items(role):
-            if page == "conta":
+            if page == "conta" or page not in allowed_pages:
                 continue
 
             is_active = current_page == page
@@ -84,6 +115,8 @@ def render_sidebar(user):
                 width="stretch",
             ):
                 _navigate(page)
+            if page == "notificacoes" and notifications_unavailable:
+                st.caption("Notificações indisponíveis no momento.")
 
         with st.container(key="rf_sidebar_footer"):
             avatar_column, profile_column = st.columns(

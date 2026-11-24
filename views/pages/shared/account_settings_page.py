@@ -2,8 +2,11 @@ import streamlit as st
 
 from config.constants import ROLE_LABELS
 from controllers import auth_service
-from models.mock_data import USERS, password_hash
+from controllers.app_state_service import go
 from views.components.ui_components import page_header
+from application.services.authentication_service import InvalidCredentials
+from controllers.streamlit_runtime import get_streamlit_actor, get_streamlit_runtime
+from models.domain.exceptions import DomainAuthorizationError, DuplicateResource, ResourceNotFound
 
 
 SECTIONS = {
@@ -25,8 +28,8 @@ SECTION_HEADERS = {
         ":material/shield:",
     ),
     "preferencias": (
-        "Preferências de notificação",
-        "Escolha quais notificações e alertas deseja receber.",
+        "Notificações da conta",
+        "Acesse sua caixa de entrada e consulte como os avisos são definidos.",
         ":material/notifications:",
     ),
     "sessao": (
@@ -35,34 +38,6 @@ SECTION_HEADERS = {
         ":material/logout:",
     ),
 }
-
-PREFERENCES = {
-    "reservas": (
-        "Reservas",
-        "Aprovações, rejeições e novas solicitações",
-    ),
-    "alteracoes": (
-        "Alterações de espaço",
-        "Quando uma sala ou horário for alterado",
-    ),
-    "conflitos": (
-        "Conflitos",
-        "Quando houver sobreposição de reservas",
-    ),
-    "cancelamentos": (
-        "Cancelamentos",
-        "Quando uma reserva for cancelada",
-    ),
-    "lembretes": (
-        "Lembretes",
-        "Notificação 1 hora antes de cada atividade",
-    ),
-    "sistema": (
-        "Atualizações do sistema",
-        "Manutenção, novidades e avisos gerais",
-    ),
-}
-
 
 def _load_css():
     st.markdown(
@@ -124,7 +99,7 @@ def _load_css():
     )
 
 
-def _state(user):
+def _state():
     st.session_state.setdefault(
         "account_section",
         "perfil",
@@ -139,34 +114,6 @@ def _state(user):
         "account_logout_confirm",
         False,
     )
-
-    st.session_state.setdefault(
-        "account_phone",
-        "(11) 98765-4321",
-    )
-
-    st.session_state.setdefault(
-        "account_preferences",
-        {
-            "reservas": True,
-            "alteracoes": True,
-            "conflitos": True,
-            "cancelamentos": True,
-            "lembretes": False,
-            "sistema": True,
-        },
-    )
-
-    st.session_state.setdefault(
-        "account_name",
-        user["name"],
-    )
-
-    st.session_state.setdefault(
-        "account_email",
-        user["email"],
-    )
-
 
 def _avatar(initials, size=64):
     st.markdown(
@@ -311,18 +258,19 @@ def _profile(user):
             with left:
                 name = st.text_input(
                     "Nome completo",
-                    value=st.session_state.account_name,
+                    value=user["name"],
                 )
 
                 phone = st.text_input(
                     "Telefone",
-                    value=st.session_state.account_phone,
+                    value=user.get("phone") or "",
+                    max_chars=20,
                 )
 
             with right:
                 email = st.text_input(
                     "E-mail",
-                    value=st.session_state.account_email,
+                    value=user["email"],
                 )
 
                 st.text_input(
@@ -366,29 +314,18 @@ def _profile(user):
                 st.error("Informe o e-mail.")
                 return
 
-            user.update(
-                {
-                    "name": name.strip(),
-                    "email": email.strip(),
-                }
-            )
+            actor = get_streamlit_actor(user)
+            if actor is None:
+                st.error("Sua sessão expirou. Entre novamente.")
+                return
+            try:
+                get_streamlit_runtime().user_management.update_own_profile(
+                    actor, name, email, phone,
+                )
+            except (DomainAuthorizationError, DuplicateResource, ResourceNotFound, ValueError) as exc:
+                st.error(str(exc))
+                return
 
-            for item in st.session_state.users:
-                if item["id"] == user["id"]:
-                    item.update(user)
-
-            for item in USERS:
-                if item["id"] == user["id"]:
-                    item.update(
-                        {
-                            "name": user["name"],
-                            "email": user["email"],
-                        }
-                    )
-
-            st.session_state.account_name = user["name"]
-            st.session_state.account_email = user["email"]
-            st.session_state.account_phone = phone
             st.session_state.account_editing = False
 
             st.toast(
@@ -410,7 +347,7 @@ def _profile(user):
 
             st.text_input(
                 "Telefone",
-                value=st.session_state.account_phone,
+                value=user.get("phone") or "",
                 disabled=True,
             )
 
@@ -442,170 +379,52 @@ def _profile(user):
 
 def _security(user):
     _section_header("seguranca")
-
     st.info(
-        "Use uma senha forte e exclusiva. "
-        "Recomendamos combinar letras, números e caracteres especiais.",
+        "Use uma senha forte e exclusiva. Recomendamos combinar letras, numeros e caracteres especiais.",
         icon=":material/shield:",
     )
-
-    st.write("")
-
-    with st.form(
-        "account_security",
-        border=False,
-    ):
-        current = st.text_input(
-            "Senha atual",
-            type="password",
-            placeholder="Digite sua senha atual",
-        )
-
-        new_password = st.text_input(
-            "Nova senha",
-            type="password",
-            placeholder="Mínimo de 8 caracteres",
-        )
-
+    with st.form("account_security", border=False):
+        current = st.text_input("Senha atual", type="password", placeholder="Digite sua senha atual")
+        new_password = st.text_input("Nova senha", type="password", placeholder="Minimo de 8 caracteres")
         if new_password:
-            if len(new_password) < 6:
-                strength = "Fraca"
-            elif len(new_password) < 10:
-                strength = "Média"
-            else:
-                strength = "Forte"
-
-            st.caption(
-                f"Força da senha: **{strength}**"
-            )
-
-        confirm = st.text_input(
-            "Confirmar nova senha",
-            type="password",
-            placeholder="Repita sua nova senha",
-        )
-
+            strength = "Fraca" if len(new_password) < 6 else "Media" if len(new_password) < 10 else "Forte"
+            st.caption(f"Forca da senha: **{strength}**")
+        confirm = st.text_input("Confirmar nova senha", type="password", placeholder="Repita sua nova senha")
         st.divider()
-
-        submitted = st.form_submit_button(
-            "Alterar senha",
-            type="primary",
-            icon=":material/lock:",
-        )
-
+        submitted = st.form_submit_button("Alterar senha", type="primary", icon=":material/lock:")
     if not submitted:
         return
-
-    source = next(
-        (
-            item
-            for item in st.session_state.users
-            if item["id"] == user["id"]
-        ),
-        None,
-    )
-
     if not current:
         st.error("Informe a senha atual.")
         return
-
-    if (
-        not source
-        or source.get("password_hash")
-        != password_hash(current)
-    ):
-        st.error(
-            "A senha atual informada não confere."
-        )
-        return
-
     if len(new_password) < 8:
-        st.error(
-            "A nova senha deve ter pelo menos 8 caracteres."
-        )
+        st.error("A nova senha deve ter pelo menos 8 caracteres.")
         return
-
     if new_password != confirm:
-        st.error("As senhas não coincidem.")
+        st.error("As senhas nao coincidem.")
         return
-
-    source["password_hash"] = password_hash(
-        new_password
-    )
-
-    for item in USERS:
-        if item["id"] == user["id"]:
-            item["password_hash"] = source[
-                "password_hash"
-            ]
-
-    st.success(
-        "Senha alterada com sucesso.",
-        icon=":material/check_circle:",
-    )
+    try:
+        get_streamlit_runtime().authentication.change_password(
+            user["id"], current, new_password
+        )
+    except InvalidCredentials:
+        st.error("A senha atual informada nao confere.")
+        return
+    except (DomainAuthorizationError, ValueError) as exc:
+        st.error(str(exc))
+        return
+    st.success("Senha alterada com sucesso.", icon=":material/check_circle:")
 
 
-def _preferences():
+def _preferences(user):
     _section_header("preferencias")
 
-    preferences = st.session_state.account_preferences
-
-    enabled = sum(
-        preferences.values()
-    )
-
-    total = len(PREFERENCES)
-
     with st.container(border=True):
-        left, right = st.columns(
-            [5, 1],
-            vertical_alignment="center",
-        )
-
-        with left:
-            st.markdown("**Notificações ativas**")
-            st.caption(
-                f"Você recebe {enabled} de {total} tipos de alerta."
-            )
-
-        with right:
-            st.metric(
-                "Ativos",
-                f"{enabled}/{total}",
-            )
-
-    st.write("")
-
-    for key, (label, description) in PREFERENCES.items():
-        with st.container(border=True):
-            text, toggle = st.columns(
-                [6, 1],
-                vertical_alignment="center",
-            )
-
-            with text:
-                st.markdown(f"**{label}**")
-                st.caption(description)
-
-            with toggle:
-                preferences[key] = st.toggle(
-                    label,
-                    value=preferences[key],
-                    key=f"account_preference_{key}",
-                    label_visibility="collapsed",
-                )
-
-    st.divider()
-
-    if st.button(
-        "Salvar preferências",
-        type="primary",
-        icon=":material/save:",
-    ):
-        st.toast(
-            "Preferências salvas.",
-            icon=":material/check_circle:",
-        )
+        st.write("Os avisos operacionais seguem a política de notificações da sua instituição.")
+        if st.button("Abrir caixa de entrada", icon=":material/notifications:"):
+            go("notificacoes")
+        if user["role"] == "admin" and st.button("Gerenciar notificações institucionais", icon=":material/settings:"):
+            go("configuracoes_instituicao")
 
 
 def _session(user):
@@ -616,22 +435,6 @@ def _session(user):
             "Sua conta está conectada neste dispositivo.",
             icon=":material/check_circle:",
         )
-
-        st.write("")
-
-        device, browser, location = st.columns(3)
-
-        with device:
-            st.caption("Dispositivo")
-            st.markdown("**Computador**")
-
-        with browser:
-            st.caption("Navegador")
-            st.markdown("**Chrome**")
-
-        with location:
-            st.caption("Localização")
-            st.markdown("**São Paulo, SP**")
 
         st.divider()
 
@@ -686,7 +489,7 @@ def _session(user):
 
 def account(user):
     _load_css()
-    _state(user)
+    _state()
 
     _header(user)
 
@@ -709,7 +512,7 @@ def account(user):
                 _security(user)
 
             elif section == "preferencias":
-                _preferences()
+                _preferences(user)
 
             elif section == "sessao":
                 _session(user)

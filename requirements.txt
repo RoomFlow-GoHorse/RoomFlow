@@ -1,6 +1,18 @@
-streamlit
+# Frontend
+streamlit>=1.62,<2.0
+streamlit-calendar>=1.5,<2.0
+pandas>=2.2,<4.0
+
+# Validação dos dados recebidos pelos controllers
+pydantic>=2.9,<3.0
+
+# Banco de dados e configuração
 SQLAlchemy>=2.0,<3.0
 alembic>=1.13,<2.0
 psycopg[binary]>=3.1,<4.0
 python-dotenv>=1.0,<2.0
-streamlit-calendar
+tzdata
+
+# Planilhas e imagens
+openpyxl>=3.1,<4.0
+Pillow>=10,<13

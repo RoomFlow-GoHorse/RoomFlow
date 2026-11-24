@@ -1,0 +1,35 @@
+from __future__ import annotations
+
+from typing import Protocol
+
+from models.domain.entities.reservation import Reservation, ReservationDetails, ReservationHistoryEvent, ReservationPeriod
+
+
+class ReservationRepository(Protocol):
+    def add(self, reservation: Reservation) -> ReservationDetails: ...
+
+    def save(self, reservation: Reservation) -> ReservationDetails: ...
+
+    def find(
+        self, institution_id: str, reservation_id: str, requester_id: str | None = None,
+    ) -> ReservationDetails | None: ...
+
+    def list(self, institution_id: str, requester_id: str | None = None) -> list[ReservationDetails]: ...
+
+    def list_for_period(
+        self, institution_id: str, period: ReservationPeriod, space_ids: frozenset[str],
+    ) -> list[ReservationDetails]: ...
+
+    def find_many(self, institution_id: str, reservation_ids: set[str]) -> dict[str, ReservationDetails]: ...
+
+    def find_with_history(
+        self, institution_id: str, reservation_id: str, requester_id: str | None = None,
+    ) -> tuple[ReservationDetails, list[ReservationHistoryEvent]] | None: ...
+
+    def append_history(self, reservation: Reservation, event: ReservationHistoryEvent) -> None: ...
+
+    def overlapping_spaces(
+        self, institution_id: str, period: ReservationPeriod, *,
+        approved_only: bool, space_id: str | None = None, exclude_id: str | None = None,
+        requester_id: str | None = None,
+    ) -> set[str]: ...

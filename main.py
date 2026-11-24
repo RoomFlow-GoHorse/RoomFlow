@@ -1,11 +1,18 @@
+from pathlib import Path
+
+from dotenv import load_dotenv
 import streamlit as st
 
-from config.constants import ROLE_NAV
-from controllers.app_state_service import boot_state, current_user
-from views.components.app_shell import shell_end, shell_start
-from views.components.ui_components import load_auth_css, load_css, toast
+load_dotenv(Path(__file__).resolve().parent / ".env", override=False)
 
-from views.pages.admin import admin_dashboard_page, floor_plan_page, permissions_page, settings_page, users_page
+from config.constants import ROLE_NAV
+from controllers.app_state_service import boot_state, clear_operational_dialogs, current_user
+from controllers.runtime_errors import RuntimeUnavailable
+from controllers.streamlit_runtime import PERSISTENT_PAGES, get_streamlit_runtime, render_runtime_error, uses_persistent_runtime
+from views.components.app_shell import shell_end, shell_start
+from views.components.ui_components import load_css, load_public_css, toast
+
+from views.pages.admin import admin_audit_page, admin_dashboard_page, floor_plan_page, permissions_page, settings_page, users_page
 from views.pages.auth import forgot_password_page, login_page, signup_choice_page, signup_institution_page, signup_member_page
 from views.pages.manager import conflicts_page, manager_dashboard_page, occupancy_page, requests_page, spaces_page
 from views.pages.participant import find_space_page, participant_dashboard_page
@@ -20,7 +27,7 @@ from views.pages.shared import account_settings_page, agenda_page, notifications
 
 st.set_page_config(
     page_title="RoomFlow",
-    page_icon="R",
+    page_icon="assets/logo-preta-icone.png",
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -30,7 +37,11 @@ st.set_page_config(
 # INICIALIZAÇÃO
 # =========================================================
 
-boot_state()
+try:
+    boot_state()
+except RuntimeUnavailable as exc:
+    render_runtime_error(exc)
+    st.stop()
 load_css()
 if st.session_state.get("page") != "planta_instituicao":
     toast()
@@ -61,6 +72,7 @@ PUBLIC_ROUTES = {
 APP_ROUTES = {
     # Dashboards
     "admin_dashboard": admin_dashboard_page.dashboard,
+    "historico_admin": admin_audit_page.admin_audit,
     "gerente_dashboard": manager_dashboard_page.dashboard,
     "solicitante_dashboard": requester_dashboard_page.dashboard,
     "participante_dashboard": participant_dashboard_page.dashboard,
@@ -101,6 +113,7 @@ APP_ROUTES = {
 # o mesmo container global das demais telas internas.
 WIDE_APP_ROUTES = {
     "admin_dashboard",
+    "historico_admin",
     "gerente_dashboard",
     "solicitante_dashboard",
     "participante_dashboard",
@@ -126,7 +139,8 @@ def sync_page_from_query():
 
     valid_routes = PUBLIC_ROUTES.keys() | APP_ROUTES.keys()
 
-    if page in valid_routes:
+    if page in valid_routes and page != st.session_state.page:
+        clear_operational_dialogs()
         st.session_state.page = page
 
 
@@ -135,6 +149,8 @@ def sync_page_from_query():
 # =========================================================
 
 def get_dashboard_by_role(user):
+    if uses_persistent_runtime():
+        return {"admin": "admin_dashboard", "gerente": "gerente_dashboard", "solicitante": "minhas_reservas"}.get(user.get("role"), "conta")
     dashboard_by_role = {
         "admin": "admin_dashboard",
         "gerente": "gerente_dashboard",
@@ -149,7 +165,8 @@ def get_dashboard_by_role(user):
 
 
 def get_allowed_pages_by_role(role):
-    return {page for _, page in ROLE_NAV.get(role, [])}
+    pages = {page for _, page in ROLE_NAV.get(role, [])}
+    return pages & PERSISTENT_PAGES if uses_persistent_runtime() else pages
 
 
 def ensure_allowed_internal_page(page, user):
@@ -160,6 +177,8 @@ def ensure_allowed_internal_page(page, user):
         return page
 
     dashboard = get_dashboard_by_role(user)
+    if dashboard != st.session_state.page:
+        clear_operational_dialogs()
     st.session_state.page = dashboard
     st.query_params["page"] = dashboard
     return dashboard
@@ -170,6 +189,8 @@ def ensure_allowed_internal_page(page, user):
 # =========================================================
 
 def main():
+    # Validate persistence before presenting any signup or login form.
+    get_streamlit_runtime()
     sync_page_from_query()
 
     page = st.session_state.page
@@ -180,23 +201,16 @@ def main():
     # ---------------------------------------------------------
 
     if not user:
-        page_function = PUBLIC_ROUTES.get(page)
-
-        if page_function:
-            if page != "landing":
-                load_auth_css()
-            page_function()
-            return
-
-        # Se tentar acessar uma rota interna sem estar autenticado,
-        # volta para a landing page.
-        PUBLIC_ROUTES["landing"]()
+        public_page = page if page in PUBLIC_ROUTES else "landing"
+        load_public_css(public_page)
+        PUBLIC_ROUTES[public_page]()
         return
 
     # ---------------------------------------------------------
     # USUÁRIO AUTENTICADO TENTANDO ACESSAR ROTA PÚBLICA
     # ---------------------------------------------------------
 
+    st.session_state.pop("login_password", None)
     if page in PUBLIC_ROUTES:
         page = get_dashboard_by_role(user)
         st.session_state.page = page
@@ -224,4 +238,7 @@ def main():
 # EXECUÇÃO
 # =========================================================
 
-main()
+try:
+    main()
+except RuntimeUnavailable as exc:
+    render_runtime_error(exc)

@@ -2,27 +2,15 @@ import copy
 import streamlit as st
 
 from models import mock_data
-from models.mock_data import USERS
+from controllers.streamlit_runtime import get_streamlit_actor, uses_persistent_runtime
 
 
-def _recover_user_from_query():
-    """Re-hydrates the authenticated user after a browser refresh.
-
-    On refresh the WebSocket (and session_state) is recreated from scratch,
-    but st.query_params survives. If 'uid' is present in the URL we look up
-    the user in mock data so the session feels uninterrupted.
-    """
-    uid = st.query_params.get("uid")
-    if not uid:
-        return None
-    return next((u for u in USERS if u.get("id") == uid), None)
-
-
-def _clear_occupancy_modal_state():
-    """Ensure modal state for the occupancy page does not leak across navigation."""
-    st.session_state.pop("occupancy_detail_id", None)
-    st.session_state.pop("occupancy_edit_id", None)
-    st.session_state.pop("occupancy_reservation_selector", None)
+def clear_operational_dialogs():
+    for key in (
+        "occupancy_detail_id", "occupancy_reservation_selector", "reservation_dialog",
+        "edit_space_id", "block_space_id", "resolve_conflict_id",
+    ):
+        st.session_state.pop(key, None)
 
 
 def boot_state():
@@ -35,12 +23,8 @@ def boot_state():
     for key, value in simple_defaults.items():
         st.session_state.setdefault(key, value)
 
-    # Recover authenticated user after a browser refresh.
-    if st.session_state.user is None:
-        recovered = _recover_user_from_query()
-        if recovered:
-            session_user = {k: v for k, v in recovered.items() if k != "password_hash"}
-            st.session_state.user = session_user
+    if uses_persistent_runtime():
+        return
 
     deep_defaults = {
         "reservations": mock_data.RESERVATIONS,
@@ -60,21 +44,43 @@ def boot_state():
 
 
 def go(page):
+    """Navega imediatamente para uma rota pública ou interna."""
     st.session_state.page = page
-    _clear_occupancy_modal_state()
+    clear_operational_dialogs()
     st.query_params["page"] = page
+    st.rerun()
 
 
 def go_authenticated(page, user):
-    """Navigate to an internal page and persist the user id in the URL."""
+    """Navigate after authentication without putting identity in the URL."""
+    del user
     st.session_state.page = page
-    _clear_occupancy_modal_state()
+    clear_operational_dialogs()
     st.query_params["page"] = page
-    st.query_params["uid"] = user["id"]
+    if "uid" in st.query_params:
+        del st.query_params["uid"]
+    st.rerun()
 
 
 def current_user():
-    return st.session_state.get("user")
+    actor = get_streamlit_actor()
+    if actor is None:
+        st.session_state.user = None
+        st.session_state.auth_token = None
+        return None
+    initials = "".join(part[0] for part in actor.name.split()[:2]).upper()
+    user_view = {
+        "id": actor.id,
+        "name": actor.name,
+        "email": actor.email,
+        "phone": getattr(actor, "phone", None),
+        "role": actor.profile.value,
+        "status": actor.status.value,
+        "institution_id": actor.institution_id,
+        "initials": initials,
+    }
+    st.session_state.user = user_view
+    return user_view
 
 
 def set_toast(message):

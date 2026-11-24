@@ -8,10 +8,12 @@ ROLE_LABELS = {
 ROLE_NAV = {
     "admin": [
         ("Dashboard", "admin_dashboard"),
+        ("Historico administrativo", "historico_admin"),
         ("Usuarios", "usuarios"),
         ("Permissoes", "permissoes"),
         ("Planta da instituição", "planta_instituicao"),
         ("Configuracoes da instituicao", "configuracoes_instituicao"),
+        ("Notificações", "notificacoes"),
         ("Conta", "conta"),
     ],
     "gerente": [
@@ -20,6 +22,7 @@ ROLE_NAV = {
         ("Espaços", "espacos"),
         ("Ocupação", "ocupacao"),
         ("Conflitos", "gerente_conflitos"),
+        ("Notificações", "notificacoes"),
         ("Conta", "conta"),
     ],
     "solicitante": [
@@ -52,6 +55,7 @@ STATUS_LABELS = {
     "aprovada": "Aprovada",
     "pendente": "Pendente",
     "rejeitada": "Rejeitada",
+    "cancelada": "Cancelada",
     "conflito": "Conflito",
     "em_analise": "Em analise",
     "nao_resolvido": "Não resolvido",

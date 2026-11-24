@@ -1,512 +1,188 @@
+import pandas as pd
 import streamlit as st
 
-from controllers import mock_data_service
+from config.constants import ROLE_LABELS
 from controllers.app_state_service import go
-from views.components.badges import badge
+from controllers.streamlit_runtime import get_streamlit_actor, get_streamlit_runtime
+from models.domain.exceptions import DomainAuthorizationError
 from views.components.ui_components import page_header
 
 
-# =========================================================
-# CONFIGURAÇÕES
-# =========================================================
-
 ROLE_CONFIG = [
-    {
-        "key": "admin",
-        "label": "Administrador",
-        "description": "Governança, usuários e configurações",
-    },
-    {
-        "key": "gerente",
-        "label": "Gerente",
-        "description": "Gestão operacional de espaços e reservas",
-    },
-    {
-        "key": "solicitante",
-        "label": "Solicitante",
-        "description": "Criação e acompanhamento de reservas",
-    },
-    {
-        "key": "participante",
-        "label": "Participante",
-        "description": "Consulta de agenda e espaços",
-    },
+    ("admin", "Governança, usuários e configurações"),
+    ("gerente", "Gestão operacional de espaços e reservas"),
+    ("solicitante", "Criação e acompanhamento de reservas"),
+    ("participante", "Consulta de agenda e espaços"),
 ]
-
 
 QUICK_ACTIONS = [
-    {
-        "icon": "👥",
-        "label": "Gerenciar usuários",
-        "description": "Criar, editar e ativar contas de acesso",
-        "page": "usuarios",
-        "color": "background:#EDE9FE; color:#6D28D9;",
-    },
-    {
-        "icon": "🛡",
-        "label": "Permissões",
-        "description": "Matriz de permissões por perfil de acesso",
-        "page": "permissoes",
-        "color": "background:#FEF3C7; color:#B45309;",
-    },
-    {
-        "icon": "⚙",
-        "label": "Configurações",
-        "description": "Políticas, regras e preferências do sistema",
-        "page": "configuracoes_instituicao",
-        "color": "background:#F0EEE9; color:#52525B;",
-    },
+    ("Gerenciar usuários", "Criar, editar e ativar contas de acesso", "usuarios", ":material/group:"),
+    ("Permissões", "Matriz de permissões por perfil de acesso", "permissoes", ":material/shield:"),
+    ("Configurações", "Políticas, regras e preferências do sistema", "configuracoes_instituicao", ":material/settings:"),
 ]
 
 
-# =========================================================
-# HELPERS
-# =========================================================
-
 def _navigate(page: str) -> None:
-    """Navega para outra página."""
     go(page)
     st.rerun()
 
 
-def _avatar_html(initials: str, size: int = 28) -> str:
-    """Cria o avatar circular do usuário."""
-    return (
-        f'<span style="'
-        f"display:inline-flex;"
-        f"align-items:center;"
-        f"justify-content:center;"
-        f"width:{size}px;"
-        f"height:{size}px;"
-        f"border-radius:50%;"
-        f"background:#EDE9FE;"
-        f"color:#6D28D9;"
-        f"font-size:11px;"
-        f"font-weight:700;"
-        f"flex-shrink:0;"
-        f'">{initials}</span>'
+def _render_user_stats(metrics) -> None:
+    indicators = (
+        ("Usuários ativos", metrics.users.active, "Contas ativas", "normal"),
+        ("Usuários inativos", metrics.users.inactive, "Requer atenção", "off"),
+        ("Total de usuários", metrics.users.total, "Na instituição", "off"),
+        (f"Cadastros em {metrics.period_days} dias", metrics.recent_user_count, "Com data registrada", "off"),
     )
+    for column, (label, value, delta, color) in zip(st.columns(4, gap="small"), indicators):
+        with column.container(border=True):
+            st.metric(label, value, delta=delta, delta_color=color)
 
 
-def _role_badge_html(role: str) -> str:
-    """Compatibility wrapper for the shared semantic role badge."""
-    return badge(role, category="role")
-
-
-def _get_user_stats(users: list) -> dict:
-    """Calcula as métricas principais."""
-    return {
-        "active": sum(
-            1
-            for user in users
-            if user["status"] == "ativo"
-        ),
-        "inactive": sum(
-            1
-            for user in users
-            if user["status"] == "inativo"
-        ),
-        "total": len(users),
-    }
-
-
-def _get_role_counts(users: list) -> dict:
-    """Calcula a quantidade de usuários por perfil."""
-    role_count = {}
-
-    for user in users:
-        role = user["role"]
-        role_count[role] = role_count.get(role, 0) + 1
-
-    return role_count
-
-
-# =========================================================
-# CARDS DE MÉTRICAS
-# =========================================================
-
-def _render_stat_card(
-    label: str,
-    value: int,
-    value_color: str = "#1C1C2E",
-) -> None:
-    """Renderiza um card de métrica."""
-
-    with st.container(border=True):
-
-        st.html(
-            f'<p style="'
-            f"font-size:11px;"
-            f"font-weight:600;"
-            f"color:#A1A1AA;"
-            f"text-transform:uppercase;"
-            f"letter-spacing:0.06em;"
-            f"margin:0 0 6px;"
-            f'">{label}</p>'
-        )
-
-        st.html(
-            f'<p style="'
-            f"font-size:24px;"
-            f"font-weight:600;"
-            f"color:{value_color};"
-            f"margin:0;"
-            f'">{value}</p>'
-        )
-
-
-def _render_stats(users: list) -> None:
-    """Renderiza os três cards de métricas."""
-
-    stats = _get_user_stats(users)
-
-    col1, col2, col3 = st.columns(
-        3,
-        gap="small",
+def _render_structure_stats(metrics) -> None:
+    indicators = (
+        ("Prédios", metrics.buildings),
+        ("Andares", metrics.floors),
+        ("Salas", metrics.spaces),
+        ("Recursos", metrics.resources),
     )
-
-    with col1:
-        _render_stat_card(
-            "Usuários ativos",
-            stats["active"],
-            "#16A34A",
-        )
-
-    with col2:
-        _render_stat_card(
-            "Usuários inativos",
-            stats["inactive"],
-            "#A1A1AA",
-        )
-
-    with col3:
-        _render_stat_card(
-            "Total de usuários",
-            stats["total"],
-            "#1C1C2E",
-        )
-
-
-# =========================================================
-# AÇÕES RÁPIDAS
-# =========================================================
-
-def _render_quick_action(action: dict) -> None:
-    """Renderiza uma ação rápida."""
-
-    with st.container(border=True):
-
-        col_icon, col_text, col_arrow = st.columns(
-            [1, 8, 1]
-        )
-
-        with col_icon:
-            st.html(
-                f'<div style="'
-                f"width:40px;"
-                f"height:40px;"
-                f"border-radius:10px;"
-                f"display:flex;"
-                f"align-items:center;"
-                f"justify-content:center;"
-                f"font-size:18px;"
-                f"{action['color']}"
-                f'">{action["icon"]}</div>'
+    for column, (label, counts) in zip(st.columns(4, gap="small"), indicators):
+        with column.container(border=True):
+            st.metric(
+                label,
+                counts.total,
+                delta=f"{counts.active} ativos · {counts.inactive} inativos",
+                delta_color="off",
             )
-
-        with col_text:
-            st.html(
-                f'<p style="'
-                f"margin:0;"
-                f"font-size:13px;"
-                f"font-weight:600;"
-                f"color:#1C1C2E;"
-                f'">{action["label"]}</p>'
-                f'<p style="'
-                f"margin:2px 0 0;"
-                f"font-size:12px;"
-                f"color:#A1A1AA;"
-                f'">{action["description"]}</p>'
-            )
-
-        with col_arrow:
-            if st.button(
-                "→",
-                key=f"quick_action_{action['page']}",
-                help=action["label"],
-            ):
-                _navigate(action["page"])
 
 
 def _render_quick_actions() -> None:
-    """Renderiza todas as ações rápidas."""
-
-    st.markdown("**Ações rápidas**")
-
-    for action in QUICK_ACTIONS:
-        _render_quick_action(action)
-
-
-# =========================================================
-# DISTRIBUIÇÃO POR PERFIL
-# =========================================================
-
-def _render_role_distribution(users: list) -> None:
-    """Renderiza a distribuição de usuários por perfil."""
-
-    role_count = _get_role_counts(users)
-    total_users = len(users)
-
-    # Cabeçalho da seção
-    header_left, header_right = st.columns(
-        [3, 1]
-    )
-
-    with header_left:
-        st.markdown("**Distribuição por perfil**")
-
-    with header_right:
-        if st.button(
-            "Gerenciar →",
-            key="distribution_manage",
-            help="Ir para Usuários",
-            use_container_width=True,
-        ):
-            _navigate("usuarios")
-
-    # Card da distribuição
-    with st.container(border=True):
-
-        for role in ROLE_CONFIG:
-
-            role_key = role["key"]
-
-            count = role_count.get(
-                role_key,
-                0,
-            )
-
-            percentage = (
-                round(
-                    (count / total_users) * 100
-                )
-                if total_users
-                else 0
-            )
-
-            col_label, col_bar, col_count = st.columns(
-                [3, 6, 1]
-            )
-
-            # Nome e descrição
-            with col_label:
-                st.html(
-                    f'<p style="'
-                    f"font-size:12px;"
-                    f"font-weight:500;"
-                    f"color:#1C1C2E;"
-                    f"margin:0;"
-                    f'">{role["label"]}</p>'
-                    f'<p style="'
-                    f"font-size:11px;"
-                    f"color:#A1A1AA;"
-                    f"margin:0;"
-                    f'">{role["description"]}</p>'
-                )
-
-            # Barra
-            with col_bar:
-                st.html(
-                    f'<div style="'
-                    f"margin-top:6px;"
-                    f"height:8px;"
-                    f"background:#EDE9FE;"
-                    f"border-radius:999px;"
-                    f"overflow:hidden;"
-                    f'">'
-                    f'<div style="'
-                    f"height:100%;"
-                    f"width:{percentage}%;"
-                    f"background:#6D28D9;"
-                    f"border-radius:999px;"
-                    f'"></div>'
-                    f"</div>"
-                )
-
-            # Quantidade
-            with col_count:
-                st.html(
-                    f'<p style="'
-                    f"font-size:13px;"
-                    f"font-weight:600;"
-                    f"color:#1C1C2E;"
-                    f"margin:6px 0 0;"
-                    f"text-align:right;"
-                    f'">{count}</p>'
-                )
-
-            st.html(
-                '<div style="height:8px;"></div>'
-            )
+    st.subheader("Ações rápidas")
+    for label, description, page, icon in QUICK_ACTIONS:
+        with st.container(border=True):
+            col_info, col_btn = st.columns([3, 1], vertical_alignment="center")
+            with col_info:
+                st.markdown(f"{icon} **{label}**")
+            with col_btn:
+                if st.button("Abrir", key=f"quick_action_{page}", icon=":material/arrow_forward:", use_container_width=True):
+                    _navigate(page)
+            st.caption(description)
 
 
-# =========================================================
-# USUÁRIOS RECENTES
-# =========================================================
+def _role_bar(label: str, count: int, total: int) -> None:
+    columns = st.columns([1.5, 3.5, 0.4], vertical_alignment="center")
+    columns[0].caption(label)
+    columns[1].progress(count / total if total else 0.0, text=None)
+    columns[2].write(f"**{count}**")
 
-def _render_recent_users(users: list) -> None:
-    """Renderiza a lista de usuários recentes."""
 
-    header_left, header_right = st.columns(
-        [5, 1]
-    )
-
-    with header_left:
-        st.markdown("**Usuários recentes**")
-
-    with header_right:
-        if st.button(
-            "Ver todos →",
-            key="recent_users_all",
-            help="Ir para Usuários",
-            use_container_width=True,
-        ):
-            _navigate("usuarios")
+def _render_role_distribution(metrics) -> None:
+    st.html("""
+        <style>
+        div[data-testid="stButton"] button[key="distribution_manage"] {
+            background-color: #7C3AED !important; color: #FFFFFF !important; border: none !important;
+        }
+        div[data-testid="stButton"] button[key="distribution_manage"]:hover {
+            background-color: #6D28D9 !important; color: #FFFFFF !important;
+        }
+        </style>
+    """)
+    header, action = st.columns([1, 0.3], vertical_alignment="center")
+    header.subheader("Distribuição por perfil")
+    if action.button("Gerenciar", key="distribution_manage", icon=":material/group:", type="primary", use_container_width=True):
+        _navigate("usuarios")
 
     with st.container(border=True):
-
-        # Cabeçalho da tabela
-        columns = st.columns(
-            [3, 3, 2, 2]
+        counts = {
+            row.profile.value: row.count
+            for row in metrics.users_by_profile
+        }
+        for role, _ in ROLE_CONFIG:
+            _role_bar(ROLE_LABELS[role], counts.get(role, 0), metrics.users.total)
+        if not metrics.users.total:
+            st.info("Ainda não há usuários cadastrados nesta instituição.")
+            return
+        most_common = max(ROLE_CONFIG, key=lambda role: counts.get(role[0], 0))[0]
+        percentage = counts.get(most_common, 0) / metrics.users.total * 100
+        st.divider()
+        st.caption(
+            f"Perfil com maior presença: **{ROLE_LABELS[most_common]}** ({percentage:.0f}% do total)"
         )
 
-        columns[0].caption("**Nome**")
-        columns[1].caption("**E-mail**")
-        columns[2].caption("**Perfil**")
-        columns[3].caption("**Status**")
 
-        st.divider()
+def _render_recent_users(metrics) -> None:
+    header, action = st.columns([5, 1], vertical_alignment="center")
+    header.subheader("Usuários recentes")
+    if action.button("Ver todos", key="recent_users_all", icon=":material/arrow_forward:", use_container_width=True):
+        _navigate("usuarios")
 
-        # Usuários
-        for user in users[:5]:
+    if not metrics.recent_users:
+        st.info(
+            f"Não há cadastros com data registrada nos últimos {metrics.period_days} dias. "
+            "Registros antigos sem data não aparecem nesta lista."
+        )
+        return
 
-            initials = user.get(
-                "initials",
-                user["name"][:2].upper(),
-            )
+    rows = [
+        {
+            "Nome": item.name,
+            "E-mail": item.email,
+            "Perfil": ROLE_LABELS.get(item.profile.value, item.profile.value),
+            "Status": "Ativo" if item.active else "Inativo",
+            "Cadastro": item.created_at.astimezone().strftime("%d/%m/%Y %H:%M"),
+        }
+        for item in metrics.recent_users
+    ]
+    if metrics.recent_user_count > len(rows):
+        st.caption(f"Exibindo os {len(rows)} mais recentes de {metrics.recent_user_count} cadastros no período.")
+    st.dataframe(
+        pd.DataFrame(rows),
+        column_config={
+            "Nome": st.column_config.TextColumn("Nome", width="medium"),
+            "E-mail": st.column_config.TextColumn("E-mail", width="large"),
+            "Perfil": st.column_config.TextColumn("Perfil", width="medium"),
+            "Status": st.column_config.TextColumn("Status", width="small"),
+            "Cadastro": st.column_config.TextColumn("Cadastro", width="medium"),
+        },
+        hide_index=True,
+        width="stretch",
+    )
 
-            columns = st.columns(
-                [3, 3, 2, 2]
-            )
-
-            # Nome
-            with columns[0]:
-                st.html(
-                    f'<div style="'
-                    f"display:flex;"
-                    f"align-items:center;"
-                    f"gap:8px;"
-                    f"padding:2px 0;"
-                    f'">'
-                    f"{_avatar_html(initials)}"
-                    f'<span style="'
-                    f"font-size:13px;"
-                    f"font-weight:600;"
-                    f"color:#1C1C2E;"
-                    f'">{user["name"]}</span>'
-                    f"</div>"
-                )
-
-            # E-mail
-            with columns[1]:
-                st.html(
-                    f'<p style="'
-                    f"font-size:12px;"
-                    f"color:#A1A1AA;"
-                    f"margin:6px 0;"
-                    f'">{user["email"]}</p>'
-                )
-
-            # Perfil
-            with columns[2]:
-                st.html(
-                    f'<div style="padding:4px 0;">'
-                    f"{_role_badge_html(user['role'])}"
-                    f"</div>"
-                )
-
-            # Status
-            with columns[3]:
-
-                if user["status"] == "ativo":
-                    st.html(
-                        '<span style="'
-                        'font-size:12px;'
-                        'font-weight:500;'
-                        'color:#16A34A;'
-                        '">Ativo</span>'
-                    )
-                else:
-                    st.html(
-                        '<span style="'
-                        'font-size:12px;'
-                        'font-weight:500;'
-                        'color:#A1A1AA;'
-                        '">Inativo</span>'
-                    )
-
-
-# =========================================================
-# PÁGINA PRINCIPAL
-# =========================================================
 
 def dashboard(user):
+    page_header("Painel administrativo", "Indicadores da instituição e acesso às configurações.")
+    actor = get_streamlit_actor()
+    if actor is None:
+        st.error("Sua sessão expirou. Entre novamente para visualizar o painel.")
+        return
 
-    # -----------------------------------------------------
-    # HEADER
-    # -----------------------------------------------------
-
-    page_header(
-        "Painel de gerência",
-        "Controle de usuários, permissões e configurações.",
+    period_days = st.selectbox(
+        "Período de cadastros recentes",
+        options=[7, 30, 90],
+        index=1,
+        format_func=lambda days: f"Últimos {days} dias",
+        key="admin_dashboard_recent_period",
     )
+    try:
+        metrics = get_streamlit_runtime().admin_dashboard.get_metrics(actor, period_days)
+    except (DomainAuthorizationError, ValueError) as exc:
+        st.error(str(exc))
+        return
 
-    users = mock_data_service.users()
+    _render_user_stats(metrics)
+    st.space("small")
+    _render_structure_stats(metrics)
+    st.space("small")
 
-    # -----------------------------------------------------
-    # MÉTRICAS
-    # -----------------------------------------------------
-
-    _render_stats(users)
-
-    st.html(
-        '<div style="height:12px;"></div>'
-    )
-
-    # -----------------------------------------------------
-    # AÇÕES RÁPIDAS + DISTRIBUIÇÃO
-    # -----------------------------------------------------
-
-    col_left, col_right = st.columns(
-        [1, 2],
-        gap="medium",
-    )
-
-    # ESQUERDA
-    with col_left:
+    actions, distribution = st.columns([1, 2], gap="medium")
+    with actions:
         _render_quick_actions()
+    with distribution:
+        _render_role_distribution(metrics)
 
-    # DIREITA
-    with col_right:
-        _render_role_distribution(users)
-
-    st.html(
-        '<div style="height:12px;"></div>'
-    )
-
-    # -----------------------------------------------------
-    # USUÁRIOS RECENTES
-    # -----------------------------------------------------
-
-    _render_recent_users(users)
-
+    st.space("small")
+    _render_recent_users(metrics)
+    st.space("small")
+    with st.container(border=True):
+        st.subheader("Reservas e ocupação")
+        st.info("Estes indicadores ficarão disponíveis quando o módulo de reservas estiver integrado.")

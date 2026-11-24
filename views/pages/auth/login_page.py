@@ -1,7 +1,10 @@
+from html import escape
+
 import streamlit as st
 
 from controllers import auth_service
 from controllers.app_state_service import go, go_authenticated
+from controllers.streamlit_runtime import uses_persistent_runtime
 from views.components.ui_components import logo
 
 
@@ -23,13 +26,17 @@ def _init_state():
 
 
 def _target_for(user):
+    if uses_persistent_runtime():
+        return {"admin": "admin_dashboard", "gerente": "gerente_dashboard", "solicitante": "minhas_reservas"}.get(user["role"], "conta")
     return ROLE_REDIRECT.get(user["role"], "participante_dashboard")
 
 
-def _attempt_login(email, password):
-    user, error = auth_service.login(email, password)
+def _attempt_login(email, password, institution_id=None):
+    user, error = auth_service.login(email, password, institution_id)
     if error:
         st.session_state.login_error = error
+        if st.session_state.get("login_institutions") and institution_id is None:
+            st.rerun()
         return
 
     st.session_state.login_error = ""
@@ -40,11 +47,7 @@ def _render_styles():
     st.html(
         """
         <style>
-            .stApp {
-                background-color: #F7F7F9 !important;
-            }
-
-            [data-testid="stMainBlockContainer"] {
+            :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] {
                 width: 100% !important;
                 max-width: 480px !important;
                 min-height: 100vh !important;
@@ -56,7 +59,7 @@ def _render_styles():
                 justify-content: center !important;
             }
 
-            [data-testid="stMainBlockContainer"] > [data-testid="stVerticalBlock"] {
+            :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] > [data-testid="stVerticalBlock"] {
                 width: 100% !important;
                 min-height: calc(100vh - 72px) !important;
                 display: flex !important;
@@ -143,7 +146,7 @@ def _render_styles():
                 margin-bottom: 32px;
             }
 
-            [data-testid="stMainBlockContainer"] .st-key-login_card {
+            :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] .st-key-login_card {
                 width: 100% !important;
                 height: auto !important;
                 min-height: 0 !important;
@@ -155,7 +158,7 @@ def _render_styles():
                 box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
             }
 
-            [data-testid="stMainBlockContainer"] .st-key-login_card [data-testid="stVerticalBlock"] {
+            :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] .st-key-login_card [data-testid="stVerticalBlock"] {
                 background: transparent !important;
                 border: none !important;
                 box-shadow: none !important;
@@ -251,13 +254,13 @@ def _render_styles():
                 font-size: 12px;
             }
 
-            [data-testid="stMainBlockContainer"] .stButton > button {
+            :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] .stButton > button {
                 border-radius: 12px !important;
                 font-size: 14px !important;
                 font-weight: 600 !important;
             }
 
-            [data-testid="stMainBlockContainer"] .stButton > button[kind="primary"] {
+            :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] .stButton > button[kind="primary"] {
                 height: 48px !important;
                 border: none !important;
                 background: #6D28D9 !important;
@@ -265,12 +268,12 @@ def _render_styles():
                 box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
             }
 
-            [data-testid="stMainBlockContainer"] .stButton > button[kind="primary"]:hover {
+            :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] .stButton > button[kind="primary"]:hover {
                 background: #5B21B6 !important;
                 color: #FFFFFF !important;
             }
 
-            [data-testid="stMainBlockContainer"] .stButton > button[kind="secondary"] {
+            :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] .stButton > button[kind="secondary"] {
                 height: auto !important;
                 min-height: 72px !important;
                 padding: 12px !important;
@@ -283,13 +286,13 @@ def _render_styles():
                 white-space: normal !important;
             }
 
-            [data-testid="stMainBlockContainer"] .stButton > button[kind="secondary"]:hover {
+            :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] .stButton > button[kind="secondary"]:hover {
                 border-color: #A78BFA !important;
                 background: #F5F3FF !important;
                 color: #6D28D9 !important;
             }
 
-            [data-testid="stMainBlockContainer"] .stButton > button[kind="tertiary"] {
+            :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] .stButton > button[kind="tertiary"] {
                 min-height: auto !important;
                 height: auto !important;
                 padding: 0 !important;
@@ -300,43 +303,43 @@ def _render_styles():
                 font-weight: 600 !important;
             }
 
-            [data-testid="stMainBlockContainer"] .stButton > button[kind="tertiary"] {
+            :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] .stButton > button[kind="tertiary"] {
                 color: #737373 !important;
             }
 
-            [data-testid="stMainBlockContainer"] .stButton > button[kind="tertiary"]:hover {
+            :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] .stButton > button[kind="tertiary"]:hover {
                 color: #4C1D95 !important;
                 background: transparent !important;
             }
 
-            [data-testid="stMainBlockContainer"] .st-key-login_forgot_password {
+            :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] .st-key-login_forgot_password {
                 display: flex !important;
                 justify-content: flex-end !important;
             }
 
-            [data-testid="stMainBlockContainer"] .st-key-login_forgot_password button[kind="tertiary"] {
+            :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] .st-key-login_forgot_password button[kind="tertiary"] {
                 color: #6D28D9 !important;
                 font-size: 12px !important;
                 font-weight: 500 !important;
                 text-align: right !important;
             }
 
-            [data-testid="stMainBlockContainer"] .st-key-login_forgot_password button[kind="tertiary"]:hover {
+            :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] .st-key-login_forgot_password button[kind="tertiary"]:hover {
                 color: #4C1D95 !important;
             }
 
-            [data-testid="stMainBlockContainer"] [data-testid="stTextInput"] {
+            :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] [data-testid="stTextInput"] {
                 margin-bottom: 20px !important;
             }
 
-            [data-testid="stMainBlockContainer"] [data-testid="stTextInput"] label {
+            :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] [data-testid="stTextInput"] label {
                 color: #262626 !important;
                 font-size: 14px !important;
                 font-weight: 500 !important;
                 margin-bottom: 8px !important;
             }
 
-            [data-testid="stMainBlockContainer"] [data-testid="stTextInput"] input {
+            :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] [data-testid="stTextInput"] input {
                 height: 48px !important;
                 border: 1px solid #D4D4D8 !important;
                 border-radius: 12px !important;
@@ -346,16 +349,12 @@ def _render_styles():
                 box-shadow: none !important;
             }
 
-            [data-testid="stMainBlockContainer"] [data-testid="stTextInput"] input:focus {
+            :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] [data-testid="stTextInput"] input:focus {
                 border-color: #7C3AED !important;
                 box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.1) !important;
             }
 
-            [data-testid="stMainBlockContainer"] [data-testid="stTextInput"] input::placeholder {
-                color: #A1A1AA !important;
-            }
-
-            [data-testid="stMainBlockContainer"] [data-testid="column"] {
+            :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] [data-testid="column"] {
                 padding: 0 !important;
             }
 
@@ -364,7 +363,7 @@ def _render_styles():
                     display: none;
                 }
 
-                [data-testid="stMainBlockContainer"] {
+                :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] {
                     max-width: 480px !important;
                     margin-left: auto !important;
                     margin-right: auto !important;
@@ -374,13 +373,13 @@ def _render_styles():
             }
 
             @media (max-width: 640px) {
-                [data-testid="stMainBlockContainer"] {
+                :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] {
                     max-width: none !important;
                     padding: 40px 24px !important;
                     justify-content: flex-start !important;
                 }
 
-                [data-testid="stMainBlockContainer"] > [data-testid="stVerticalBlock"] {
+                :where(html:has(#rf-public-theme)) [data-testid="stMainBlockContainer"] > [data-testid="stVerticalBlock"] {
                     min-height: auto !important;
                     justify-content: flex-start !important;
                 }
@@ -398,7 +397,7 @@ def _render_art_panel():
     st.html(
         f"""
         <aside class="rf-login-art">
-            <div>{logo(variant="light")}</div>
+            <div class="rf-public-art-logo rf-public-art-logo--login">{logo(variant="light")}</div>
             <div class="rf-login-art-copy">
                 <div class="rf-login-gold-line"></div>
                 <h2>Gestão de espaços<br><span>simples e inteligente.</span></h2>
@@ -412,8 +411,9 @@ def _render_art_panel():
 
 def _render_header():
     st.markdown(
-        """
+        f"""
         <div class="rf-login-header">
+            <div class="rf-public-mobile-logo">{logo(variant="dark")}</div>
             <p class="rf-login-eyebrow">Bem-vindo de volta</p>
             <h1>Entrar na sua conta</h1>
             <p>Acesse o RoomFlow para gerenciar seus espaços e reservas.</p>
@@ -447,13 +447,8 @@ def login():
                 '<span class="rf-login-password-label">Senha</span>',
                 unsafe_allow_html=True,
             )
-        with forgot_col:
-            if st.button(
-                "Esqueci minha senha",
-                key="login_forgot_password",
-                type="tertiary",
-            ):
-                go("forgot_password")
+        if forgot_col.button("Esqueci minha senha", key="login_forgot_password", type="tertiary"):
+            go("forgot_password")
 
         st.text_input(
             "Senha",
@@ -465,12 +460,19 @@ def login():
 
         if st.session_state.login_error:
             st.markdown(
-                f'<div class="rf-login-error">{st.session_state.login_error}</div>',
+                f'<div class="rf-login-error">{escape(st.session_state.login_error)}</div>',
                 unsafe_allow_html=True,
             )
 
+        institution_id = None
+        if options := st.session_state.get("login_institutions"):
+            institution_id = st.selectbox("Instituição", options, format_func=lambda item: f"Instituição {item}")
+            if st.button("Trocar e-mail"):
+                st.session_state.pop("login_institutions", None)
+                st.session_state.login_error = ""
+                st.rerun()
         if st.button("Entrar →", key="login_submit", type="primary", width="stretch"):
-            _attempt_login(st.session_state.login_email, st.session_state.login_password)
+            _attempt_login(st.session_state.login_email, st.session_state.login_password, institution_id)
 
         st.markdown(
             '<div class="rf-login-footer"><p class="rf-login-signup-link">Ainda não possui uma conta? <a href="?page=signup_choice" target="_self">Criar conta</a></p><span>Problemas para acessar? Entre em contato com a instituição.</span></div>',

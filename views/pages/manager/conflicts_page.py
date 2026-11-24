@@ -1,280 +1,158 @@
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
+import pandas as pd
 import streamlit as st
 
-from controllers import mock_data_service
+from config.constants import STATUS_LABELS
 from controllers.app_state_service import set_toast
-from views.components.ui_components import badge, page_header
+from controllers.streamlit_runtime import get_streamlit_runtime, uses_persistent_runtime
+from views.components.reservation_forms import RESERVATION_ERRORS, local_times
+from views.components.ui_components import page_header
 
 
-def _reservations_for(conflict):
-    """Retorna todas as reservas envolvidas no conflito."""
-    identifiers = conflict.get("affected_reservations")
+CONFLICT_LABELS = {"nao_resolvido": "Em aberto", "em_analise": "Em análise", "resolvido": "Resolvido"}
 
-    if not identifiers:
-        identifiers = [
-            conflict.get("reservation_a"),
-            conflict.get("reservation_b"),
-        ]
 
-    identifiers = [identifier for identifier in identifiers if identifier]
+def _space_label(item):
+    return " / ".join(dict.fromkeys(reservation["space_name"] for reservation in item["reservations"]))
 
-    by_id = {
-        reservation["id"]: reservation
-        for reservation in st.session_state.reservations
+
+def _schedule(item, timezone):
+    periods = [local_times(reservation, timezone) for reservation in item["reservations"]]
+    start = max(period[0] for period in periods)
+    end = min(period[1] for period in periods)
+    return f"{start:%d/%m/%Y · %H:%M}–{end:%H:%M}" if start < end else "Períodos distintos"
+
+
+def _local_date(value, timezone):
+    return datetime.fromisoformat(value).astimezone(ZoneInfo(timezone)).strftime("%d/%m/%Y %H:%M")
+
+
+def _close_dialog():
+    st.session_state.pop("resolve_conflict_id", None)
+
+
+@st.dialog("Conflito de reservas", width="large", on_dismiss=_close_dialog)
+def _conflict_dialog(conflict_id, timezone):
+    api = get_streamlit_runtime().conflict_service
+    try:
+        conflict = api.detail(conflict_id)
+    except RESERVATION_ERRORS as error:
+        st.error(str(error))
+        return
+    reservations = conflict["reservations"]
+    st.caption(f"{_space_label(conflict)} · {_schedule(conflict, timezone)}")
+    st.text(conflict["reason"])
+    for label, column, reservation in zip(("A", "B"), st.columns(2), reservations, strict=True):
+        start, end = local_times(reservation, timezone)
+        with column.container(border=True):
+            st.caption(f"Reserva {label} · {STATUS_LABELS[reservation['status']]}")
+            st.text(reservation["requester_name"])
+            st.text(reservation["title"])
+            st.caption(f"{start:%d/%m/%Y %H:%M}–{end:%H:%M} · {reservation['participants']} pessoas")
+            st.text(reservation["space_name"])
+            if reservation["justification"]:
+                st.text(reservation["justification"])
+    if conflict["decision"]:
+        st.text(conflict["decision"])
+        if conflict["resolved_at"]:
+            date = _local_date(conflict["resolved_at"], timezone)
+            st.caption(f"{conflict['resolver_name'] or 'Responsável indisponível'} · {date}")
+    if conflict["available_actions"]:
+        _resolution_form(api, conflict)
+
+
+def _resolution_form(api, conflict):
+    a, b = conflict["reservations"]
+    conflict_id = conflict["id"]
+    labels = {
+        "manteve_a": f"Manter reserva A ({a['requester_name']})",
+        "manteve_b": f"Manter reserva B ({b['requester_name']})",
+        "alterou": "Mover uma reserva para uma sala alternativa",
     }
-
-    return [
-        by_id[identifier]
-        for identifier in identifiers
-        if identifier in by_id
-    ]
-
-
-def _conflict_schedule(conflict, reservations):
-    if reservations:
-        first = reservations[0]
-        return f"{first['date']} · {first['start']}–{first['end']}"
-
-    return conflict.get("reason", "Horário não disponível")
-
-
-@st.dialog("Resolver conflito", width="medium")
-def resolve_conflict_dialog(conflict, reservations):
-    st.caption(
-        f"{conflict['space']} · "
-        f"{_conflict_schedule(conflict, reservations)}"
-    )
-
-    if reservations:
-        st.markdown("**Reservas envolvidas**")
-
-        for start in range(0, len(reservations), 2):
-            row_reservations = reservations[start:start + 2]
-            reservation_columns = st.columns(len(row_reservations))
-
-            for offset, reservation in enumerate(row_reservations):
-                index = start + offset
-                with reservation_columns[offset]:
-                    with st.container(border=True):
-                        st.caption(f"Reserva {chr(65 + index)}")
-                        st.markdown(f"**{reservation['requester']}**")
-                        st.caption(f"{reservation['title']} · {reservation['type']}")
-                        st.caption(f"{reservation.get('participants', 0)} pessoas")
-                        st.caption(
-                            f"Justificativa: "
-                            f"{reservation.get('justification') or 'Sem justificativa informada.'}"
-                        )
-
-    else:
-        st.info(
-            "As reservas originais não estão disponíveis "
-            "no ambiente atual."
-        )
-
-    outcomes = {}
-
-    if reservations:
-        reservation_a = reservations[0]["requester"]
-
-        outcomes[
-            f"Manter reserva A ({reservation_a})"
-        ] = "manteve_a"
-
-    if len(reservations) > 1:
-        reservation_b = reservations[1]["requester"]
-
-        outcomes[
-            f"Manter reserva B ({reservation_b})"
-        ] = "manteve_b"
-
-    outcomes["Sugerir espaço alternativo"] = "alterou"
-
-    with st.form(key=f"resolve_conflict_form_{conflict['id']}"):
-        selected_label = st.selectbox(
-            "Resultado",
-            list(outcomes),
-            key=f"conflict_outcome_{conflict['id']}",
-        )
-
-        justification = st.text_area(
-            "Decisão / justificativa *",
-            placeholder=(
-                "Descreva a decisão tomada e o motivo..."
-            ),
-            key=f"conflict_justification_{conflict['id']}",
-        )
-
-        cancel_column, resolve_column = st.columns(2)
-
-        with cancel_column:
-            cancelled = st.form_submit_button(
-                "Cancelar",
-                width="stretch",
-            )
-
-        with resolve_column:
-            resolved = st.form_submit_button(
-                "Marcar como resolvido",
-                type="primary",
-                icon=":material/check:",
-                width="stretch",
-            )
-
-    if cancelled:
-        st.rerun()
-
-    if resolved:
-        if not justification.strip():
-            st.error("Descreva a decisão tomada.")
+    action = st.selectbox("Resultado da análise", conflict["available_actions"], format_func=labels.__getitem__,
+                          key=f"conflict_outcome_{conflict_id}")
+    payload = {"action": action}
+    can_submit = True
+    if action == "alterou":
+        try:
+            alternatives = api.alternatives(conflict_id)
+        except RESERVATION_ERRORS as error:
+            st.error(str(error))
             return
+        available = {item["id"]: item["title"] for item in (a, b) if alternatives.get(item["id"])}
+        if available:
+            reservation_id = st.selectbox("Reserva a mover", list(available), format_func=available.__getitem__)
+            rooms = {room["id"]: f"{room['name']} · {room['capacity']} pessoas"
+                     for room in alternatives[reservation_id]}
+            space_id = st.selectbox("Sala alternativa", list(rooms), format_func=rooms.__getitem__)
+            payload.update(reservation_id=reservation_id, space_id=space_id)
+        else:
+            st.info("Nenhuma sala alternativa está disponível para esta decisão.")
+            can_submit = False
 
-        mock_data_service.resolve_conflict(
-            conflict["id"],
-            justification.strip(),
-            outcome=outcomes[selected_label],
+    with st.form(f"resolve_conflict_form_{conflict_id}"):
+        reason = st.text_area("Justificativa da decisão", max_chars=600, key=f"conflict_justification_{conflict_id}")
+        cancel_col, resolve_col = st.columns(2)
+        cancelled = cancel_col.form_submit_button("Cancelar", width="stretch")
+        resolved = resolve_col.form_submit_button(
+            "Aplicar decisão", type="primary", icon=":material/check:", width="stretch", disabled=not can_submit,
         )
-
-        set_toast("Conflito resolvido.")
+    if cancelled:
+        _close_dialog()
         st.rerun()
+    if resolved:
+        try:
+            api.resolve(conflict_id, {**payload, "reason": reason})
+        except RESERVATION_ERRORS as error:
+            st.error(str(error))
+        else:
+            _close_dialog()
+            set_toast("Conflito resolvido.")
+            st.rerun()
 
 
-def _reservation_card(reservation, label):
-    with st.container(border=True):
-        st.caption(label)
-
-        st.markdown(
-            f"**{reservation['requester']}**"
-        )
-
-        st.caption(
-            f"{reservation['title']} · "
-            f"{reservation['type']} · "
-            f"{reservation.get('participants', 0)} pessoas"
-        )
-
-        st.caption(
-            f"Justificativa: "
-            f"{reservation.get('justification') or 'Sem justificativa informada.'}"
-        )
-
-
-def conflicts(user):
-    all_conflicts = st.session_state.conflicts
-
-    page_header(
-        "Conflitos",
-        "Resolva conflitos de reservas e bloqueios de espaços.",
+def conflicts(user=None):
+    page_header("Conflitos", "Analise sobreposições de horários e aplique uma decisão às reservas.")
+    if not uses_persistent_runtime():
+        st.info("Esta área está indisponível no momento.")
+        return
+    api = get_streamlit_runtime().conflict_service
+    search, status_column, detect_column = st.columns([3, 2, 2], vertical_alignment="bottom")
+    query = search.text_input("Buscar conflito", placeholder="ID, sala ou solicitante", max_chars=120,
+                             key="conflict_search_query")
+    status = status_column.selectbox(
+        "Status", [None, *CONFLICT_LABELS],
+        format_func=lambda value: CONFLICT_LABELS.get(value, "Todos"), key="conflict_status_filter",
     )
-
-    if not all_conflicts:
-        st.info("Nenhum conflito registrado.")
+    try:
+        if detect_column.button("Detectar sobreposições", key="detect_reservation_conflicts"):
+            count = api.detect()["updated"]
+            st.success(f"Conflitos atualizados: {count}.")
+        listing = api.list(status, query)
+    except RESERVATION_ERRORS as error:
+        st.error(str(error))
         return
 
-    status_filter = st.selectbox(
-        "Filtrar por status",
-        ["Todos", "Em aberto", "Em análise", "Resolvidos"],
-        key="conflict_status_filter",
-    )
-    statuses_by_filter = {
-        "Todos": {"nao_resolvido", "em_analise", "resolvido"},
-        "Em aberto": {"nao_resolvido"},
-        "Em análise": {"em_analise"},
-        "Resolvidos": {"resolvido"},
-    }
-    filtered_conflicts = [
-        conflict
-        for conflict in all_conflicts
-        if conflict["status"] in statuses_by_filter[status_filter]
-    ]
-
-    if not filtered_conflicts:
-        st.info("Nenhum conflito encontrado para este filtro.")
+    items = listing["items"]
+    timezone = listing["timezone"]
+    if not items:
+        st.info("Nenhum conflito encontrado.", icon=":material/search_off:")
         return
+    st.dataframe(pd.DataFrame([{
+        "ID": item["id"], "Espaço": _space_label(item), "Data / Horário": _schedule(item, timezone),
+        "Solicitantes Envolvidos": " × ".join(res["requester_name"] for res in item["reservations"]),
+        "Status": CONFLICT_LABELS[item["status"]], "Detectado": _local_date(item["created_at"], timezone),
+    } for item in items]), hide_index=True, width="stretch")
 
-    for conflict in filtered_conflicts:
-        reservations = _reservations_for(conflict)
-
-        with st.container(border=True):
-            # Cabeçalho
-            identifier_column, status_column, detected_column = st.columns(
-                [2, 2, 3],
-                vertical_alignment="center",
-            )
-
-            with identifier_column:
-                st.caption(
-                    f"CONFLITO · {conflict['id'].upper()}"
-                )
-
-            with status_column:
-                st.html(
-                    badge(conflict["status"])
-                )
-
-            with detected_column:
-                st.caption(
-                    f"Detectado: "
-                    f"{conflict.get('detected_at', 'agora')}"
-                )
-
-            # Sala e horário
-            st.markdown(
-                f"**{conflict['space']}**"
-            )
-
-            st.caption(
-                _conflict_schedule(
-                    conflict,
-                    reservations,
-                )
-            )
-
-            # Reservas envolvidas
-            if reservations:
-                st.markdown("**Reservas envolvidas**")
-
-                # Duas por linha.
-                # Se houver 3, 4, 5..., continua criando novas linhas.
-                for start in range(0, len(reservations), 2):
-                    row_reservations = reservations[start:start + 2]
-
-                    reservation_columns = st.columns(
-                        len(row_reservations)
-                    )
-
-                    for offset, reservation in enumerate(
-                        row_reservations
-                    ):
-                        index = start + offset
-
-                        with reservation_columns[offset]:
-                            _reservation_card(
-                                reservation,
-                                f"Reserva {chr(65 + index)}",
-                            )
-
-            else:
-                st.info(
-                    "As reservas envolvidas não estão "
-                    "disponíveis no ambiente atual."
-                )
-
-            # Decisão já tomada
-            if conflict.get("decision"):
-                st.success(
-                    f"Decisão: {conflict['decision']}"
-                )
-
-            # Ação
-            if (
-                conflict["status"] != "resolvido"
-                and st.button(
-                    "Resolver conflito",
-                    key=f"resolve_conflict_{conflict['id']}",
-                    type="primary",
-                    icon=":material/check:",
-                )
-            ):
-                resolve_conflict_dialog(
-                    conflict,
-                    reservations,
-                )
+    by_id = {item["id"]: item for item in items}
+    select, action = st.columns([4, 1], vertical_alignment="bottom")
+    selected = select.selectbox("Ações do conflito", list(by_id),
+                                format_func=lambda key: f"#{key} · {_space_label(by_id[key])}",
+                                key="select_conflict_action")
+    label = "Ver detalhes" if by_id[selected]["status"] == "resolvido" else "Resolver conflito"
+    if action.button(label, key="btn_resolve_conflict", type="primary", width="stretch"):
+        st.session_state["resolve_conflict_id"] = selected
+    if st.session_state.get("resolve_conflict_id") == selected:
+        _conflict_dialog(selected, timezone)

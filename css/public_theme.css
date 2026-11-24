@@ -1,0 +1,296 @@
+/* The style element is rendered only for public routes, including widget portals. */
+html:has(#rf-public-theme),
+html:has(#rf-public-theme) :is(.stApp, [data-testid="stMain"]) {
+    color-scheme: only light;
+    --brand: #6D28D9;
+    --brand-hover: #5B21B6;
+    --brand-light: #EDE9FE;
+    --brand-lighter: #F5F3FF;
+    --mustard: #B45309;
+    --mustard-light: #FEF3C7;
+    --mustard-border: #FCD34D;
+    --surface: #FFFFFF;
+    --surface-card: #FFFFFF;
+    --surface-alt: #F4F4F5;
+    --graphite: #18181B;
+    --graphite-soft: #52525B;
+    --graphite-muted: #71717A;
+    --soft: var(--graphite-soft);
+    --muted: var(--graphite-muted);
+    --text-muted: var(--graphite-muted);
+    --stroke: #E4E4E7;
+    --stroke-strong: #D4D4D8;
+    --success: #16A34A;
+    --danger: #DC2626;
+    --warning: #D97706;
+    --info: #2563EB;
+    --success-bg: #DCFCE7;
+    --danger-bg: #FEE2E2;
+    --warning-bg: #FEF3C7;
+    --info-bg: #DBEAFE;
+    color: var(--graphite);
+}
+
+html:has(#rf-public-theme) {
+    --public-background: #F7F7F9;
+}
+
+html:has(#rf-public-theme[data-page="landing"]) {
+    --public-background: #FFFFFF;
+}
+
+html:has(#rf-public-theme) :is(body, .stApp, [data-testid="stMain"], [data-testid="stAppViewContainer"]) {
+    background-color: var(--public-background) !important;
+    color: var(--graphite);
+}
+
+html:has(#rf-public-theme) [data-testid="stHeader"] {
+    background-color: transparent;
+    color: var(--graphite);
+}
+
+html:has(#rf-public-theme) :is([data-testid="stHeader"], [data-testid="stToolbar"]) button {
+    color: var(--graphite-soft);
+}
+
+html:has(#rf-public-theme) ::selection {
+    background-color: var(--brand-light);
+    color: #4C1D95;
+}
+
+html:has(#rf-public-theme) [data-testid="stMarkdownContainer"] a {
+    color: var(--brand);
+}
+
+html:has(#rf-public-theme) [data-testid="stMarkdownContainer"] a:hover {
+    color: var(--brand-hover);
+}
+
+html:has(#rf-public-theme) .rf-public-art-logo {
+    display: inline-flex;
+    align-self: flex-start;
+    border-radius: 4px;
+    background-color: var(--surface-card);
+    box-shadow: 0 0 0 8px var(--surface-card);
+}
+
+/* A marca branca fica sem placa apenas no painel roxo do login. */
+html:has(#rf-public-theme[data-page="login"]) .rf-public-art-logo--login {
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+}
+
+html:has(#rf-public-theme) .rf-public-mobile-logo {
+    display: none;
+}
+
+@media (max-width: 1023px) {
+    html:has(#rf-public-theme) .rf-public-mobile-logo {
+        display: flex;
+        margin: 0 0 16px;
+    }
+}
+
+/* Native widget surfaces also carry colors supplied by Streamlit's theme. */
+html:has(#rf-public-theme) [data-testid="stMain"] :is(
+    [data-testid="stForm"], [data-testid="stTextInputRootElement"],
+    [data-testid="stSelectbox"] [role="group"]
+) {
+    background-color: var(--surface-card);
+    color: var(--graphite);
+    border-color: var(--stroke-strong);
+}
+
+html:has(#rf-public-theme) [data-testid="stMain"] :is(
+    [data-testid="stTextInputRootElement"], [data-testid="stSelectbox"] [role="group"]
+):focus-within {
+    border-color: #7C3AED;
+    box-shadow: 0 0 0 3px rgb(124 58 237 / 10%);
+}
+
+html:has(#rf-public-theme) [data-testid="stMain"] :is(
+    input:not([type="checkbox"], [type="radio"]), textarea
+) {
+    background-color: var(--surface-card);
+    color: #171717;
+    caret-color: var(--brand);
+}
+
+html:has(#rf-public-theme) [data-testid="stMain"] :is(input, textarea)::placeholder {
+    color: var(--graphite-muted) !important;
+    opacity: 1;
+}
+
+:where(html:has(#rf-public-theme)) [data-testid="stMain"] input:autofill {
+    box-shadow: inset 0 0 0 1000px var(--surface-card) !important;
+    -webkit-text-fill-color: var(--graphite);
+}
+
+:where(html:has(#rf-public-theme)) [data-testid="stMain"] [data-testid="stWidgetLabel"],
+:where(html:has(#rf-public-theme)) [data-testid="stMain"] [data-testid="stWidgetLabel"] p {
+    color: #262626;
+}
+
+html:has(#rf-public-theme) [data-testid="stMain"] :is(
+    [data-testid="stTextInputRootElement"], [data-testid="stSelectbox"] [role="group"]
+) :is(button, svg) {
+    color: var(--graphite-soft);
+}
+
+html:has(#rf-public-theme) [data-testid="stMain"] :is(
+    [data-testid="stTextInputRootElement"], [data-testid="stSelectbox"] [role="group"]
+) button {
+    background-color: var(--surface-card);
+}
+
+html:has(#rf-public-theme) [data-testid="stMain"] :is(
+    [data-testid="stTextInputRootElement"], [data-testid="stSelectbox"] [role="group"]
+) button:hover {
+    background-color: var(--brand-lighter);
+    color: var(--brand);
+}
+
+html:has(#rf-public-theme) [data-testid="stMain"] :is(
+    [data-testid="stTextInputRootElement"], [data-testid="stSelectbox"] [role="group"]
+):has([aria-invalid="true"]) {
+    border-color: #DC2626;
+}
+
+html:has(#rf-public-theme) :is([data-testid="stSelectboxVirtualDropdown"], [role="listbox"]) {
+    background-color: var(--surface-card);
+    color: var(--graphite);
+    border-color: var(--stroke-strong);
+}
+
+html:has(#rf-public-theme) [role="option"] {
+    background-color: var(--surface-card);
+    color: var(--graphite);
+}
+
+html:has(#rf-public-theme) [role="option"]:is(:hover, [aria-selected="true"], [data-focused="true"]) {
+    background-color: var(--brand-lighter);
+    color: #4C1D95;
+}
+
+html:has(#rf-public-theme) [data-testid="stMain"] :is(
+    [data-testid="stButton"], [data-testid="stFormSubmitButton"]
+) button[kind^="primary"] {
+    background-color: var(--brand);
+    color: #FFFFFF;
+    border-color: var(--brand);
+}
+
+html:has(#rf-public-theme) [data-testid="stMain"] :is(
+    [data-testid="stButton"], [data-testid="stFormSubmitButton"]
+) button[kind^="primary"]:enabled:hover {
+    background-color: var(--brand-hover);
+    border-color: var(--brand-hover);
+}
+
+html:has(#rf-public-theme) [data-testid="stMain"] :is(
+    [data-testid="stButton"], [data-testid="stFormSubmitButton"]
+) button[kind^="secondary"] {
+    background-color: var(--surface-card);
+    color: #4C1D95;
+    border-color: var(--stroke-strong);
+}
+
+html:has(#rf-public-theme) [data-testid="stMain"] :is(
+    [data-testid="stButton"], [data-testid="stFormSubmitButton"]
+) button[kind^="secondary"]:enabled:hover {
+    background-color: var(--brand-lighter);
+    border-color: #7C3AED;
+}
+
+:where(html:has(#rf-public-theme)) [data-testid="stMain"] button[kind="tertiary"] {
+    color: var(--graphite-muted);
+}
+
+:where(html:has(#rf-public-theme)) [data-testid="stMain"] button[kind="tertiary"]:enabled:hover {
+    color: var(--brand-hover);
+}
+
+:where(html:has(#rf-public-theme)) [data-testid="stMain"] :is(button, a):focus-visible {
+    outline: 2px solid #7C3AED;
+    outline-offset: 2px;
+}
+
+html:has(#rf-public-theme) [data-testid="stMain"] :is(.stButton, .stFormSubmitButton) button:disabled {
+    background-color: var(--surface-alt) !important;
+    border: 1px solid var(--stroke-strong) !important;
+    color: var(--graphite-soft) !important;
+    opacity: 1;
+}
+
+:where(html:has(#rf-public-theme)) [data-testid="stMain"] :is([data-testid="stCode"], [data-testid="stCode"] pre) {
+    background-color: var(--surface-alt);
+    color: var(--graphite);
+}
+
+:where(html:has(#rf-public-theme)) [data-testid="stMain"] [data-testid="stCode"] code {
+    color: inherit;
+}
+
+html:has(#rf-public-theme) [data-testid="stCode"] button {
+    background-color: var(--surface-card);
+    color: var(--graphite-soft);
+    border-color: var(--stroke-strong);
+}
+
+html:has(#rf-public-theme) [data-testid="stCode"] button:hover {
+    background-color: var(--brand-lighter);
+    color: var(--brand-hover);
+}
+
+html:has(#rf-public-theme) [data-testid="stTooltipHoverTarget"] button {
+    color: rgb(24 24 27 / 60%);
+}
+
+html:has(#rf-public-theme) [data-testid="stTooltipHoverTarget"] button:is(:hover, :focus-visible) {
+    color: var(--brand-hover);
+}
+
+html:has(#rf-public-theme) [role="tooltip"] {
+    background-color: var(--surface-card);
+    color: var(--graphite);
+    border-color: var(--stroke);
+}
+
+html:has(#rf-public-theme) [role="tooltip"] p {
+    color: inherit;
+}
+
+html:has(#rf-public-theme) [data-testid="stAlertContainer"] {
+    color: var(--public-alert-text);
+    background-color: var(--public-alert-surface);
+    border: 1px solid var(--public-alert-border);
+}
+
+html:has(#rf-public-theme) [data-testid="stAlertContainer"] :is(p, svg, [data-testid="stIconMaterial"]) {
+    color: inherit;
+}
+
+html:has(#rf-public-theme) [data-testid="stAlertContainer"]:has([data-testid="stAlertContentInfo"]) {
+    --public-alert-text: #0054A3;
+    --public-alert-surface: #EFF6FF;
+    --public-alert-border: #BFDBFE;
+}
+
+html:has(#rf-public-theme) [data-testid="stAlertContainer"]:has([data-testid="stAlertContentError"]) {
+    --public-alert-text: #991B1B;
+    --public-alert-surface: #FEF2F2;
+    --public-alert-border: #FECACA;
+}
+
+html:has(#rf-public-theme) [data-testid="stAlertContainer"]:has([data-testid="stAlertContentSuccess"]) {
+    --public-alert-text: #166534;
+    --public-alert-surface: #F0FDF4;
+    --public-alert-border: #BBF7D0;
+}
+
+html:has(#rf-public-theme) [data-testid="stAlertContainer"]:has([data-testid="stAlertContentWarning"]) {
+    --public-alert-text: #92400E;
+    --public-alert-surface: #FFFBEB;
+    --public-alert-border: #FDE68A;
+}

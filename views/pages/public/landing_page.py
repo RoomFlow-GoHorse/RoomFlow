@@ -24,7 +24,7 @@ def landing():
 
                         <!-- Logo -->
                         <div class="rf-header-logo">
-                            {logo()}
+                            {logo(variant="dark")}
                         </div>
 
                         <!-- Navegação -->
@@ -953,7 +953,7 @@ def landing():
                 <div class="rf-container rf-footer-content">
 
                     <div class="rf-footer-logo">
-                        {logo()}
+                        {logo(variant="dark")}
                     </div>
 
 

@@ -16,17 +16,33 @@ from views.components.badges import badge
 ASSETS_DIR = Path(__file__).resolve().parents[2] / "assets"
 
 LOGO_FILES = {
-    "dark": "logo-preta.png",
-    "light": "logo-branca.png",
+    "dark": "logo-preta-icone.png",
+    "light": "logo-branca-icone.png",
     "mark": "logo-icone.png",
 }
 
 LOGO_SIZES = {
-    "small": "110px",
-    "medium": "150px",
-    "large": "210px",
+    "small": "26px",
+    "medium": "32px",
+    "large": "40px",
     "mark": "38px",
 }
+
+
+# ============================================================
+# TEMA
+# ============================================================
+
+def is_dark_theme() -> bool:
+    try:
+        if hasattr(st, "context") and hasattr(st.context, "theme") and st.context.theme:
+            theme_val = getattr(st.context.theme, "type", None)
+            if not theme_val and isinstance(st.context.theme, dict):
+                theme_val = st.context.theme.get("type")
+            return theme_val == "dark"
+    except Exception:
+        pass
+    return False
 
 
 # ============================================================
@@ -34,9 +50,9 @@ LOGO_SIZES = {
 # ============================================================
 
 @lru_cache
-def _read_css_content(path):
+def _read_css_content(path, style_attributes=""):
     content = Path(path).read_text(encoding="utf-8")
-    return f"<style>\n{content}\n</style>"
+    return f"<style{style_attributes}>\n{content}\n</style>"
 
 
 def load_css_file(path):
@@ -47,10 +63,43 @@ def load_css():
     load_css_file("css/global.css")
     load_css_file("css/sidebar.css")
 
+    if is_dark_theme():
+        st.html(
+            """<style>
+            :root, .stApp, [data-testid="stApp"], [data-testid="stSidebar"] {
+              --brand: #8B5CF6;
+              --brand-hover: #A78BFA;
+              --brand-light: #2E1065;
+              --brand-lighter: #1F113D;
+              --surface: #09090B;
+              --surface-card: #18181B;
+              --surface-alt: #27272A;
+              --graphite: #FAFAFA;
+              --graphite-soft: #D4D4D8;
+              --graphite-muted: #A1A1AA;
+              --stroke: #3F3F46;
+              --stroke-strong: #52525B;
+              --success-bg: #052E16;
+              --danger-bg: #450A0A;
+              --warning-bg: #451A03;
+              --info-bg: #172554;
+            }
+            [data-testid="stSidebar"],
+            [data-testid="stSidebar"] > div:first-child,
+            [data-testid="stSidebar"] [data-testid="stSidebarContent"],
+            .st-key-rf_sidebar_footer {
+              background: #18181B !important;
+            }
+            </style>"""
+        )
 
-def load_auth_css():
-    """Loads styles that are exclusive to the public authentication flow."""
-    load_css_file("css/signup_pages.css")
+
+def load_public_css(page):
+    """Attach the light palette to the current public render only."""
+    page = html.escape(page, quote=True)
+    st.html(_read_css_content("css/public_theme.css", f' id="rf-public-theme" data-page="{page}"'))
+    if page != "landing":
+        load_css_file("css/signup_pages.css")
 
 
 # ============================================================
@@ -102,7 +151,7 @@ def _logo_data_uri(variant):
     return f"data:image/png;base64,{encoded_image}"
 
 
-def logo(size="medium", variant="dark", class_name=""):
+def logo(size="medium", variant=None, class_name=""):
     """
     Retorna a logo do RoomFlow em HTML.
 
@@ -117,6 +166,7 @@ def logo(size="medium", variant="dark", class_name=""):
             "dark"  -> logo preta
             "light" -> logo branca
             "mark"  -> somente o ícone
+            None    -> detecta automaticamente com base no tema ativo
 
         class_name:
             Classe CSS adicional opcional.
@@ -127,6 +177,9 @@ def logo(size="medium", variant="dark", class_name=""):
             f"Tamanho de logo inválido: {size}. "
             f"Use: {', '.join(LOGO_SIZES)}"
         )
+
+    if variant is None:
+        variant = "light" if is_dark_theme() else "dark"
 
     if variant not in LOGO_FILES:
         raise ValueError(
@@ -148,13 +201,21 @@ def logo(size="medium", variant="dark", class_name=""):
 
     image_uri = _logo_data_uri(variant)
 
+    wordmark = (
+        ""
+        if variant == "mark"
+        else '<span class="rf-logo__name"><span class="rf-logo__room">Room</span>'
+        '<span class="rf-logo__flow">Flow</span></span>'
+    )
+
     return (
-        f'<div class="rf-logo rf-logo--{size}{extra_class}">'
+        f'<div class="rf-logo rf-logo--{size} rf-logo--{variant}{extra_class}">'
         f'<img '
         f'class="rf-logo__image" '
         f'src="{image_uri}" '
         f'alt="{alt_text}" '
         f'style="width:{LOGO_SIZES[size]};">'
+        f'{wordmark}'
         f'</div>'
     )
 
@@ -193,9 +254,7 @@ def stat_card(label, value, subtext=""):
         '<div class="rf-card">'
         f'<div class="rf-stat-label">{esc(label)}</div>'
         f'<div class="rf-stat-value">{esc(value)}</div>'
-        f'<div style="color:var(--muted);font-size:13px;margin-top:4px">'
-        f'{esc(subtext)}'
-        f'</div>'
+        f'<div class="rf-stat-subtext">{esc(subtext)}</div>'
         "</div>"
     )
 
