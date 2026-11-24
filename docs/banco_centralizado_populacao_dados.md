@@ -25,4 +25,9 @@
 
 ## Próxima tarefa
 
-Configurar parâmetros opcionais de conexão PostgreSQL e atualizar a documentação de implantação.
+Auditar migrations e preparar testes PostgreSQL isolados.
+
+## Concluído
+
+- A conexão aceita `DATABASE_URL` remota ou `DB_*`, com `DB_SSLMODE`, timeout e pool configuráveis sem credenciais fixas.
+- Testes de regressão da API e mapeamento: 13 aprovados.
