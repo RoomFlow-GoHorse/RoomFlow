@@ -37,3 +37,12 @@
 | Notificações para participantes | Concluída | Compilação Python; validação PostgreSQL pendente de banco isolado | Pendente |
 | Dashboard do participante por API | Concluída | Compilação Python; preserva os componentes visuais existentes | Pendente |
 | Agenda compartilhada por API | Concluída | Compilação Python; preserva os componentes visuais existentes | Pendente |
+| Regressão sem PostgreSQL | Concluída | `127` testes aprovados; `27` PostgreSQL ignorados por ausência de `ROOMFLOW_TEST_DATABASE` | Pendente |
+
+## Aplicação da migration
+
+Com o `.env` apontando para o banco local desejado, aplique a revisão com:
+
+```powershell
+.\.venv\Scripts\python.exe -m alembic upgrade head
+```
