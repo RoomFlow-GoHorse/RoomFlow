@@ -4,8 +4,8 @@ from zoneinfo import ZoneInfo
 
 import streamlit as st
 
-from controllers.streamlit_runtime import get_streamlit_runtime, uses_roomflow_api
-from controllers.roomflow_api import ApiUnavailable
+from controllers.streamlit_runtime import get_streamlit_runtime, uses_persistent_runtime
+from controllers.runtime_errors import RuntimeUnavailable
 from views.components.reservation_forms import RESERVATION_ERRORS
 from views.components.ui_components import page_header
 
@@ -55,7 +55,7 @@ def _render_notification_card(item, api, zone):
                                 icon=":material/check_circle:"):
             try:
                 api.mark_read(notification_id)
-            except (*RESERVATION_ERRORS, ApiUnavailable) as error:
+            except (*RESERVATION_ERRORS, RuntimeUnavailable) as error:
                 LOGGER.warning("Could not mark notification %s as read: %s", notification_id, error)
                 st.error("Não foi possível atualizar a notificação. Tente novamente.")
             else:
@@ -63,7 +63,7 @@ def _render_notification_card(item, api, zone):
 
 
 def notifications(user=None):
-    if not uses_roomflow_api():
+    if not uses_persistent_runtime():
         page_header("Notificações", "Consulte as atualizações da sua instituição.")
         st.error("Não foi possível carregar suas notificações. Tente novamente.")
         return
@@ -71,7 +71,7 @@ def notifications(user=None):
     _render_styles()
     try:
         api = get_streamlit_runtime().notifications
-    except ApiUnavailable as error:
+    except RuntimeUnavailable as error:
         LOGGER.warning("Could not connect to the notification service: %s", error)
         page_header("Notificações", "Consulte as atualizações da sua instituição.")
         st.error("Não foi possível carregar suas notificações. Tente novamente.")
@@ -87,7 +87,7 @@ def notifications(user=None):
             unread_only=selection == "unread", category=selection if selection in CATEGORY_LABELS else None,
             limit=PAGE_SIZE, offset=offset,
         )
-    except (*RESERVATION_ERRORS, ApiUnavailable) as error:
+    except (*RESERVATION_ERRORS, RuntimeUnavailable) as error:
         LOGGER.warning("Could not load the authenticated user's notifications: %s", error)
         st.error("Não foi possível carregar suas notificações. Tente novamente.")
         return
@@ -102,7 +102,7 @@ def notifications(user=None):
                                     icon=":material/done_all:", width="stretch"):
             try:
                 api.mark_all_read()
-            except (*RESERVATION_ERRORS, ApiUnavailable) as error:
+            except (*RESERVATION_ERRORS, RuntimeUnavailable) as error:
                 LOGGER.warning("Could not mark all notifications as read: %s", error)
                 st.error("Não foi possível atualizar as notificações. Tente novamente.")
             else:

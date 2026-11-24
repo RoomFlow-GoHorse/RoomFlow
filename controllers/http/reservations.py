@@ -1,8 +1,9 @@
+from controllers.operation_presenters import reservation_response
+from controllers.operation_payloads import ReservationPayload, DecisionPayload, ReservationEditPayload, CancellationPayload
 from dataclasses import asdict
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
-from pydantic import BaseModel, ConfigDict, Field
 
 from application.services.reservation_service import ReservationService
 from controllers.http.dependencies import get_current_user
@@ -14,41 +15,6 @@ from models.domain.exceptions import DomainAuthorizationError, DuplicateResource
 
 
 router = APIRouter(prefix="/reservations", tags=["reservations"])
-
-
-class ReservationPayload(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    space_id: str = Field(min_length=1, max_length=19)
-    title: str = Field(min_length=1, max_length=200)
-    activity_type: str = Field(min_length=1, max_length=60)
-    start: datetime
-    end: datetime
-    participants: int = Field(strict=True, ge=1, le=10000)
-    justification: str | None = Field(default=None, max_length=600)
-
-    def to_request(self) -> ReservationRequest:
-        return ReservationRequest(
-            self.space_id, self.title, self.activity_type, ReservationPeriod(self.start, self.end),
-            self.participants, self.justification,
-        )
-
-
-class DecisionPayload(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    status: ReservationStatus
-    reason: str | None = Field(default=None, max_length=600)
-
-
-class ReservationEditPayload(ReservationPayload):
-    reason: str | None = Field(default=None, max_length=600)
-
-
-class CancellationPayload(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    reason: str | None = Field(default=None, max_length=600)
 
 
 def get_service(request: Request) -> ReservationService:
@@ -150,18 +116,6 @@ def review(
     actor: User = Depends(get_current_user), service: ReservationService = Depends(get_service),
 ):
     return {"data": reservation_response(run_reservation_action(lambda: service.review(actor, reservation_id, payload.status, payload.reason)))}
-
-
-def reservation_response(details: ReservationDetails) -> dict:
-    item = details.reservation
-    request = item.request
-    return {
-        "id": item.id, "space_id": request.space_id, "space_name": details.space_name,
-        "requester_name": details.requester_name, "title": request.title, "activity_type": request.activity_type,
-        "start": request.period.start, "end": request.period.end, "participants": request.participants,
-        "justification": request.justification, "status": item.status, "has_overlap": details.has_overlap,
-        "created_at": item.created_at, "reviewed_at": item.reviewed_at, "decision_reason": item.decision_reason,
-    }
 
 
 def run_reservation_action(action):

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from sqlalchemy import distinct, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import aliased

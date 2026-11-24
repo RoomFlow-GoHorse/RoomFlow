@@ -1,3 +1,4 @@
+from controllers.operation_presenters import room_response as _room
 from dataclasses import asdict
 from datetime import date, time
 
@@ -66,10 +67,3 @@ def report(
         ],
         "reservations": [reservation_response(row) for row in result.reservations],
     }}
-
-
-def _room(room: Space) -> dict:
-    return {
-        "id": room.id, "name": room.name, "building_id": room.building_id, "building": room.building,
-        "location": room.location, "capacity": room.capacity, "type": room.type,
-    }

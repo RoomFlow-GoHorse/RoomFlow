@@ -42,24 +42,52 @@ def semear_perfis() -> None:
 
 def criar_contas(sessao: Session, instituicao_id: int, senha: str) -> dict[str, Usuario]:
     perfis = dict(sessao.execute(select(TipoUsuario.name, TipoUsuario.id)).all())
-    contas = {
-        perfil: Usuario(
-            name=f"{rotulo} Demo",
-            email=f"{perfil}@roomflow",
-            password_hash=hash_password(senha),
-            role=perfil,
-            tipo_usuario_id=perfis[perfil],
-            institution_links=[
+    contas = {}
+    for numero, (perfil, rotulo) in enumerate(ROLE_LABELS.items(), start=1):
+        email = f"{perfil}@gmail.com"
+        conta = sessao.scalar(select(Usuario).where(Usuario.email == email))
+        if conta is None:
+            # Atualiza contas criadas por versões anteriores do seed.
+            conta = sessao.scalar(
+                select(Usuario).where(Usuario.email == f"{perfil}@roomflow")
+            )
+        if conta is None:
+            conta = Usuario(
+                name=f"{rotulo} Demo",
+                email=email,
+                password_hash=hash_password(senha),
+                role=perfil,
+                tipo_usuario_id=perfis[perfil],
+            )
+            sessao.add(conta)
+            sessao.flush()
+        else:
+            conta.name = f"{rotulo} Demo"
+            conta.email = email
+            conta.password_hash = hash_password(senha)
+            conta.role = perfil
+            conta.tipo_usuario_id = perfis[perfil]
+            conta.status = "ativo"
+
+        vinculo = sessao.scalar(
+            select(UsuarioInstituicao).where(
+                UsuarioInstituicao.user_id == conta.id,
+                UsuarioInstituicao.institution_id == instituicao_id,
+            )
+        )
+        if vinculo is None:
+            sessao.add(
                 UsuarioInstituicao(
+                    user_id=conta.id,
                     institution_id=instituicao_id,
                     role=perfil,
                     registration_number=f"DEMO-{numero:02}",
                 )
-            ],
-        )
-        for numero, (perfil, rotulo) in enumerate(ROLE_LABELS.items(), start=1)
-    }
-    sessao.add_all(contas.values())
+            )
+        else:
+            vinculo.role = perfil
+            vinculo.status = "ativo"
+        contas[perfil] = conta
     sessao.flush()
     return contas
 
@@ -125,7 +153,7 @@ def criar_agenda(sessao: Session, sala: Espaco, contas: dict[str, Usuario]) -> N
         )
 
 
-def semear_demo(senha: str) -> bool:
+def semear_demo(senha: str) -> str:
     with SessionLocal.begin() as sessao:
         cadastrar_perfis(sessao)
         instituicao_id = sessao.scalar(
@@ -140,10 +168,18 @@ def semear_demo(senha: str) -> bool:
             .on_conflict_do_nothing(index_elements=[Instituicao.cnpj])
             .returning(Instituicao.id)
         )
+        instituicao_nova = instituicao_id is not None
         if instituicao_id is None:
-            return False
+            instituicao_id = sessao.scalar(
+                select(Instituicao.id).where(Instituicao.cnpj == "00000000000000")
+            )
+            if instituicao_id is None:
+                raise RuntimeError("Não foi possível localizar ou criar a instituição de demonstração.")
 
         contas = criar_contas(sessao, instituicao_id, senha)
+        if not instituicao_nova:
+            return "contas"
+
         sala, laboratorio, auditorio = [
             Espaco(
                 instituicao_id=instituicao_id,
@@ -179,7 +215,7 @@ def semear_demo(senha: str) -> bool:
             ]
         )
         criar_agenda(sessao, sala, contas)
-    return True
+    return "demo"
 
 
 def main() -> None:
@@ -193,10 +229,11 @@ def main() -> None:
 
     if args.demo:
         senha = "123456789"
-        if semear_demo(senha):
+        resultado = semear_demo(senha)
+        if resultado == "demo":
             print("Perfis e dados de demonstração cadastrados na Faculdade unisapiens.")
-        else:
-            print("Os perfis foram conferidos; a instituição de demonstração já está cadastrada.")
+        elif resultado == "contas":
+            print("Perfis e contas demo vinculadas à instituição existente. Os demais dados não foram duplicados.")
     else:
         semear_perfis()
         print("Perfis cadastrados: " + ", ".join(ROLE_LABELS.values()))

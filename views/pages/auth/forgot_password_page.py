@@ -5,7 +5,7 @@ import streamlit as st
 from application.services.authentication_service import TooManyLoginAttempts
 from application.services.password_recovery_service import InvalidRecoveryToken
 from controllers.app_state_service import go
-from controllers.streamlit_runtime import get_streamlit_runtime, uses_roomflow_api
+from controllers.streamlit_runtime import get_streamlit_runtime, uses_persistent_runtime
 from models.domain.exceptions import DomainAuthorizationError
 from views.components.ui_components import logo
 
@@ -337,7 +337,7 @@ def forgot_password():
         if st.button("Enviar instruções →", key="forgot_password_submit", type="primary", width="stretch"):
             email = st.session_state.forgot_password_email.strip()
             try:
-                if uses_roomflow_api():
+                if uses_persistent_runtime():
                     get_streamlit_runtime().password_recovery.request(email)
             except (DomainAuthorizationError, ValueError, TooManyLoginAttempts) as exc:
                 st.error(str(exc))
@@ -351,7 +351,7 @@ def forgot_password():
                 f'<div class="rf-forgot-success">{escape(st.session_state.forgot_password_success)}</div>',
                 unsafe_allow_html=True,
             )
-            if uses_roomflow_api():
+            if uses_persistent_runtime():
                 _reset_with_code()
 
         st.markdown(

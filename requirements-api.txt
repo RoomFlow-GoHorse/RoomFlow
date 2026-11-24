@@ -1,0 +1,8 @@
+# API opcional e suíte de compatibilidade HTTP; não necessários ao Streamlit.
+-r requirements.txt
+fastapi>=0.165,<1.0
+starlette>=1.6,<2.0
+uvicorn>=0.30,<1.0
+python-multipart>=0.0.18,<1.0
+httpx2>=2,<3
+anyio>=4,<5

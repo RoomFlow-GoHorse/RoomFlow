@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from fastapi import Query
 from fastapi.testclient import TestClient
@@ -124,14 +124,14 @@ class ApiTests(unittest.TestCase):
     def test_spaces_route_is_hidden_outside_development_and_test(self) -> None:
         for environment in ("production", "staging"):
             with self.subTest(environment=environment):
-                with TestClient(create_app(environment=environment)) as client:
+                with patch("infrastructure.persistence.runtime.build_postgres_runtime"), TestClient(create_app(environment=environment, postgres_session_factory=Mock())) as client:
                     response = client.get("/spaces")
                 self.assertEqual(response.status_code, 404)
                 self.assertEqual(response.json()["error"]["code"], "not_found")
 
     def test_spaces_route_is_disabled_by_default(self) -> None:
         with patch.dict("os.environ", {}, clear=True):
-            with TestClient(create_app()) as client:
+            with patch("infrastructure.persistence.runtime.build_postgres_runtime"), TestClient(create_app(postgres_session_factory=Mock())) as client:
                 response = client.get("/spaces")
 
         self.assertEqual(response.status_code, 404)

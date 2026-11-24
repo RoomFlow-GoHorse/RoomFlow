@@ -2,7 +2,7 @@ import pandas as pd
 import streamlit as st
 
 from config.constants import ROLE_LABELS
-from controllers.streamlit_runtime import get_streamlit_actor, get_streamlit_runtime, uses_roomflow_api
+from controllers.streamlit_runtime import get_streamlit_actor, get_streamlit_runtime, uses_persistent_runtime
 from models.domain.entities.authorized_enrollment import EnrollmentStatus
 from models.domain.entities.profile import Profile
 from models.domain.entities.user import User, UserStatus
@@ -192,7 +192,7 @@ def users_page(user):
         st.error("Acesso nao autorizado.")
         return
 
-    if uses_roomflow_api():
+    if uses_persistent_runtime():
         page_header("Usuários", "Gerencie usuários, convites e matrículas da sua instituição.")
         users_tab, access_tab = st.tabs(["Usuários", "Códigos e matrículas"])
     else:

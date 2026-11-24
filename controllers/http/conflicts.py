@@ -1,5 +1,6 @@
+from controllers.operation_presenters import conflict_response as _response
+from controllers.operation_payloads import ResolutionPayload
 from fastapi import APIRouter, Depends, Query, Request
-from pydantic import BaseModel, ConfigDict, Field
 
 from application.services.conflict_service import ConflictService
 from controllers.http.dependencies import get_current_user
@@ -9,15 +10,6 @@ from models.domain.entities.user import User
 
 
 router = APIRouter(prefix="/conflicts", tags=["conflicts"])
-
-
-class ResolutionPayload(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    action: ConflictAction
-    reason: str = Field(min_length=1, max_length=600)
-    reservation_id: str | None = Field(default=None, min_length=1, max_length=19)
-    space_id: str | None = Field(default=None, min_length=1, max_length=19)
 
 
 def get_service(request: Request) -> ConflictService:
@@ -71,14 +63,3 @@ def resolve(
         actor, conflict_id, payload.action, payload.reason, payload.reservation_id, payload.space_id,
     ))
     return {"data": {**_response(item), "available_actions": actions}}
-
-
-def _response(item: ConflictDetails) -> dict:
-    conflict = item.conflict
-    return {
-        "id": conflict.id, "status": conflict.status, "severity": conflict.severity,
-        "reason": conflict.reason, "created_at": conflict.created_at, "decision": conflict.decision,
-        "resolved_at": conflict.resolved_at, "resolved_by": conflict.resolved_by,
-        "resolver_name": conflict.resolver_name,
-        "reservations": [reservation_response(item.reservation_a), reservation_response(item.reservation_b)],
-    }

@@ -5,6 +5,8 @@ from urllib.parse import quote, urlsplit
 
 import httpx2
 
+from controllers.runtime_errors import RuntimeUnavailable as ApiUnavailable
+
 from application.services.authentication_service import (
     InstitutionSelectionRequired, InvalidCredentials, InvalidSession, LoginResult, TooManyLoginAttempts,
 )
@@ -31,8 +33,6 @@ from models.domain.exceptions import (
 )
 
 
-class ApiUnavailable(DomainAuthorizationError):
-    pass
 
 
 class ApiTimeout(ApiUnavailable):
@@ -48,7 +48,7 @@ class ApiSessionExpired(InvalidSession, DomainAuthorizationError):
 
 
 class RoomFlowApi:
-    def __init__(self, base_url: str, token: Callable[[], str | None]):
+    def __init__(self, base_url: str, token: Callable[[], str | None], *, client=None):
         try:
             url = urlsplit(base_url)
             valid = (
@@ -61,7 +61,7 @@ class RoomFlowApi:
             valid = False
         if not valid:
             raise ApiUnavailable("Configure ROOMFLOW_API_URL com um endereço HTTP ou HTTPS válido da API.")
-        self._client = httpx2.Client(base_url=base_url, timeout=6.0, trust_env=False)
+        self._client = client if client is not None else httpx2.Client(base_url=base_url, timeout=6.0, trust_env=False)
         self._token = token
 
     def request(

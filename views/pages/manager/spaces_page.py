@@ -2,7 +2,7 @@ import pandas as pd
 import streamlit as st
 
 from controllers.app_state_service import set_toast
-from controllers.streamlit_runtime import get_streamlit_actor, get_streamlit_runtime, uses_roomflow_api
+from controllers.streamlit_runtime import get_streamlit_actor, get_streamlit_runtime, uses_persistent_runtime
 from models.domain.entities.space import Space
 from models.domain.exceptions import DomainAuthorizationError, DuplicateResource, ResourceNotFound
 from views.components.ui_components import badge, page_header
@@ -122,7 +122,7 @@ def edit_space_dialog(space: Space):
         st.rerun()
     if submitted:
         try:
-            if uses_roomflow_api():
+            if uses_persistent_runtime():
                 runtime.resource_management.update_space_configuration(
                     space.id, capacity, selected, name=name, room_type=room_type,
                 )

@@ -1,9 +1,14 @@
+from pathlib import Path
+
+from dotenv import load_dotenv
 import streamlit as st
+
+load_dotenv(Path(__file__).resolve().parent / ".env", override=False)
 
 from config.constants import ROLE_NAV
 from controllers.app_state_service import boot_state, clear_operational_dialogs, current_user
-from controllers.roomflow_api import ApiUnavailable
-from controllers.streamlit_runtime import API_PAGES, render_api_error, uses_roomflow_api
+from controllers.runtime_errors import RuntimeUnavailable
+from controllers.streamlit_runtime import PERSISTENT_PAGES, get_streamlit_runtime, render_runtime_error, uses_persistent_runtime
 from views.components.app_shell import shell_end, shell_start
 from views.components.ui_components import load_css, load_public_css, toast
 
@@ -32,7 +37,11 @@ st.set_page_config(
 # INICIALIZAÇÃO
 # =========================================================
 
-boot_state()
+try:
+    boot_state()
+except RuntimeUnavailable as exc:
+    render_runtime_error(exc)
+    st.stop()
 load_css()
 if st.session_state.get("page") != "planta_instituicao":
     toast()
@@ -140,7 +149,7 @@ def sync_page_from_query():
 # =========================================================
 
 def get_dashboard_by_role(user):
-    if uses_roomflow_api():
+    if uses_persistent_runtime():
         return {"admin": "admin_dashboard", "gerente": "gerente_dashboard", "solicitante": "minhas_reservas"}.get(user.get("role"), "conta")
     dashboard_by_role = {
         "admin": "admin_dashboard",
@@ -157,7 +166,7 @@ def get_dashboard_by_role(user):
 
 def get_allowed_pages_by_role(role):
     pages = {page for _, page in ROLE_NAV.get(role, [])}
-    return pages & API_PAGES if uses_roomflow_api() else pages
+    return pages & PERSISTENT_PAGES if uses_persistent_runtime() else pages
 
 
 def ensure_allowed_internal_page(page, user):
@@ -180,6 +189,8 @@ def ensure_allowed_internal_page(page, user):
 # =========================================================
 
 def main():
+    # Validate persistence before presenting any signup or login form.
+    get_streamlit_runtime()
     sync_page_from_query()
 
     page = st.session_state.page
@@ -229,5 +240,5 @@ def main():
 
 try:
     main()
-except ApiUnavailable as exc:
-    render_api_error(exc)
+except RuntimeUnavailable as exc:
+    render_runtime_error(exc)

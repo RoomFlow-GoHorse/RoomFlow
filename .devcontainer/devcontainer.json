@@ -19,7 +19,7 @@
   },
   "updateContentCommand": "if [ -f packages.txt ]; then sudo apt update && sudo apt upgrade -y && sudo xargs apt install -y < packages.txt || exit 1; fi; python -m pip install --user -r requirements.txt",
   "postAttachCommand": {
-    "server": "streamlit run main.py --server.enableCORS false --server.enableXsrfProtection false"
+    "server": "streamlit run main.py"
   },
   "portsAttributes": {
     "8501": {

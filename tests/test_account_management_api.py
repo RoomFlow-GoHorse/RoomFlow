@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import patch
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from fastapi.testclient import TestClient
@@ -181,12 +182,9 @@ class AccountManagementApiTests(unittest.TestCase):
         self.assertEqual(original_own.json()["data"]["name"], original_name)
 
     def test_in_memory_registration_routes_are_local_only(self) -> None:
-        with TestClient(create_app(environment="production")) as production_client:
-            response = production_client.post(
-                "/institutions/signup", json=institution_signup_payload()
-            )
-
-        self.assertEqual(response.status_code, 404)
+        with patch.dict("os.environ", {"ROOMFLOW_PERSISTENCE": "memory"}):
+            with self.assertRaisesRegex(ValueError, "memória"):
+                create_app(environment="production")
 
     def test_duplicate_institution_cnpj_is_rejected(self) -> None:
         first = self.client.post(
