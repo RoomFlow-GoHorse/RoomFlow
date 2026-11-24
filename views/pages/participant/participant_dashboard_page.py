@@ -1,9 +1,11 @@
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 from typing import List, Optional
 import streamlit as st
 
 from controllers.app_state_service import go
+from controllers.streamlit_runtime import get_streamlit_runtime, uses_roomflow_api
+from controllers.roomflow_api import ApiUnavailable
 from views.components.ui_components import esc, page_header
 
 # =========================================================
@@ -344,9 +346,27 @@ def dashboard(user: dict) -> None:
         "Sexta-feira, 21 de agosto de 2026",
     )
 
-    # Carregamento de dados
-    agenda_events = _get_demo_agenda_events()
-    changes_log = _get_demo_changes_log()
+    agenda_events: List[AgendaEvent] = []
+    changes_log: List[ChangeLog] = []
+    if uses_roomflow_api():
+        try:
+            runtime = get_streamlit_runtime()
+            reservations = runtime.reservations.list_participating()
+            notifications = runtime.notifications.inbox(unread_only=False, category=None, limit=4, offset=0)["items"]
+            for item in reservations:
+                start = datetime.fromisoformat(item["start"])
+                end = datetime.fromisoformat(item["end"])
+                agenda_events.append(AgendaEvent(
+                    id=item["id"], title=item["title"], start_time=f"{start:%H:%M}", end_time=f"{end:%H:%M}",
+                    space=item["space_name"], location=item["space_name"], color="#6D28D9",
+                    weekday=("Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom")[start.weekday()],
+                    formatted_date=f"{start:%d/%m}", event_date=start.date(),
+                ))
+            for item in notifications:
+                changes_log.append(ChangeLog(item["id"], item["title"], item["message"], None, None, item["category"]))
+        except ApiUnavailable as error:
+            st.error(str(error))
+            return
 
     # Banner Destaque (Próxima atividade)
     if agenda_events:
