@@ -4,10 +4,11 @@ from zoneinfo import ZoneInfo
 import streamlit as st
 
 from controllers.streamlit_runtime import get_streamlit_runtime, uses_persistent_runtime
+from controllers.runtime_errors import RuntimeUnavailable
 from models.domain.exceptions import DomainAuthorizationError, DuplicateResource, ResourceNotFound
 
 
-RESERVATION_ERRORS = (DomainAuthorizationError, DuplicateResource, ResourceNotFound, ValueError)
+RESERVATION_ERRORS = (DomainAuthorizationError, DuplicateResource, ResourceNotFound, RuntimeUnavailable, ValueError)
 
 
 def reservation_api():
@@ -37,7 +38,7 @@ def period_inputs(timezone, key, item=None):
     return datetime.combine(day, start_time, zone), datetime.combine(day, end_time, zone)
 
 
-def request_fields(rooms, start, end, key, item=None, justification_required=True, participants=None):
+def request_fields(rooms, start, end, key, item=None, justification_required=True, participants=None, eligible_participants=()):
     values = item or {}
     by_id = {room["id"]: room for room in rooms}
     ids = list(by_id)
@@ -53,11 +54,23 @@ def request_fields(rooms, start, end, key, item=None, justification_required=Tru
     if participants is None:
         participants = st.number_input("Participantes", min_value=1, max_value=10000,
                                        value=values.get("participants", 1), key=f"{key}_participants")
+    participants_by_id = {participant["id"]: participant for participant in eligible_participants}
+    selected_participants = st.multiselect(
+        "Participantes vinculados",
+        options=list(participants_by_id),
+        default=[participant_id for participant_id in values.get("participant_ids", []) if participant_id in participants_by_id],
+        format_func=lambda participant_id: f"{participants_by_id[participant_id]['name']} · {participants_by_id[participant_id]['email']}",
+        key=f"{key}_linked_participants",
+        placeholder="Pesquise participantes",
+    )
+    if len(selected_participants) > participants:
+        st.error("A quantidade de participantes vinculados não pode exceder o total informado.")
     label = "Justificativa" if justification_required else "Justificativa (opcional)"
     reason = st.text_area(label, value=values.get("justification") or "", max_chars=600, key=f"{key}_reason")
     return {
         "space_id": room_id or "", "title": title, "activity_type": activity,
         "start": start.isoformat(), "end": end.isoformat(), "participants": participants, "justification": reason,
+        "participant_ids": selected_participants,
     }
 
 
@@ -72,9 +85,11 @@ def edit_reservation(item):
         return
     try:
         catalog = api.catalog()
+        eligible_participants = api.eligible_participants()
+        item = api.detail_own(item["id"])
         with st.form("edit_reservation"):
             start, end = period_inputs(catalog["timezone"], "edit", item)
-            payload = request_fields(catalog["spaces"], start, end, "edit", item, catalog["justification_required"])
+            payload = request_fields(catalog["spaces"], start, end, "edit", item, catalog["justification_required"], eligible_participants=eligible_participants)
             payload["reason"] = st.text_area("Motivo da alteração (opcional)", max_chars=600, key="edit_change_reason")
             submitted = st.form_submit_button("Salvar alterações", type="primary")
         if submitted:

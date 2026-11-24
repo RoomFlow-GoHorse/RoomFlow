@@ -154,15 +154,32 @@ class ReservationController:
     def create(self, payload):
         return presentation(reservation_response(self.service.create(self.runtime.actor(), ReservationPayload(**payload).to_request())))
 
+    def eligible_participants(self):
+        return presentation([asdict(user) for user in self.service.eligible_participants(self.runtime.actor())])
+
     def list_own(self):
         return presentation([reservation_response(item) for item in self.service.list_own(self.runtime.actor())])
 
     def list_institution(self):
         return presentation([reservation_response(item) for item in self.service.list_institution(self.runtime.actor())])
 
+    def list_participating(self):
+        return presentation([reservation_response(item) for item in self.service.list_participating(self.runtime.actor())])
+
+    def participating_detail(self, reservation_id):
+        item, status = self.service.participating_detail(self.runtime.actor(), reservation_id)
+        return presentation({**reservation_response(item), 'participation_status': status})
+
+    def respond_participation(self, reservation_id, status):
+        item, status = self.service.respond_participation(self.runtime.actor(), reservation_id, status)
+        return presentation({**reservation_response(item), 'participation_status': status})
+
     def detail_own(self, reservation_id):
         item, history = self.service.detail_own(self.runtime.actor(), reservation_id)
-        return presentation({**reservation_response(item), 'history': [asdict(event) for event in history]})
+        actor = self.runtime.actor()
+        participants = self.service.participants(actor, reservation_id)
+        return presentation({**reservation_response(item), 'participant_ids': [link.user_id for link in participants],
+                             'history': [asdict(event) for event in history]})
 
     def detail(self, reservation_id):
         item, history = self.service.detail(self.runtime.actor(), reservation_id)

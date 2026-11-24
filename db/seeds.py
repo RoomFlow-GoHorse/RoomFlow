@@ -1,6 +1,7 @@
 """Centraliza a criação dos dados iniciais e de demonstração do PostgreSQL."""
 
 import argparse
+import os
 from datetime import datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
@@ -9,7 +10,6 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from config.constants import ROLE_LABELS
-from config.database import SessionLocal
 from controllers.password_service import hash_password
 from models.database_models import (
     ConflitoReserva,
@@ -36,11 +36,37 @@ def cadastrar_perfis(sessao: Session) -> None:
 
 
 def semear_perfis() -> None:
+    from config.database import SessionLocal
+
     with SessionLocal.begin() as sessao:
         cadastrar_perfis(sessao)
 
 
-def criar_contas(sessao: Session, instituicao_id: int, senha: str) -> dict[str, Usuario]:
+def _is_demo_seed_account(conta: Usuario, vinculo: UsuarioInstituicao | None, outros_vinculos: bool,
+                          perfil: str, rotulo: str) -> bool:
+    return (
+        conta.name == f"{rotulo} Demo"
+        and conta.role == perfil
+        and vinculo is not None
+        and vinculo.role == perfil
+        and not outros_vinculos
+    )
+
+
+def demo_passwords(environment: dict[str, str] | None = None) -> dict[str, str]:
+    environment = os.environ if environment is None else environment
+    names = {perfil: f"ROOMFLOW_DEMO_PASSWORD_{perfil.upper()}" for perfil in ROLE_LABELS}
+    supplied = {perfil: environment.get(name, "") for perfil, name in names.items()}
+    if any(supplied.values()):
+        missing = [names[perfil] for perfil, password in supplied.items() if not password]
+        if missing:
+            raise ValueError("Configure todas as senhas demo no ambiente: " + ", ".join(missing))
+        return supplied
+    # Backward compatibility for an explicitly requested legacy demo seed.
+    return {perfil: "123456789" for perfil in ROLE_LABELS}
+
+
+def criar_contas(sessao: Session, instituicao_id: int, senhas: dict[str, str]) -> dict[str, Usuario]:
     perfis = dict(sessao.execute(select(TipoUsuario.name, TipoUsuario.id)).all())
     contas = {}
     for numero, (perfil, rotulo) in enumerate(ROLE_LABELS.items(), start=1):
@@ -51,11 +77,25 @@ def criar_contas(sessao: Session, instituicao_id: int, senha: str) -> dict[str, 
             conta = sessao.scalar(
                 select(Usuario).where(Usuario.email == f"{perfil}@roomflow")
             )
+        if conta is not None:
+            vinculo = sessao.scalar(select(UsuarioInstituicao).where(
+                UsuarioInstituicao.user_id == conta.id,
+                UsuarioInstituicao.institution_id == instituicao_id,
+            ))
+            outros_vinculos = sessao.scalar(select(UsuarioInstituicao.id).where(
+                UsuarioInstituicao.user_id == conta.id,
+                UsuarioInstituicao.institution_id != instituicao_id,
+            ).limit(1)) is not None
+            if not _is_demo_seed_account(conta, vinculo, outros_vinculos, perfil, rotulo):
+                raise RuntimeError(
+                    f"A conta {email} já existe e não foi reconhecida como conta exclusiva de demonstração. "
+                    "Nenhuma senha ou dado dessa conta foi alterado."
+                )
         if conta is None:
             conta = Usuario(
                 name=f"{rotulo} Demo",
                 email=email,
-                password_hash=hash_password(senha),
+                password_hash=hash_password(senhas[perfil]),
                 role=perfil,
                 tipo_usuario_id=perfis[perfil],
             )
@@ -64,7 +104,7 @@ def criar_contas(sessao: Session, instituicao_id: int, senha: str) -> dict[str, 
         else:
             conta.name = f"{rotulo} Demo"
             conta.email = email
-            conta.password_hash = hash_password(senha)
+            conta.password_hash = hash_password(senhas[perfil])
             conta.role = perfil
             conta.tipo_usuario_id = perfis[perfil]
             conta.status = "ativo"
@@ -153,7 +193,10 @@ def criar_agenda(sessao: Session, sala: Espaco, contas: dict[str, Usuario]) -> N
         )
 
 
-def semear_demo(senha: str) -> str:
+def semear_demo(senhas: dict[str, str] | None = None) -> str:
+    from config.database import SessionLocal
+
+    senhas = senhas or {perfil: "123456789" for perfil in ROLE_LABELS}
     with SessionLocal.begin() as sessao:
         cadastrar_perfis(sessao)
         instituicao_id = sessao.scalar(
@@ -176,7 +219,7 @@ def semear_demo(senha: str) -> str:
             if instituicao_id is None:
                 raise RuntimeError("Não foi possível localizar ou criar a instituição de demonstração.")
 
-        contas = criar_contas(sessao, instituicao_id, senha)
+        contas = criar_contas(sessao, instituicao_id, senhas)
         if not instituicao_nova:
             return "contas"
 
@@ -228,8 +271,7 @@ def main() -> None:
     args = parser.parse_args()
 
     if args.demo:
-        senha = "123456789"
-        resultado = semear_demo(senha)
+        resultado = semear_demo(demo_passwords())
         if resultado == "demo":
             print("Perfis e dados de demonstração cadastrados na Faculdade unisapiens.")
         elif resultado == "contas":

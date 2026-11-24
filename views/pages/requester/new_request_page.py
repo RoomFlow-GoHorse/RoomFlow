@@ -13,6 +13,7 @@ def new_reservation(user):
 
     try:
         settings = api.catalog()
+        eligible_participants = api.eligible_participants()
         timezone = settings["timezone"]
         start, end = period_inputs(timezone, "new_reservation")
         st.caption(f"Fuso horário das reservas: {timezone}")
@@ -45,6 +46,7 @@ def new_reservation(user):
         payload = request_fields(
             eligible, start, end, "new_reservation",
             justification_required=settings["justification_required"], participants=participants,
+            eligible_participants=eligible_participants,
         )
         submitted = st.form_submit_button("Solicitar reserva", type="primary")
     if submitted:

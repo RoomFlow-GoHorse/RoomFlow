@@ -114,6 +114,14 @@ class PostgresIntegrationTests(unittest.TestCase):
         self.assertEqual(created.status_code, 201, created.text)
         return self.login(email)
 
+    def _participant_login(self, admin):
+        email = f"{secrets.token_hex(5)}@example.test"
+        created = self.client.post("/admin/users", headers=admin, json={
+            "name": "Participante Teste", "email": email, "password": PASSWORD, "profile": "participante",
+        })
+        self.assertEqual(created.status_code, 201, created.text)
+        return self.login(email)
+
     @staticmethod
     def _reservation_payload(room):
         start = (datetime.now(ZoneInfo("America/Sao_Paulo")) + timedelta(days=3)).replace(
@@ -125,6 +133,45 @@ class PostgresIntegrationTests(unittest.TestCase):
             "start": start.isoformat(), "end": end.isoformat(), "participants": 20,
             "justification": "Atividade com a turma",
         }
+
+    def test_reservation_participants_are_isolated_and_can_respond(self):
+        own, _ = self.register()
+        other, _ = self.register()
+        admin = self.headers(self.login(own["responsible_email"]))
+        foreign_admin = self.headers(self.login(other["responsible_email"]))
+        requester = self.headers(self._requester_login(admin))
+        participant_login = self._participant_login(admin)
+        participant = self.headers(participant_login)
+        foreign_participant = self.headers(self._participant_login(foreign_admin))
+        room = self._structure_room(admin, "Sala com participantes")
+
+        eligible = self.client.get("/reservations/participants", headers=requester)
+        self.assertEqual(eligible.status_code, 200, eligible.text)
+        participant_id = participant_login.json()["data"]["user"]["id"]
+        self.assertIn(participant_id, [item["id"] for item in eligible.json()["data"]])
+
+        payload = {**self._reservation_payload(room), "participant_ids": [participant_id]}
+        created = self.client.post("/reservations", headers=requester, json=payload)
+        self.assertEqual(created.status_code, 201, created.text)
+        reservation_id = created.json()["data"]["id"]
+
+        self.assertEqual(self.client.post("/reservations", headers=requester, json={
+            **payload, "title": "Duplicada", "participant_ids": [participant_id, participant_id],
+        }).status_code, 422)
+        self.assertEqual(self.client.get("/reservations/participating", headers=foreign_participant)
+                         .json()["data"], [])
+        linked = self.client.get("/reservations/participating", headers=participant)
+        self.assertEqual([item["id"] for item in linked.json()["data"]], [reservation_id])
+
+        detail = self.client.get(f"/reservations/participating/{reservation_id}", headers=participant)
+        self.assertEqual(detail.status_code, 200, detail.text)
+        self.assertEqual(detail.json()["data"]["participation_status"], "pendente")
+        self.assertEqual(self.client.patch(f"/reservations/participating/{reservation_id}", headers=foreign_participant,
+                                           json={"status": "confirmada"}).status_code, 404)
+        confirmed = self.client.patch(f"/reservations/participating/{reservation_id}", headers=participant,
+                                      json={"status": "confirmada"})
+        self.assertEqual(confirmed.status_code, 200, confirmed.text)
+        self.assertEqual(confirmed.json()["data"]["participation_status"], "confirmada")
 
     def test_reservations_are_scoped_validated_and_persisted(self):
         own, _ = self.register()

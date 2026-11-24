@@ -1,0 +1,52 @@
+# Implementação: solicitante e participante
+
+## Diagnóstico inicial
+
+- Branch: `fix/integração_SolicitanteParticipante`.
+- A API seleciona persistência PostgreSQL somente com `ROOMFLOW_PERSISTENCE=postgres`.
+- Reservas já possuem CRUD, histórico, validações de período, capacidade e conflitos.
+- Não existe vínculo persistido entre uma reserva e seus participantes: a quantidade atual é apenas um número previsto.
+- O participante não dispõe de consulta de reservas vinculadas; dashboard e agenda usam dados locais de demonstração.
+- Notificações de reserva alcançam solicitante e revisores, não participantes vinculados.
+- `requirements.txt` declarava `httpx2`, embora o cliente importe `httpx`; a dependência foi corrigida antes deste plano.
+
+## Plano
+
+1. Corrigir os mocks de disponibilidade para `httpx` e registrar a linha de base de testes.
+2. Adicionar persistência N:N reserva–participante, migração e contratos de domínio.
+3. Integrar criação, edição, leitura e cancelamento de reservas aos vínculos, de forma atômica.
+4. Expor consultas e respostas de participação autenticadas e restritas ao vínculo.
+5. Entregar notificações aos participantes e substituir dados demonstrativos das telas participantes/agenda por API.
+6. Cobrir os fluxos em testes; validar PostgreSQL somente em banco isolado configurado por `ROOMFLOW_TEST_DATABASE`.
+
+## Limitações conhecidas
+
+- `ROOMFLOW_TEST_DATABASE` não está configurado neste ambiente; migrations e testes PostgreSQL destrutivos não serão executados contra o banco local.
+- Cada alteração será testada e registrada abaixo antes do próximo item.
+
+## Registro de execução
+
+| Etapa | Resultado | Testes | Commit |
+| --- | --- | --- | --- |
+| Diagnóstico | Concluído | `127` executados: `124` aprovados, `27` ignorados, `2` erros e `1` falha nos mocks `httpx2` | — |
+| Compatibilidade `httpx` | Concluída | `tests.test_api_availability`: 3 aprovados | Pendente |
+| Modelo e migration de participantes | Concluída | Compilação Python; validação PostgreSQL pendente de banco isolado | Pendente |
+| Repositório de participantes | Concluída | Compilação Python; validação PostgreSQL pendente de banco isolado | Pendente |
+| Serviço/API de vínculos na reserva | Concluída | `tests.test_api`: 9 aprovados; testes PostgreSQL: 27 ignorados sem banco isolado | Pendente |
+| Consulta e resposta do participante | Concluída | Compilação Python; validação PostgreSQL pendente de banco isolado | Pendente |
+| Notificações para participantes | Concluída | Compilação Python; validação PostgreSQL pendente de banco isolado | Pendente |
+| Dashboard do participante por API | Concluída | Compilação Python; preserva os componentes visuais existentes | Pendente |
+| Agenda compartilhada por API | Concluída | Compilação Python; preserva os componentes visuais existentes | Pendente |
+| Regressão sem PostgreSQL | Concluída | `127` testes aprovados; `27` PostgreSQL ignorados por ausência de `ROOMFLOW_TEST_DATABASE` | Pendente |
+| Seleção de participantes | Concluída | Compilação Python; `tests.test_api` e `tests.test_api_availability`: 12 aprovados | Pendente |
+| Integração real de agenda, dashboard e Localizar | Concluída | Compilação Python; 16 testes de API/persistência aprovados; removidos dados demonstrativos inativos da agenda | Pendente |
+| Integração PostgreSQL de participantes | Implementada; execução pendente | Cobre isolamento institucional, consulta, duplicidade e confirmação; 28 testes PostgreSQL ignorados sem `ROOMFLOW_TEST_DATABASE` | Pendente |
+| Resposta visual de participação | Concluída | Dashboard chama o endpoint autenticado de confirmação/recusa somente para vínculos pendentes | Pendente |
+
+## Aplicação da migration
+
+Com o `.env` apontando para o banco local desejado, aplique a revisão com:
+
+```powershell
+.\.venv\Scripts\python.exe -m alembic upgrade head
+```

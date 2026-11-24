@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import distinct, func, select
+from sqlalchemy import distinct, func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import aliased
 
@@ -8,10 +8,10 @@ from application.ports.reservation_dashboard_query import ReservationDashboardMe
 from infrastructure.persistence.records import reservation_history
 from infrastructure.persistence.transaction import PostgresTransaction
 from infrastructure.persistence.user_mapping import to_database_identity_id
-from models.database_models import ConflitoReserva, Espaco, Reserva, Usuario
+from models.database_models import ConflitoReserva, Espaco, Reserva, ReservaParticipante, Usuario
 from models.domain.entities.reservation import (
     EDITABLE, Reservation, ReservationDetails, ReservationHistoryAction, ReservationHistoryEvent,
-    ReservationPeriod, ReservationRequest, ReservationStatus,
+    ReservationParticipant, ReservationPeriod, ReservationRequest, ReservationStatus,
 )
 from models.domain.exceptions import DuplicateResource, ResourceNotFound
 from models.domain.entities.reservation_conflict import ConflictStatus
@@ -56,6 +56,60 @@ class PostgresReservationRepository:
         with self._transaction.session() as session:
             statement = self._listing(institution_id, requester_id).order_by(Reserva.inicio.desc(), Reserva.id.desc())
             return [self._details(row) for row in session.execute(statement)]
+
+    def list_for_participant(self, institution_id: str, participant_id: str) -> list[ReservationDetails]:
+        with self._transaction.session() as session:
+            statement = self._listing(institution_id).join(
+                ReservaParticipante,
+                (ReservaParticipante.reserva_id == Reserva.id)
+                & (ReservaParticipante.instituicao_id == Reserva.instituicao_id),
+            ).where(ReservaParticipante.usuario_id == to_database_identity_id(participant_id)).order_by(
+                Reserva.inicio.desc(), Reserva.id.desc(),
+            )
+            return [self._details(row) for row in session.execute(statement)]
+
+    def participants(self, institution_id: str, reservation_id: str) -> list[ReservationParticipant]:
+        with self._transaction.session() as session:
+            rows = session.execute(
+                select(ReservaParticipante, Usuario).join(Usuario, Usuario.id == ReservaParticipante.usuario_id).where(
+                    ReservaParticipante.instituicao_id == to_database_identity_id(institution_id),
+                    ReservaParticipante.reserva_id == to_database_identity_id(reservation_id, bits=64),
+                ).order_by(Usuario.name, Usuario.id)
+            )
+            return [ReservationParticipant(str(link.usuario_id), user.name, user.email, link.status, link.criado_em, link.respondido_em)
+                    for link, user in rows]
+
+    def participation_status(self, institution_id: str, reservation_id: str, participant_id: str) -> str | None:
+        with self._transaction.session() as session:
+            return session.scalar(select(ReservaParticipante.status).where(
+                ReservaParticipante.instituicao_id == to_database_identity_id(institution_id),
+                ReservaParticipante.reserva_id == to_database_identity_id(reservation_id, bits=64),
+                ReservaParticipante.usuario_id == to_database_identity_id(participant_id),
+            ))
+
+    def set_participation_status(self, institution_id, reservation_id, participant_id, status, responded_at) -> bool:
+        with self._transaction.session() as session:
+            result = session.execute(update(ReservaParticipante).where(
+                ReservaParticipante.instituicao_id == to_database_identity_id(institution_id),
+                ReservaParticipante.reserva_id == to_database_identity_id(reservation_id, bits=64),
+                ReservaParticipante.usuario_id == to_database_identity_id(participant_id),
+            ).values(status=status, respondido_em=responded_at, atualizado_em=responded_at))
+            return result.rowcount == 1
+
+    def replace_participants(self, institution_id: str, reservation_id: str, participant_ids: frozenset[str]) -> None:
+        with self._transaction.session() as session:
+            reservation = to_database_identity_id(reservation_id, bits=64)
+            institution = to_database_identity_id(institution_id)
+            session.query(ReservaParticipante).filter(
+                ReservaParticipante.instituicao_id == institution, ReservaParticipante.reserva_id == reservation,
+            ).delete(synchronize_session=False)
+            for participant_id in participant_ids:
+                session.add(ReservaParticipante(instituicao_id=institution, reserva_id=reservation,
+                                                usuario_id=to_database_identity_id(participant_id)))
+            try:
+                session.flush()
+            except IntegrityError as exc:
+                raise DuplicateResource("Os participantes informados não são válidos para esta instituição.") from exc
 
     def list_for_period(
         self, institution_id: str, period: ReservationPeriod, space_ids: frozenset[str],

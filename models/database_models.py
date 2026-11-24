@@ -250,6 +250,36 @@ class Reserva(Base):
     criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+class ReservaParticipante(Base):
+    __tablename__ = "reserva_participantes"
+    __table_args__ = (
+        UniqueConstraint("reserva_id", "usuario_id", name="uq_reserva_participantes_reserva_usuario"),
+        ForeignKeyConstraint(
+            ["instituicao_id", "reserva_id"], ["reservas.instituicao_id", "reservas.id"],
+            name="fk_reserva_participantes_reserva",
+            ondelete="CASCADE",
+        ),
+        ForeignKeyConstraint(
+            ["usuario_id", "instituicao_id"], ["usuario_instituicao.user_id", "usuario_instituicao.institution_id"],
+            name="fk_reserva_participantes_usuario",
+        ),
+        Index("ix_reserva_participantes_usuario", "instituicao_id", "usuario_id"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    instituicao_id: Mapped[int]
+    reserva_id: Mapped[int] = mapped_column(BigInteger)
+    usuario_id: Mapped[int]
+    status: Mapped[str] = mapped_column(
+        Enum("pendente", "confirmada", "recusada", name="status_participacao_reserva", native_enum=False,
+             create_constraint=True),
+        server_default="pendente",
+    )
+    criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    atualizado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    respondido_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
 class ConflitoReserva(Base):
     __tablename__ = "conflitos"
     __table_args__ = (

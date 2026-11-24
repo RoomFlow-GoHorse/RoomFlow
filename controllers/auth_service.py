@@ -31,6 +31,17 @@ def login(email, password, institution_id=None):
         return None, "Muitas tentativas de login. Aguarde um minuto e tente novamente."
     except (RuntimeUnavailable, ValueError) as exc:
         return None, str(exc)
+    except Exception as exc:
+        # Streamlit can retain cached services while reloading modules. In that
+        # case the exception class may have the same canonical name but a
+        # different identity from this script run's imported class.
+        error_type = type(exc)
+        if (
+            error_type.__name__ == InvalidCredentials.__name__
+            and error_type.__module__ == InvalidCredentials.__module__
+        ):
+            return None, "E-mail ou senha incorretos. Verifique seus dados e tente novamente."
+        raise
 
     st.session_state.pop("login_institutions", None)
     account = result.user

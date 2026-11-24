@@ -9,13 +9,15 @@ from application.ports.conflict_repository import ConflictRepository
 from application.ports.institution_repository import InstitutionRepository
 from application.ports.reservation_repository import ReservationRepository
 from application.ports.space_repository import SpaceRepository
+from application.ports.user_repository import UserRepository
 from application.services.notification_service import NotificationService
 from models.domain.entities.institution import Institution
 from models.domain.entities.permission import Permission
 from models.domain.entities.profile import Profile
 from models.domain.entities.reservation import (
     EDITABLE, REVIEW_DECISIONS, Reservation, ReservationDetails, ReservationHistoryAction,
-    ReservationHistoryEvent, ReservationPeriod, ReservationRequest, ReservationStatus, review_decisions,
+    ReservationHistoryEvent, ReservationParticipant, ReservationPeriod, ReservationRequest,
+    ReservationStatus, review_decisions,
 )
 from models.domain.entities.space import Space
 from models.domain.entities.user import User
@@ -55,7 +57,7 @@ class ReservationService:
         atomic: Callable[[], AbstractContextManager],
         current_actor: Callable[[User], User],
         conflicts: ConflictRepository,
-        notifications: NotificationService,
+        notifications: NotificationService, users: UserRepository | None = None,
     ) -> None:
         self._repository = repository
         self._spaces = spaces
@@ -65,6 +67,7 @@ class ReservationService:
         self._current_actor = current_actor
         self._conflicts = conflicts
         self._notifications = notifications
+        self._users = users
         self._permissions = PermissionPolicy()
 
     def catalog(self, actor: User, period: ReservationPeriod | None = None) -> tuple[Institution, list[Space]]:
@@ -126,6 +129,7 @@ class ReservationService:
                 "", institution.id, actor.id, request, status, now,
                 reviewed_at=now if status is ReservationStatus.APPROVED else None,
             ))
+            self._replace_participants(institution.id, result.reservation, request.participant_ids or frozenset())
             self._record_event(result.reservation, ReservationHistoryEvent(
                 ReservationHistoryAction.CREATE, None, ReservationStatus.PENDING, now,
                 actor.id, actor.name, request.justification,
@@ -158,7 +162,59 @@ class ReservationService:
                 current, request=request, status=ReservationStatus.IN_REVIEW,
                 reviewed_by=None, reviewed_at=None, decision_reason=None,
             )
-            return self._save_change(actor, current, updated, ReservationHistoryAction.EDIT, now, reason)
+            result = self._save_change(actor, current, updated, ReservationHistoryAction.EDIT, now, reason)
+            if request.participant_ids is not None:
+                self._replace_participants(institution.id, result.reservation, request.participant_ids)
+            return result
+
+    def eligible_participants(self, actor: User) -> list[User]:
+        institution = self._institution(actor, Permission.CREATE_RESERVATION)
+        if self._users is None:
+            return []
+        return [account.user for account in self._users.list_by_institution(institution.id)
+                if account.user.is_active and account.user.profile is Profile.PARTICIPANT]
+
+    def participants(self, actor: User, reservation_id: str) -> list[ReservationParticipant]:
+        details, _ = self.detail_own(actor, reservation_id)
+        return self._repository.participants(details.reservation.institution_id, reservation_id)
+
+    def list_participating(self, actor: User) -> list[ReservationDetails]:
+        scope = self._permissions.authorize_listing(actor, Permission.VIEW_PARTICIPANT_DASHBOARD)
+        return self._repository.list_for_participant(scope, actor.id)
+
+    def participating_detail(self, actor: User, reservation_id: str) -> tuple[ReservationDetails, str]:
+        scope = self._permissions.authorize_listing(actor, Permission.VIEW_PARTICIPANT_DASHBOARD)
+        details = self._repository.find(scope, reservation_id)
+        if details is None:
+            raise ResourceNotFound("Reserva não encontrada.")
+        status = self._repository.participation_status(scope, reservation_id, actor.id)
+        if status is None:
+            raise ResourceNotFound("Reserva não encontrada.")
+        return details, status
+
+    def respond_participation(self, actor: User, reservation_id: str, status: str) -> tuple[ReservationDetails, str]:
+        if status not in {"confirmada", "recusada"}:
+            raise ValueError("Resposta de participação inválida.")
+        details, _ = self.participating_detail(actor, reservation_id)
+        if details.reservation.status is ReservationStatus.CANCELLED:
+            raise DuplicateResource("Não é possível responder a uma reserva cancelada.")
+        if not self._repository.set_participation_status(
+            details.reservation.institution_id, reservation_id, actor.id, status, self._clock.now(),
+        ):
+            raise ResourceNotFound("Reserva não encontrada.")
+        return details, status
+
+    def _replace_participants(self, institution_id: str, reservation: Reservation, participant_ids: frozenset[str]) -> None:
+        if not participant_ids:
+            self._repository.replace_participants(institution_id, reservation.id, participant_ids)
+            return
+        if self._users is None:
+            raise ValueError("Participantes exigem persistência institucional.")
+        for participant_id in participant_ids:
+            account = self._users.find_by_id(participant_id, institution_id)
+            if account is None or not account.user.is_active or account.user.profile is not Profile.PARTICIPANT:
+                raise ValueError("Participante informado não está ativo nesta instituição.")
+        self._repository.replace_participants(institution_id, reservation.id, participant_ids)
 
     def cancel(self, actor: User, reservation_id: str, reason: str | None = None) -> ReservationDetails:
         with self._atomic():

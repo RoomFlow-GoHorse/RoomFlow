@@ -26,6 +26,9 @@ def database_url():
     missing = [name for name in required if not os.getenv(name)]
     if missing:
         raise RuntimeError(f"Configure no .env: {', '.join(missing)}")
+    query = {}
+    if sslmode := os.getenv("DB_SSLMODE", "").strip():
+        query["sslmode"] = sslmode
     return URL.create(
         "postgresql+psycopg",
         username=os.environ["DB_USERNAME"],
@@ -33,10 +36,29 @@ def database_url():
         host=os.environ["DB_HOST"],
         port=int(os.environ["DB_PORT"]),
         database=os.environ["DB_NAME"],
+        query=query,
     )
 
 
+def _positive_int(name: str, default: int) -> int:
+    value = os.getenv(name, "").strip()
+    if not value:
+        return default
+    try:
+        parsed = int(value)
+    except ValueError:
+        raise RuntimeError(f"{name} deve ser um número inteiro positivo.") from None
+    if parsed < 1:
+        raise RuntimeError(f"{name} deve ser maior que zero.")
+    return parsed
+
+
+connect_args = {"connect_timeout": _positive_int("DB_CONNECT_TIMEOUT", 5)}
+if sslmode := os.getenv("DB_SSLMODE", "").strip():
+    connect_args["sslmode"] = sslmode
+
 engine = create_engine(
-    database_url(), pool_pre_ping=True, connect_args={"connect_timeout": 5}, hide_parameters=True,
+    database_url(), pool_pre_ping=True, pool_size=_positive_int("DB_POOL_SIZE", 5),
+    max_overflow=_positive_int("DB_MAX_OVERFLOW", 10), connect_args=connect_args, hide_parameters=True,
 )
 SessionLocal = sessionmaker(bind=engine)

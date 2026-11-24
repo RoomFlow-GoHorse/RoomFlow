@@ -1,5 +1,7 @@
 from controllers.operation_presenters import reservation_response
-from controllers.operation_payloads import ReservationPayload, DecisionPayload, ReservationEditPayload, CancellationPayload
+from controllers.operation_payloads import (
+    ReservationPayload, DecisionPayload, ReservationEditPayload, CancellationPayload, ParticipationPayload,
+)
 from dataclasses import asdict
 from datetime import datetime
 
@@ -54,6 +56,29 @@ def create(
     return {"data": reservation_response(run_reservation_action(lambda: service.create(actor, payload.to_request())))}
 
 
+@router.get("/participants")
+def eligible_participants(actor: User = Depends(get_current_user), service: ReservationService = Depends(get_service)):
+    return {"data": [{"id": user.id, "name": user.name, "email": user.email}
+                     for user in run_reservation_action(lambda: service.eligible_participants(actor))]}
+
+
+@router.get("/participating")
+def participating(actor: User = Depends(get_current_user), service: ReservationService = Depends(get_service)):
+    return {"data": [reservation_response(item) for item in run_reservation_action(lambda: service.list_participating(actor))]}
+
+
+@router.get("/participating/{reservation_id}")
+def participating_detail(reservation_id: str, actor: User = Depends(get_current_user), service: ReservationService = Depends(get_service)):
+    details, status = run_reservation_action(lambda: service.participating_detail(actor, reservation_id))
+    return {"data": {**reservation_response(details), "participation_status": status}}
+
+
+@router.patch("/participating/{reservation_id}")
+def respond_participation(reservation_id: str, payload: ParticipationPayload, actor: User = Depends(get_current_user), service: ReservationService = Depends(get_service)):
+    details, status = run_reservation_action(lambda: service.respond_participation(actor, reservation_id, payload.status))
+    return {"data": {**reservation_response(details), "participation_status": status}}
+
+
 @router.get("/mine")
 def list_own(actor: User = Depends(get_current_user), service: ReservationService = Depends(get_service)):
     return {"data": [reservation_response(item) for item in run_reservation_action(lambda: service.list_own(actor))]}
@@ -71,7 +96,11 @@ def detail_own(
 ):
     item, history = run_reservation_action(lambda: service.detail_own(actor, reservation_id))
     response.headers["Cache-Control"] = "private, no-store"
-    return {"data": {**reservation_response(item), "history": [asdict(event) for event in history]}}
+    return {"data": {
+        **reservation_response(item),
+        "participant_ids": [participant.user_id for participant in service.participants(actor, reservation_id)],
+        "history": [asdict(event) for event in history],
+    }}
 
 
 @router.get("/{reservation_id}")

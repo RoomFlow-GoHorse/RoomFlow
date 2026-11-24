@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from models.domain.entities.reservation import Reservation, ReservationDetails, ReservationHistoryEvent, ReservationPeriod
+from models.domain.entities.reservation import Reservation, ReservationDetails, ReservationHistoryEvent, ReservationParticipant, ReservationPeriod
 
 
 class ReservationRepository(Protocol):
@@ -27,6 +27,16 @@ class ReservationRepository(Protocol):
     ) -> tuple[ReservationDetails, list[ReservationHistoryEvent]] | None: ...
 
     def append_history(self, reservation: Reservation, event: ReservationHistoryEvent) -> None: ...
+
+    def replace_participants(self, institution_id: str, reservation_id: str, participant_ids: frozenset[str]) -> None: ...
+
+    def participants(self, institution_id: str, reservation_id: str) -> list[ReservationParticipant]: ...
+
+    def list_for_participant(self, institution_id: str, participant_id: str) -> list[ReservationDetails]: ...
+
+    def participation_status(self, institution_id: str, reservation_id: str, participant_id: str) -> str | None: ...
+
+    def set_participation_status(self, institution_id: str, reservation_id: str, participant_id: str, status: str, responded_at) -> bool: ...
 
     def overlapping_spaces(
         self, institution_id: str, period: ReservationPeriod, *,

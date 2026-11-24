@@ -85,7 +85,41 @@ http://localhost:8501
 
 ## Executando com PostgreSQL
 
-### Streamlit Community Cloud + Supabase (sem API separada)
+### Supabase compartilhado do grupo
+
+Todos os integrantes devem usar a URI do mesmo projeto PostgreSQL Supabase já
+criado pelo grupo. Solicite ao responsável a URI do banco para o ambiente de
+execução e confirme que o projeto é o ambiente acadêmico autorizado. Obtenha a
+URI em **Supabase Dashboard → Connect**; copie a opção adequada ao tipo de rede
+e use a string exatamente como fornecida. Para redes IPv4, o pooler compartilhado
+em modo **Session** é uma opção compatível; use conexão direta quando a rede
+suportar o endpoint. Consulte a [documentação de conexão do Supabase](https://supabase.com/docs/guides/database/connecting-to-postgres)
+para escolher o modo e ativar SSL.
+
+No `.env` privado de cada computador, configure:
+
+```dotenv
+APP_ENV=production
+ROOMFLOW_PERSISTENCE=postgres
+DATABASE_URL=<URI PostgreSQL compartilhada fornecida pelo grupo>
+```
+
+Substitua o texto entre sinais pela URI privada do painel e codifique caracteres
+reservados da senha. Se o responsável indicar SSL obrigatório e a URI não tiver
+`sslmode`, configure também `DB_SSLMODE=require`. `DATABASE_URL` tem precedência
+sobre os campos `DB_*`. Não envie a URI pelo Git, README, `.env.example` ou chat.
+
+Depois de configurar a URI:
+
+```powershell
+streamlit run main.py
+```
+
+O Streamlit usa controllers e serviços locais; os repositórios abrem sessões no
+PostgreSQL compartilhado. Os computadores configurados com a mesma URI, o mesmo
+esquema e vínculos institucionais consultam os mesmos dados.
+
+### Streamlit Community Cloud + Supabase
 
 Em **App settings → Secrets** do Streamlit, configure as chaves na raiz do TOML:
 
@@ -95,25 +129,51 @@ ROOMFLOW_PERSISTENCE = "postgres"
 DATABASE_URL = "postgresql+psycopg://USUARIO:SENHA@HOST-DO-POOLER:5432/postgres"
 ```
 
-Use a conexão real do Supabase nesse campo privado e codifique caracteres especiais
-da senha na URL. Não publique o `.env` no Git. Remova `ROOMFLOW_API_URL`, que não é usada pelo Streamlit. O `.env` local não é enviado ao Community Cloud.
+Use a URI compartilhada do grupo nesse campo privado e codifique caracteres
+reservados da senha na URL. Não publique o `.env` no Git. O `.env` local não é
+enviado ao Community Cloud.
 
 O Streamlit chama controllers locais e os serviços do runtime PostgreSQL no
 mesmo processo. Não usa HTTP interno, ASGI, Uvicorn ou `ROOMFLOW_API_URL`.
 O runtime valida a conexão e o esquema antes de exibir os formulários; uma falha
 interrompe a operação com erro explícito, sem fallback para memória.
 
+### Arquivos e imagens
+
+Plantas de andares e posições de salas são persistidas no PostgreSQL; os bytes
+das plantas ficam em `arquivos_planta`, portanto acompanham o banco compartilhado.
+Logos e demais arquivos em `assets/` fazem parte do código implantado. A foto de
+perfil ainda não está conectada a um armazenamento: o seletor atual não grava nem
+exibe a imagem, e o modelo de usuário não tem campo de foto. Não há bucket ou
+credencial do Supabase Storage configurado neste repositório. Antes de habilitar
+fotos, confirme com o grupo se já existe um bucket autorizado e receba o nome,
+políticas e credencial de servidor por um canal privado; se não existir, será
+necessário aprovar a estratégia de armazenamento e a migration correspondente.
+
 ### Execução local
 
-Preencha `.env` conforme `.env.example`. `DATABASE_URL` tem precedência sobre
+Configure `DATABASE_URL` com a URI privada do Supabase compartilhado, conforme
+acima. O template não seleciona `localhost`; se a URI estiver ausente, a conexão
+deve falhar explicitamente na inicialização. `DATABASE_URL` tem precedência sobre
 os cinco campos `DB_*`; o carregamento não sobrescreve variáveis do ambiente.
-O PostgreSQL é o padrão em todos os ambientes. Uma demonstração exige tanto
-`APP_ENV=development` (ou `test`) quanto `ROOMFLOW_PERSISTENCE=memory`.
 
-Depois de conferir o banco de destino, aplique as migrations existentes:
+Use `DB_*` somente em um ambiente separado de desenvolvimento local ou teste.
+A demonstração em memória exige `APP_ENV=development` (ou `test`) e
+`ROOMFLOW_PERSISTENCE=memory`; ela não compartilha dados.
 
-```bash
-python -m alembic upgrade head
+Antes de iniciar com um banco compartilhado, confira o head local e a revisão
+atual do banco:
+
+```powershell
+python -m alembic heads
+python -m alembic current
+```
+
+Se houver revisão pendente no Supabase, combine a janela, backup e autorização
+com o responsável antes de aplicar migrations. Use `upgrade head` apenas em um
+banco local isolado ou após essa aprovação e a análise do impacto. Depois, inicie:
+
+```powershell
 streamlit run main.py
 ```
 
@@ -144,10 +204,14 @@ Use **Criar conta → Cadastrar instituição** para criar a primeira instituiç
 o administrador. O cadastro registra o perfil necessário no catálogo, junto com
 a conta e o vínculo. Para inserir os perfis manualmente, execute
 `python -m db.seeds`; para criar também a instituição e os dados de
-demonstração, execute `python -m db.seeds --demo`. As quatro contas de
-demonstração recebem a senha `123456789`. Se a instituição com o CNPJ reservado
-para a demo já existir, o seed cria ou atualiza essas contas e seus vínculos,
-sem duplicar os demais dados de demonstração.
+demonstração, execute `python -m db.seeds --demo` somente em um banco acadêmico
+autorizado. A senha legada é `123456789`; para senhas separadas, configure
+`ROOMFLOW_DEMO_PASSWORD_ADMIN`, `ROOMFLOW_DEMO_PASSWORD_GERENTE`,
+`ROOMFLOW_DEMO_PASSWORD_SOLICITANTE` e
+`ROOMFLOW_DEMO_PASSWORD_PARTICIPANTE` no ambiente do processo. A seed só altera
+contas identificadas como demos exclusivas; ela interrompe a transação ao
+encontrar um e-mail que pertença a uma conta não reconhecida como demo. Revise o
+destino antes de executá-la e nunca use senhas previsíveis em produção pública.
 
 Confirmação de e-mail e recuperação de senha usam SMTP com TLS implícito.
 Configure `ROOMFLOW_SMTP_HOST`, `ROOMFLOW_SMTP_PORT` (padrão 465),

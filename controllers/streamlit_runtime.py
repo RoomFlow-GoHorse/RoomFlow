@@ -15,7 +15,7 @@ PERSISTENT_PAGES = frozenset({
     "admin_dashboard", "usuarios", "historico_admin", "configuracoes_instituicao",
     "permissoes", "planta_instituicao", "espacos", "conta",
     "nova_reserva", "minhas_reservas", "gerente_reservas", "gerente_conflitos",
-    "gerente_dashboard", "ocupacao", "notificacoes",
+    "gerente_dashboard", "ocupacao", "notificacoes", "participante_dashboard", "agenda", "localizar",
 })
 
 LOGGER = logging.getLogger(__name__)
@@ -26,6 +26,11 @@ def uses_persistent_runtime() -> bool:
         return persistence_mode() == "postgres"
     except ValueError as exc:
         raise RuntimeUnavailable(str(exc)) from None
+
+
+def uses_roomflow_api() -> bool:
+    """Compatibility for pages integrated before Streamlit moved to local services."""
+    return uses_persistent_runtime()
 
 
 @st.cache_resource

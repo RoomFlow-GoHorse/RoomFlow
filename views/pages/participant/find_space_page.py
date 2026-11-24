@@ -1,7 +1,8 @@
 import streamlit as st
 
-from controllers import mock_data_service
 from controllers.app_state_service import boot_state
+from controllers.roomflow_api import ApiUnavailable
+from controllers.streamlit_runtime import get_streamlit_runtime, uses_roomflow_api
 from views.components.ui_components import badge, esc, page_header
 
 
@@ -169,24 +170,55 @@ def localizar(user: dict):
     boot_state()
     _render_styles()
 
-    b_list = mock_data_service.buildings()
-    buildings = [b["name"] for b in b_list] if b_list else ["Bloco A"]
+    b_list = []
+    f_list_by_building = {}
+    all_spaces = []
+    if uses_roomflow_api():
+        try:
+            runtime = get_streamlit_runtime()
+            b_list = [
+                {"id": item.id, "name": item.name}
+                for item in runtime.space_management.list_buildings(None)
+            ]
+            for building in b_list:
+                f_list_by_building[building["id"]] = [
+                    {"id": item.id, "name": item.name}
+                    for item in runtime.space_management.list_floors(None, building["id"])
+                ]
+            all_spaces = [
+                {
+                    "id": item.id, "name": item.name, "building": item.building,
+                    "floor": item.floor, "location": item.location, "type": item.type,
+                    "capacity": item.capacity, "status": item.status,
+                }
+                for item in runtime.space_management.list_spaces(None)
+            ]
+        except ApiUnavailable as error:
+            st.error(str(error))
+
+    buildings = [b["name"] for b in b_list]
+    if not buildings:
+        page_header("Localizar espaço", "Encontre uma sala no mapa e veja como chegar até ela.")
+        st.info("Nenhum prédio disponível para consulta.")
+        return
 
     st.session_state.setdefault("find_search", "")
     if "find_building" not in st.session_state or st.session_state.find_building not in buildings:
         st.session_state.find_building = buildings[0]
 
     curr_b_item = next((b for b in b_list if b["name"] == st.session_state.find_building), None)
-    f_list = mock_data_service.floors(curr_b_item["id"] if curr_b_item else None)
-    floors_list = [f["name"] for f in f_list] if f_list else ["Térreo"]
+    f_list = f_list_by_building.get(curr_b_item["id"], []) if curr_b_item else []
+    floors_list = [f["name"] for f in f_list]
+    if not floors_list:
+        page_header("Localizar espaço", "Encontre uma sala no mapa e veja como chegar até ela.")
+        st.info("Nenhum andar disponível para o prédio selecionado.")
+        return
 
     if "find_floor" not in st.session_state or st.session_state.find_floor not in floors_list:
         st.session_state.find_floor = floors_list[0]
 
     st.session_state.setdefault("find_selected_space_id", None)
     st.session_state.setdefault("find_show_directions", False)
-
-    all_spaces = mock_data_service.spaces()
 
     # 1. Cabeçalho
     page_header(
@@ -274,8 +306,8 @@ def localizar(user: dict):
             if sel_bld != st.session_state.find_building:
                 st.session_state.find_building = sel_bld
                 new_b_item = next((b for b in b_list if b["name"] == sel_bld), None)
-                new_floors = [f["name"] for f in mock_data_service.floors(new_b_item["id"] if new_b_item else None)]
-                st.session_state.find_floor = new_floors[0] if new_floors else "Térreo"
+                new_floors = f_list_by_building.get(new_b_item["id"], []) if new_b_item else []
+                st.session_state.find_floor = new_floors[0]["name"] if new_floors else ""
                 st.session_state.find_selected_space_id = None
                 st.session_state.find_show_directions = False
                 st.rerun()
@@ -298,7 +330,7 @@ def localizar(user: dict):
     # Dados do andar atual
     curr_bld = st.session_state.find_building
     curr_flr = st.session_state.find_floor
-    floor_spaces = mock_data_service.spaces(building=curr_bld, floor=curr_flr)
+    floor_spaces = [space for space in all_spaces if space["building"] == curr_bld and space["floor"] == curr_flr]
 
     selected_space = next(
         (sp for sp in all_spaces if sp["id"] == st.session_state.find_selected_space_id),
