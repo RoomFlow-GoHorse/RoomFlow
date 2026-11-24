@@ -18,16 +18,17 @@ class PermissionPolicy:
                 Permission.MANAGE_USERS,
                 Permission.VIEW_PERMISSIONS,
                 Permission.MANAGE_FLOOR_PLAN,
+                Permission.MANAGE_RESERVATION_TYPES,
                 Permission.EDIT_INSTITUTION_SETTINGS,
             }
         ) | _COMMON_PERMISSIONS,
         Profile.MANAGER: frozenset({
-            Permission.MANAGE_SPACES, Permission.REVIEW_RESERVATIONS, Permission.RESOLVE_CONFLICTS,
-            Permission.VIEW_MANAGER_DASHBOARD,
-        }) | _COMMON_PERMISSIONS,
-        Profile.REQUESTER: frozenset({
-            Permission.CREATE_RESERVATION, Permission.VIEW_OWN_RESERVATIONS, Permission.CANCEL_OWN_RESERVATION,
-        }) | _COMMON_PERMISSIONS,
+    Permission.MANAGE_SPACES,
+    Permission.MANAGE_RESERVATION_TYPES,
+    Permission.REVIEW_RESERVATIONS,
+    Permission.RESOLVE_CONFLICTS,
+    Permission.VIEW_MANAGER_DASHBOARD,
+}) | _COMMON_PERMISSIONS,
    Profile.PARTICIPANT: frozenset({
     Permission.VIEW_PARTICIPANT_DASHBOARD,
     Permission.VIEW_AGENDA,
