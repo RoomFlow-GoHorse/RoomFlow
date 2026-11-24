@@ -1,7 +1,6 @@
-// Perfis que podem ser retornados pela autenticação do backend.
+//perfis que podem ser autenticados
 export type UserProfile = 'admin' | 'gerente' | 'solicitante' | 'participante'
 
-// Dados do usuário autenticado e da sessão ativa.
 export interface AuthenticatedUser {
   id: string
   name: string
@@ -21,7 +20,7 @@ export interface InstitutionOption {
   institution_id: string
 }
 
-// Estruturas usadas no catálogo de salas e espaços.
+//catálogo de salas e espaços
 export interface Space {
   id: string
   name: string
@@ -39,7 +38,7 @@ export interface SpaceCatalog {
   spaces: Space[]
 }
 
-// Estruturas usadas para ler e criar reservas.
+//ler e criar reservas
 export type ReservationStatus =
   | 'pendente'
   | 'em_analise'
