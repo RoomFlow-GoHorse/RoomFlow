@@ -99,3 +99,13 @@ class ReservationDetails:
     space_name: str
     requester_name: str
     has_overlap: bool
+
+
+@dataclass(frozen=True, slots=True)
+class ReservationParticipant:
+    user_id: str
+    name: str
+    email: str
+    status: str
+    created_at: datetime
+    responded_at: datetime | None = None
