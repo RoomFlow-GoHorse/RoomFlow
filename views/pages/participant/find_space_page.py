@@ -1,7 +1,7 @@
 import streamlit as st
 
 from controllers.app_state_service import boot_state
-from controllers.roomflow_api import ApiUnavailable
+from controllers.runtime_errors import RuntimeUnavailable
 from controllers.streamlit_runtime import get_streamlit_runtime, uses_roomflow_api
 from views.components.ui_components import badge, esc, page_header
 
@@ -193,7 +193,7 @@ def localizar(user: dict):
                 }
                 for item in runtime.space_management.list_spaces(None)
             ]
-        except ApiUnavailable as error:
+        except RuntimeUnavailable as error:
             st.error(str(error))
 
     buildings = [b["name"] for b in b_list]

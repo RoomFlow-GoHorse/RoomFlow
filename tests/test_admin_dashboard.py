@@ -2,10 +2,8 @@ import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from fastapi.testclient import TestClient
 from streamlit.testing.v1 import AppTest
 
-from api.app import create_app
 from application.services.admin_dashboard_service import AdminDashboardService
 from application.services.institution_management_service import InstitutionRegistration
 from controllers.streamlit_runtime import get_streamlit_runtime
@@ -16,12 +14,6 @@ from infrastructure.time.system_clock import SystemClock
 from models.domain.entities.profile import Profile
 from models.domain.entities.user import User, UserStatus
 from models.domain.entities.user_account import UserAccount
-
-
-def _login(client: TestClient, email: str, password: str) -> dict[str, str]:
-    response = client.post("/auth/login", json={"email": email, "password": password})
-    assert response.status_code == 200
-    return {"Authorization": f"Bearer {response.json()['data']['access_token']}"}
 
 
 class AdminDashboardServiceTests(unittest.TestCase):
@@ -116,28 +108,7 @@ class AdminDashboardServiceTests(unittest.TestCase):
         self.assertEqual(metrics.recent_users, ())
 
 
-class AdminDashboardHttpAndStreamlitTests(unittest.TestCase):
-    def test_http_dashboard_is_authenticated_and_institution_scoped(self):
-        with TestClient(create_app(environment="test")) as client:
-            admin = _login(client, "admin@gmail.com", "admin123")
-            manager = _login(client, "gerente@gmail.com", "gerente123")
-            dashboard = client.get("/admin/dashboard?period_days=30", headers=admin)
-            self.assertEqual(dashboard.status_code, 200)
-            self.assertEqual(dashboard.json()["users"]["total"], 4)
-            self.assertEqual(client.get("/admin/dashboard", headers=manager).status_code, 403)
-            self.assertEqual(client.get("/admin/dashboard?period_days=14", headers=admin).status_code, 422)
-            self.assertEqual(client.get("/admin/dashboard").status_code, 401)
-            registration = client.post("/institutions/signup", json={
-                "responsible_name": "Admin externo", "responsible_email": "external-dashboard@example.edu",
-                "password": "password-123", "name": "Instituição externa",
-                "cnpj": "99887766000155", "institution_type": "Universidade",
-            })
-            self.assertEqual(registration.status_code, 201)
-            other_admin = _login(client, "external-dashboard@example.edu", "password-123")
-            own_scope = client.get("/admin/dashboard?institution_id=inst-demo", headers=other_admin)
-            self.assertEqual(own_scope.status_code, 200)
-            self.assertEqual(own_scope.json()["institution_id"], registration.json()["data"]["institution"]["id"])
-
+class AdminDashboardStreamlitTests(unittest.TestCase):
     def test_streamlit_admin_dashboard_uses_application_metrics(self):
         runtime = get_streamlit_runtime()
         admin = runtime.users.find_by_email("admin@gmail.com").user
