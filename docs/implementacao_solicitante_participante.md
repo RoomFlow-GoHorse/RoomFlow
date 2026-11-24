@@ -29,3 +29,4 @@
 | Etapa | Resultado | Testes | Commit |
 | --- | --- | --- | --- |
 | Diagnóstico | Concluído | `127` executados: `124` aprovados, `27` ignorados, `2` erros e `1` falha nos mocks `httpx2` | — |
+| Compatibilidade `httpx` | Concluída | `tests.test_api_availability`: 3 aprovados | Pendente |
