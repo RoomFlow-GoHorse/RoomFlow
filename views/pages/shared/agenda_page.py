@@ -3,6 +3,8 @@ from datetime import date, datetime, timedelta
 import streamlit as st
 
 from controllers.app_state_service import go
+from controllers.roomflow_api import ApiUnavailable
+from controllers.streamlit_runtime import get_streamlit_runtime, uses_roomflow_api
 from views.components.ui_components import esc, page_header
 
 # =========================================================
@@ -62,6 +64,34 @@ AGENDA_EVENTS = [
         "date": date(2026, 8, 24),
     },
 ]
+
+
+def _api_events():
+    if not uses_roomflow_api():
+        return []
+    try:
+        runtime = get_streamlit_runtime()
+        actor = st.session_state.get("user") or {}
+        role = actor.get("role")
+        if role == "participante":
+            reservations = runtime.reservations.list_participating()
+        elif role == "solicitante":
+            reservations = runtime.reservations.list_own()
+        else:
+            return []
+    except ApiUnavailable as error:
+        st.error(str(error))
+        return []
+    events = []
+    for item in reservations:
+        start = datetime.fromisoformat(item["start"])
+        end = datetime.fromisoformat(item["end"])
+        events.append({
+            "id": item["id"], "title": item["title"], "startTime": f"{start:%H:%M}",
+            "endTime": f"{end:%H:%M}", "space": item["space_name"], "location": item["space_name"],
+            "type": item["activity_type"], "color": "#6D28D9", "date": start.date(),
+        })
+    return events
 
 
 # =========================================================
@@ -382,6 +412,7 @@ def agenda(user: dict):
         st.session_state.agenda_view_tab = "Semanal"
 
     selected_date = _get_current_selected_date()
+    events = _api_events()
 
     col_header, col_view = st.columns([2, 1], vertical_alignment="center")
 
@@ -402,8 +433,8 @@ def agenda(user: dict):
 
     with st.container():
         if active_view == "Diário":
-            _render_daily_view(AGENDA_EVENTS, selected_date)
+            _render_daily_view(events, selected_date)
         elif active_view == "Mensal":
-            _render_monthly_view(AGENDA_EVENTS, selected_date)
+            _render_monthly_view(events, selected_date)
         else:
-            _render_weekly_view(AGENDA_EVENTS, selected_date)
+            _render_weekly_view(events, selected_date)
