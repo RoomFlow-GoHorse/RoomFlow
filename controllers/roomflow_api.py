@@ -3,7 +3,7 @@ from dataclasses import asdict, dataclass
 from datetime import datetime
 from urllib.parse import quote, urlsplit
 
-import httpx2
+import httpx
 
 from application.services.authentication_service import (
     InstitutionSelectionRequired, InvalidCredentials, InvalidSession, LoginResult, TooManyLoginAttempts,
@@ -61,7 +61,7 @@ class RoomFlowApi:
             valid = False
         if not valid:
             raise ApiUnavailable("Configure ROOMFLOW_API_URL com um endereço HTTP ou HTTPS válido da API.")
-        self._client = httpx2.Client(base_url=base_url, timeout=6.0, trust_env=False)
+        self._client = httpx.Client(base_url=base_url, timeout=6.0, trust_env=False)
         self._token = token
 
     def request(
@@ -73,9 +73,9 @@ class RoomFlowApi:
         headers = {"Authorization": f"Bearer {credential}"} if credential else {}
         try:
             response = self._client.request(method, path, json=payload, params=params, headers=headers, files=files)
-        except httpx2.TimeoutException:
+        except httpx.TimeoutException:
             raise ApiTimeout("A API do RoomFlow demorou para responder. Tente novamente.") from None
-        except httpx2.RequestError:
+        except httpx.RequestError:
             raise ApiUnavailable(
                 "Não foi possível conectar à API do RoomFlow. Verifique se o FastAPI está rodando e confira ROOMFLOW_API_URL."
             ) from None
