@@ -3,7 +3,7 @@ from datetime import date, datetime, timedelta
 import streamlit as st
 
 from controllers.app_state_service import go
-from controllers.roomflow_api import ApiUnavailable
+from controllers.runtime_errors import RuntimeUnavailable
 from controllers.streamlit_runtime import get_streamlit_runtime, uses_roomflow_api
 from views.components.ui_components import esc, page_header
 
@@ -31,7 +31,7 @@ def _api_events():
             reservations = runtime.reservation_service.list_own()
         else:
             return []
-    except ApiUnavailable as error:
+    except RuntimeUnavailable as error:
         st.error(str(error))
         return []
     events = []

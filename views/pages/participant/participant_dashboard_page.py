@@ -5,7 +5,7 @@ import streamlit as st
 
 from controllers.app_state_service import go
 from controllers.streamlit_runtime import get_streamlit_runtime, uses_roomflow_api
-from controllers.roomflow_api import ApiUnavailable
+from controllers.runtime_errors import RuntimeUnavailable
 from views.components.ui_components import esc, page_header
 
 # =========================================================
@@ -310,7 +310,7 @@ def _render_event_item(event: AgendaEvent, reservation_api=None) -> None:
             if decline.button("Recusar", key=f"decline_participation_{event.id}", type="secondary", use_container_width=True):
                 reservation_api.respond_participation(event.id, "recusada")
                 st.rerun()
-        except ApiUnavailable as error:
+        except RuntimeUnavailable as error:
             st.error(str(error))
 
 
@@ -380,7 +380,7 @@ def dashboard(user: dict) -> None:
                 ))
             for item in notifications:
                 changes_log.append(ChangeLog(item["id"], item["title"], item["message"], None, None, item["category"]))
-        except ApiUnavailable as error:
+        except RuntimeUnavailable as error:
             st.error(str(error))
             return
 

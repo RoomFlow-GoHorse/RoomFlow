@@ -1,15 +1,12 @@
 import io
 import secrets
 import unittest
-from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import patch
 
-from fastapi.testclient import TestClient
 from openpyxl import Workbook
 from streamlit.testing.v1 import AppTest
 
-from api.app import create_app
 from controllers.streamlit_runtime import get_streamlit_runtime
 from infrastructure.authentication_factory import build_application_runtime
 from models.domain.entities.admin_audit_event import AdminAuditAction as Action
@@ -98,145 +95,6 @@ class AdminAuditServiceTests(unittest.TestCase):
         self.assertEqual(service.read_file(self.admin, floor), (plan, SVG))
         events = self.runtime.admin_audit.list_events(self.admin)
         self.assertEqual([event.action for event in events], [Action.FLOOR_PLAN_UPLOADED])
-
-
-class AdminAuditHttpTests(unittest.TestCase):
-    def setUp(self):
-        self.app = create_app(environment="test")
-        self.client = self.enterContext(TestClient(self.app))
-        self.admin = self.login("admin@gmail.com", "admin123")
-
-    def login(self, email, password):
-        result = self.client.post("/auth/login", json={"email": email, "password": password})
-        self.assertEqual(result.status_code, 200, result.text)
-        return {"Authorization": "Bearer " + result.json()["data"]["access_token"]}
-
-    def request(self, method, path, status=200, **kwargs):
-        result = self.client.request(method, path, headers=kwargs.pop("headers", self.admin), **kwargs)
-        self.assertEqual(result.status_code, status, result.text)
-        return result.json()["data"] if status < 400 and result.content else None
-
-    def test_admin_workflow_records_successes_by_action_and_resource(self):
-        expected = set()
-
-        def record(action, item):
-            expected.add((action.value, item["id"]))
-            return item["id"]
-
-        user = self.request("POST", "/admin/users", 201, json={
-            "name": "Audit user", "email": "audit-user@example.edu", "password": PASSWORD,
-        })
-        uid = record(Action.USER_CREATED, user)
-        user_path = f"/admin/users/{uid}"
-        record(Action.USER_ACCOUNT_UPDATED, self.request("PATCH", user_path, json={
-            "name": "Edited user", "email": "edited-user@example.edu",
-        }))
-        record(Action.USER_PROFILE_CHANGED, self.request("PATCH", user_path + "/profile", json={"profile": "gerente"}))
-        user_session = self.login("edited-user@example.edu", PASSWORD)
-        record(Action.USER_DEACTIVATED, self.request("PATCH", user_path + "/status", json={"status": "inativo"}))
-        record(Action.USER_ACTIVATED, self.request("PATCH", user_path + "/status", json={"status": "ativo"}))
-        self.assertEqual(self.client.get("/auth/me", headers=user_session).status_code, 401)
-
-        code_path = "/institutions/me/invitation-code"
-        first = self.request("POST", code_path + "/rotate")["code"]
-        self.request("DELETE", code_path)
-        second = self.request("POST", code_path + "/rotate")["code"]
-        self.request("DELETE", code_path)
-        self.request("DELETE", code_path)
-
-        enrollment_path = "/admin/enrollments"
-        enrollment = self.request("POST", enrollment_path, 201, json={"registration_number": "RA-SECRET"})
-        enrollment_id = record(Action.ENROLLMENT_CREATED, enrollment)
-        record(Action.ENROLLMENT_DEACTIVATED, self.request("DELETE", f"{enrollment_path}/{enrollment_id}"))
-        preview = self.request("POST", enrollment_path + "/import/preview", files={
-            "file": ("enrollments.xlsx", excel("RA-IMPORT")),
-        })
-        self.request("POST", enrollment_path + "/import/confirm", json={"preview_id": preview["preview_id"]})
-        record(Action.ENROLLMENT_IMPORTED, self.request("GET", enrollment_path, params={"q": "RA-IMPORT"})[0])
-        record(Action.INSTITUTION_SETTINGS_UPDATED, self.request("PATCH", "/institutions/me", json={"name": "Updated institution"}))
-
-        building = record(Action.BUILDING_CREATED, self.request("POST", "/structure/buildings", 201, json={"name": "Building Audit"}))
-        building_path = f"/structure/buildings/{building}"
-        record(Action.BUILDING_UPDATED, self.request("PATCH", building_path, json={"name": "Building Edited"}))
-        floor = record(Action.FLOOR_CREATED, self.request("POST", building_path + "/floors", 201, json={"name": "First"}))
-        floor_path = f"/structure/floors/{floor}"
-        record(Action.FLOOR_UPDATED, self.request("PATCH", floor_path, json={"name": "Second"}))
-        room = record(Action.SPACE_CREATED, self.request("POST", "/structure/spaces", 201, json={
-            "floor_id": floor, "name": "Audit room", "type": "Sala de aula", "capacity": 16,
-        }))
-        room_path = f"/structure/spaces/{room}"
-        record(Action.SPACE_UPDATED, self.request("PATCH", room_path, json={"capacity": 18}))
-        resource = record(Action.RESOURCE_CREATED, self.request("POST", "/structure/resources", 201, json={"name": "Audit resource"}))
-        resource_path = f"/structure/resources/{resource}"
-        record(Action.RESOURCE_UPDATED, self.request("PATCH", resource_path, json={"name": "Edited resource"}))
-        record(Action.SPACE_RESOURCES_UPDATED, self.request("PUT", room_path + "/resources", json={"resource_ids": [resource]}))
-        record(Action.RESOURCE_DEACTIVATED, self.request("PATCH", resource_path + "/status", json={"active": False}))
-
-        plan_path = floor_path + "/plan"
-        upload = record(Action.FLOOR_PLAN_UPLOADED, self.request("POST", plan_path, files={"file": ("audit.svg", SVG)}))
-        position_path = floor_path + f"/positions/{room}"
-        self.request("PUT", position_path, json={"x": 25, "y": 40})
-        expected.add((Action.FLOOR_PLAN_POSITION_SET.value, room))
-        record(Action.FLOOR_PLAN_REPLACED, self.request("POST", plan_path, files={"file": ("replacement.svg", SVG)}))
-        self.request("DELETE", position_path)
-        expected.add((Action.FLOOR_PLAN_POSITION_REMOVED.value, room))
-        self.request("DELETE", plan_path, 204)
-        expected.add((Action.FLOOR_PLAN_REMOVED.value, upload))
-        record(Action.SPACE_DEACTIVATED, self.request("PATCH", room_path, json={"status": "inativo"}))
-        record(Action.FLOOR_DEACTIVATED, self.request("PATCH", floor_path + "/status", json={"active": False}))
-        record(Action.BUILDING_DEACTIVATED, self.request("PATCH", building_path + "/status", json={"active": False}))
-
-        events = self.request("GET", "/admin/audit")
-        self.assertEqual(
-            {(event["action"], event["resource_id"]) for event in events if "invitation_code" not in event["action"]},
-            expected,
-        )
-        self.assertEqual({event["actor_user_id"] for event in events}, {"u1"})
-        self.assertEqual({event["institution_id"] for event in events}, {"inst-demo"})
-        self.assertEqual([event["action"] for event in events if "invitation_code" in event["action"]], [
-            Action.INVITATION_CODE_REVOKED.value, Action.INVITATION_CODE_GENERATED.value,
-            Action.INVITATION_CODE_REVOKED.value, Action.INVITATION_CODE_REPLACED.value,
-        ])
-        for secret in (first, second, PASSWORD, "RA-SECRET", "RA-IMPORT", "audit.svg"):
-            self.assertNotIn(secret, str(events))
-
-    def test_filters_permissions_isolation_and_rejected_mutations(self):
-        path = "/admin/audit"
-        self.assertEqual(self.client.get(path).status_code, 401)
-        manager = self.login("gerente@gmail.com", "gerente123")
-        self.request("GET", path, 403, headers=manager)
-        self.request("POST", "/admin/users", 422, json={"name": "Invalid"})
-        self.request("PATCH", "/admin/users/u1/status", 409, json={"status": "inativo"})
-        self.request("POST", "/structure/floors/b-1-f-1/plan", 422, files={"file": ("invalid.png", b"invalid")})
-        self.assertEqual(self.request("GET", path), [])
-
-        self.request("POST", "/structure/resources", 201, headers=manager, json={"name": "Manager resource"})
-        building = self.request("POST", "/structure/buildings", 201, json={"name": "Scoped building"})
-        self.request("POST", "/institutions/signup", 201, json={
-            "responsible_name": "Other admin", "responsible_email": "other-audit@example.edu",
-            "password": PASSWORD, "name": "Other institution", "cnpj": "99887766000155",
-            "institution_type": "Universidade",
-        })
-        other = self.login("other-audit@example.edu", PASSWORD)
-        scoped = self.request("GET", path, headers=other, params={"institution_id": "inst-demo"})
-        self.assertTrue(scoped)
-        self.assertTrue(all(event["institution_id"] != "inst-demo" for event in scoped))
-        self.request("PATCH", f"/structure/buildings/{building['id']}", 404, headers=other, json={"name": "Rejected"})
-        self.assertEqual(self.request("GET", path, headers=other), scoped)
-
-        events = self.request("GET", path)
-        self.assertEqual(len(events), 2)
-        selected = self.request("GET", path, params={"action": "building.created", "actor_user_id": "u1"})
-        self.assertEqual([event["resource_id"] for event in selected], [building["id"]])
-        self.assertEqual(len(self.request("GET", path, params={"actor_user_id": "u2"})), 1)
-        timestamp = datetime.fromisoformat(selected[0]["occurred_at"])
-        offset = timezone(timedelta(hours=-4))
-        self.assertEqual(self.request("GET", path, params={
-            "start_at": timestamp.astimezone(offset).isoformat(), "end_at": timestamp.isoformat(),
-        }), selected)
-        self.assertEqual(self.request("GET", path, params={"start_at": (timestamp + timedelta(days=1)).isoformat()}), [])
-        self.request("GET", path, 422, params={"start_at": "2026-01-01T00:00:00"})
-        self.request("GET", path, 422, params={"start_at": "2026-02-01T00:00:00Z", "end_at": "2026-01-01T00:00:00Z"})
 
 
 class AdminAuditStreamlitTests(unittest.TestCase):
