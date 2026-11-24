@@ -1,3 +1,5 @@
+import hashlib
+
 import streamlit as st
 
 from application.services.authentication_service import (
@@ -7,7 +9,7 @@ from application.services.authentication_service import (
     TooManyLoginAttempts,
 )
 from controllers.app_state_service import clear_operational_dialogs
-from controllers.roomflow_api import ApiUnavailable
+from controllers.runtime_errors import RuntimeUnavailable
 from controllers.streamlit_runtime import get_streamlit_runtime
 from models.domain.identity_normalization import normalize_email
 
@@ -18,7 +20,7 @@ def login(email, password, institution_id=None):
         return None, "E-mail ou senha incorretos. Verifique seus dados e tente novamente."
     try:
         result = get_streamlit_runtime().authentication.login(
-            email, password, attempt_key="streamlit-local", institution_id=institution_id
+            email, password, attempt_key="streamlit-login:" + hashlib.sha256(email.encode()).hexdigest(), institution_id=institution_id
         )
     except InstitutionSelectionRequired as exc:
         st.session_state["login_institutions"] = exc.institution_ids
@@ -27,7 +29,7 @@ def login(email, password, institution_id=None):
         return None, "E-mail ou senha incorretos. Verifique seus dados e tente novamente."
     except TooManyLoginAttempts:
         return None, "Muitas tentativas de login. Aguarde um minuto e tente novamente."
-    except (ApiUnavailable, ValueError) as exc:
+    except (RuntimeUnavailable, ValueError) as exc:
         return None, str(exc)
 
     st.session_state.pop("login_institutions", None)
@@ -53,7 +55,7 @@ def logout():
             get_streamlit_runtime().authentication.logout(token)
         except InvalidSession:
             pass
-        except ApiUnavailable as exc:
+        except RuntimeUnavailable as exc:
             st.error(str(exc))
             return
     st.session_state.auth_token = None

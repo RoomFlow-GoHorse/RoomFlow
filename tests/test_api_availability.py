@@ -3,7 +3,7 @@ from pathlib import Path
 import unittest
 from unittest.mock import patch
 
-import httpx
+import httpx2 as httpx
 from streamlit.testing.v1 import AppTest
 
 from controllers.roomflow_api import ApiResponseError, ApiRuntime, ApiSessionExpired, ApiTimeout, ApiUnavailable, RoomFlowApi
@@ -44,21 +44,23 @@ class ApiClientErrorsTests(unittest.TestCase):
                     if expected is ApiResponseError:
                         self.assertIn(str(response.status_code), str(raised.exception))
 
-    def test_connection_failure_keeps_token_and_api_401_clears_it_on_retry(self):
-        unauthorized = httpx.Response(401, json={"error": {"message": "Sessão inválida."}})
+    def test_database_failure_keeps_token_and_invalid_session_clears_it(self):
+        from unittest.mock import Mock
+        from sqlalchemy.exc import OperationalError
+        from application.services.authentication_service import InvalidSession
+        services = Mock()
+        services.authentication.authenticate.side_effect = [OperationalError("", {}, Exception("offline")), InvalidSession()]
         with (
-            patch.dict(os.environ, {"ROOMFLOW_API_URL": URL}),
-            patch("controllers.streamlit_runtime._get_api_runtime", return_value=ApiRuntime(self.api)),
-            patch.object(self.api._client, "request", side_effect=[httpx.ConnectError("offline"), unauthorized]),
+            patch.dict(os.environ, {"ROOMFLOW_PERSISTENCE": "postgres"}),
+            patch("controllers.streamlit_runtime._get_postgres_runtime", return_value=services),
         ):
             app = AppTest.from_file(str(PROJECT / "main.py"), default_timeout=20)
             app.query_params["page"] = "conta"
             app.session_state["auth_token"] = "test-token"
             app.run()
             self.assertFalse(app.exception)
-            self.assertIn("conectar", app.error[0].value)
+            self.assertIn("PostgreSQL", app.error[0].value)
             self.assertEqual(app.session_state["auth_token"], "test-token")
-            # A Streamlit interaction reruns the script from the top and rechecks the API.
-            app.button(key="roomflow_api_retry").click().run()
+            app.button(key="roomflow_runtime_retry").click().run()
             self.assertFalse(app.exception)
             self.assertIsNone(app.session_state["auth_token"])

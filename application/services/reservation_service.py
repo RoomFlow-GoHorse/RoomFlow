@@ -16,7 +16,8 @@ from models.domain.entities.permission import Permission
 from models.domain.entities.profile import Profile
 from models.domain.entities.reservation import (
     EDITABLE, REVIEW_DECISIONS, Reservation, ReservationDetails, ReservationHistoryAction,
-    ReservationHistoryEvent, ReservationPeriod, ReservationRequest, ReservationStatus, review_decisions,
+    ReservationHistoryEvent, ReservationParticipant, ReservationPeriod, ReservationRequest,
+    ReservationStatus, review_decisions,
 )
 from models.domain.entities.space import Space
 from models.domain.entities.user import User
@@ -172,6 +173,10 @@ class ReservationService:
             return []
         return [account.user for account in self._users.list_by_institution(institution.id)
                 if account.user.is_active and account.user.profile is Profile.PARTICIPANT]
+
+    def participants(self, actor: User, reservation_id: str) -> list[ReservationParticipant]:
+        details, _ = self.detail_own(actor, reservation_id)
+        return self._repository.participants(details.reservation.institution_id, reservation_id)
 
     def list_participating(self, actor: User) -> list[ReservationDetails]:
         scope = self._permissions.authorize_listing(actor, Permission.VIEW_PARTICIPANT_DASHBOARD)

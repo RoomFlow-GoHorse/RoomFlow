@@ -1,5 +1,6 @@
 import unittest
 from datetime import datetime, timedelta, timezone
+from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
@@ -155,14 +156,9 @@ class AuthenticationApiTests(unittest.TestCase):
         self.assertEqual(responses[5].headers["retry-after"], "60")
 
     def test_production_does_not_enable_demo_credentials(self) -> None:
-        with TestClient(create_app(environment="production")) as client:
-            response = client.post(
-                "/auth/login",
-                json={"email": "admin@gmail.com", "password": "admin123"},
-            )
-
-        self.assertEqual(response.status_code, 401)
-        self.assertEqual(response.json()["error"]["message"], "E-mail ou senha incorretos.")
+        with patch.dict("os.environ", {"ROOMFLOW_PERSISTENCE": "memory"}):
+            with self.assertRaisesRegex(ValueError, "memória"):
+                create_app(environment="production")
 
 
 class PasswordHasherTests(unittest.TestCase):

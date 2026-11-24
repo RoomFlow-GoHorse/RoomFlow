@@ -2,7 +2,7 @@ import copy
 import streamlit as st
 
 from models import mock_data
-from controllers.streamlit_runtime import get_streamlit_actor, uses_roomflow_api
+from controllers.streamlit_runtime import get_streamlit_actor, uses_persistent_runtime
 
 
 def clear_operational_dialogs():
@@ -23,7 +23,7 @@ def boot_state():
     for key, value in simple_defaults.items():
         st.session_state.setdefault(key, value)
 
-    if uses_roomflow_api():
+    if uses_persistent_runtime():
         return
 
     deep_defaults = {

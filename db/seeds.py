@@ -1,5 +1,7 @@
+"""Centraliza a criação dos dados iniciais e de demonstração do PostgreSQL."""
+
+import argparse
 from datetime import datetime, time, timedelta
-from getpass import getpass
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import select
@@ -22,29 +24,70 @@ from models.database_models import (
     Usuario,
     UsuarioInstituicao,
 )
-from scripts.seed_perfis import cadastrar_perfis
+
+
+def cadastrar_perfis(sessao: Session) -> None:
+    comando = (
+        insert(TipoUsuario)
+        .values([{"name": perfil} for perfil in ROLE_LABELS])
+        .on_conflict_do_nothing(index_elements=[TipoUsuario.name])
+    )
+    sessao.execute(comando)
+
+
+def semear_perfis() -> None:
+    with SessionLocal.begin() as sessao:
+        cadastrar_perfis(sessao)
 
 
 def criar_contas(sessao: Session, instituicao_id: int, senha: str) -> dict[str, Usuario]:
     perfis = dict(sessao.execute(select(TipoUsuario.name, TipoUsuario.id)).all())
-    contas = {
-        perfil: Usuario(
-            name=f"{rotulo} Demo",
-            email=f"{perfil}@roomflow.example",
-            password_hash=hash_password(senha),
-            role=perfil,
-            tipo_usuario_id=perfis[perfil],
-            institution_links=[
+    contas = {}
+    for numero, (perfil, rotulo) in enumerate(ROLE_LABELS.items(), start=1):
+        email = f"{perfil}@gmail.com"
+        conta = sessao.scalar(select(Usuario).where(Usuario.email == email))
+        if conta is None:
+            # Atualiza contas criadas por versões anteriores do seed.
+            conta = sessao.scalar(
+                select(Usuario).where(Usuario.email == f"{perfil}@roomflow")
+            )
+        if conta is None:
+            conta = Usuario(
+                name=f"{rotulo} Demo",
+                email=email,
+                password_hash=hash_password(senha),
+                role=perfil,
+                tipo_usuario_id=perfis[perfil],
+            )
+            sessao.add(conta)
+            sessao.flush()
+        else:
+            conta.name = f"{rotulo} Demo"
+            conta.email = email
+            conta.password_hash = hash_password(senha)
+            conta.role = perfil
+            conta.tipo_usuario_id = perfis[perfil]
+            conta.status = "ativo"
+
+        vinculo = sessao.scalar(
+            select(UsuarioInstituicao).where(
+                UsuarioInstituicao.user_id == conta.id,
+                UsuarioInstituicao.institution_id == instituicao_id,
+            )
+        )
+        if vinculo is None:
+            sessao.add(
                 UsuarioInstituicao(
+                    user_id=conta.id,
                     institution_id=instituicao_id,
                     role=perfil,
                     registration_number=f"DEMO-{numero:02}",
                 )
-            ],
-        )
-        for numero, (perfil, rotulo) in enumerate(ROLE_LABELS.items(), start=1)
-    }
-    sessao.add_all(contas.values())
+            )
+        else:
+            vinculo.role = perfil
+            vinculo.status = "ativo"
+        contas[perfil] = conta
     sessao.flush()
     return contas
 
@@ -110,13 +153,13 @@ def criar_agenda(sessao: Session, sala: Espaco, contas: dict[str, Usuario]) -> N
         )
 
 
-def semear_demo(senha: str) -> bool:
+def semear_demo(senha: str) -> str:
     with SessionLocal.begin() as sessao:
         cadastrar_perfis(sessao)
         instituicao_id = sessao.scalar(
             insert(Instituicao)
             .values(
-                name="Faculdade RoomFlow Demo",
+                name="Faculdade unisapiens",
                 cnpj="00000000000000",
                 institution_type="faculdade",
                 city="Porto Velho",
@@ -125,10 +168,18 @@ def semear_demo(senha: str) -> bool:
             .on_conflict_do_nothing(index_elements=[Instituicao.cnpj])
             .returning(Instituicao.id)
         )
+        instituicao_nova = instituicao_id is not None
         if instituicao_id is None:
-            return False
+            instituicao_id = sessao.scalar(
+                select(Instituicao.id).where(Instituicao.cnpj == "00000000000000")
+            )
+            if instituicao_id is None:
+                raise RuntimeError("Não foi possível localizar ou criar a instituição de demonstração.")
 
         contas = criar_contas(sessao, instituicao_id, senha)
+        if not instituicao_nova:
+            return "contas"
+
         sala, laboratorio, auditorio = [
             Espaco(
                 instituicao_id=instituicao_id,
@@ -147,29 +198,46 @@ def semear_demo(senha: str) -> bool:
         computadores = Recurso(instituicao_id=instituicao_id, nome="Computador", quantidade_total=24)
         sessao.add_all([sala, laboratorio, auditorio, projetor, computadores])
         sessao.flush()
-        sessao.add_all([
-            EspacoRecurso(
-                instituicao_id=instituicao_id,
-                espaco_id=sala.id,
-                recurso_id=projetor.id,
-                quantidade=1,
-            ),
-            EspacoRecurso(
-                instituicao_id=instituicao_id,
-                espaco_id=laboratorio.id,
-                recurso_id=computadores.id,
-                quantidade=24,
-            ),
-        ])
+        sessao.add_all(
+            [
+                EspacoRecurso(
+                    instituicao_id=instituicao_id,
+                    espaco_id=sala.id,
+                    recurso_id=projetor.id,
+                    quantidade=1,
+                ),
+                EspacoRecurso(
+                    instituicao_id=instituicao_id,
+                    espaco_id=laboratorio.id,
+                    recurso_id=computadores.id,
+                    quantidade=24,
+                ),
+            ]
+        )
         criar_agenda(sessao, sala, contas)
-    return True
+    return "demo"
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Popula dados iniciais do RoomFlow no PostgreSQL.")
+    parser.add_argument(
+        "--demo",
+        action="store_true",
+        help="cria também instituição, contas e dados de demonstração",
+    )
+    args = parser.parse_args()
+
+    if args.demo:
+        senha = "123456789"
+        resultado = semear_demo(senha)
+        if resultado == "demo":
+            print("Perfis e dados de demonstração cadastrados na Faculdade unisapiens.")
+        elif resultado == "contas":
+            print("Perfis e contas demo vinculadas à instituição existente. Os demais dados não foram duplicados.")
+    else:
+        semear_perfis()
+        print("Perfis cadastrados: " + ", ".join(ROLE_LABELS.values()))
 
 
 if __name__ == "__main__":
-    senha = getpass("Senha para as quatro contas de demonstração: ")
-    if len(senha) < 8:
-        raise SystemExit("Informe uma senha com pelo menos 8 caracteres.")
-    if semear_demo(senha):
-        print("Dados de demonstração cadastrados na Faculdade RoomFlow Demo.")
-    else:
-        print("A Faculdade RoomFlow Demo já está cadastrada.")
+    main()

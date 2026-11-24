@@ -3,10 +3,8 @@ import io
 import json
 import os
 import secrets
-import socket
 import subprocess
 import sys
-import time
 import unittest
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
@@ -18,7 +16,6 @@ from threading import Barrier
 from unittest.mock import patch
 from zoneinfo import ZoneInfo
 
-import httpx
 from dotenv import dotenv_values
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, select, update
@@ -47,7 +44,7 @@ PROJECT = Path(__file__).resolve().parents[1]
 class PostgresIntegrationTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        config = dotenv_values(PROJECT / ".env")
+        config = {**dotenv_values(PROJECT / ".env"), **os.environ}
         if not TEST_DATABASE.startswith("roomflow_test_") or config["DB_HOST"] not in {"localhost", "127.0.0.1", "::1"}:
             raise RuntimeError("Os testes exigem um banco PostgreSQL local com prefixo roomflow_test_.")
         cls.database_config = {**config, "DB_NAME": TEST_DATABASE}
@@ -378,13 +375,13 @@ class PostgresIntegrationTests(unittest.TestCase):
                                   params={"start": payload["start"], "end": payload["end"]})
         self.assertEqual([space["id"] for space in catalog.json()["data"]["spaces"]], [room["id"]])
 
-    def test_reservation_streamlit_submission_reaches_manager_via_http(self):
+    def test_reservation_streamlit_submission_reaches_manager_directly(self):
         own, _ = self.register()
         admin = self.headers(self.login(own["responsible_email"]))
         requester = self._requester_login(admin)
         manager = self._manager_login(admin)
         room = self._structure_room(admin, "Sala Streamlit Reserva")
-        with self.api_process() as url, patch.dict(os.environ, {"ROOMFLOW_API_URL": url}):
+        with self.streamlit_runtime():
             def open_page(login, page):
                 app = AppTest.from_file(str(PROJECT / "main.py"), default_timeout=20)
                 app.query_params["page"] = page
@@ -404,10 +401,10 @@ class PostgresIntegrationTests(unittest.TestCase):
             self.assertTrue(app.success, [item.value for item in app.error])
             mine = open_page(requester, "minhas_reservas")
             self.assertIn(title, [item.value for item in mine.subheader])
-            self.assertNotIn("reservations", mine.session_state.filtered_state)
+            self.assertNotIn("reservations", mine.session_state)
             institution = open_page(manager, "gerente_reservas")
             self.assertIn(title, institution.dataframe[0].value["Solicitação"].tolist())
-            self.assertNotIn("reservations", institution.session_state.filtered_state)
+            self.assertNotIn("reservations", institution.session_state)
             next(button for button in institution.button if button.label == "Analisar solicitação").click().run()
             institution.selectbox(key="reservation_decision").select("aprovada")
             institution.text_area[0].set_value("Aprovada pelo Streamlit")
@@ -559,13 +556,13 @@ class PostgresIntegrationTests(unittest.TestCase):
                 "action": "alterou", "reason": "Realocação", "reservation_id": a["id"], "space_id": invalid,
             })
             self.assertEqual(failed.status_code, 409, failed.text)
-        with self.api_process() as url, patch.dict(os.environ, {"ROOMFLOW_API_URL": url}):
+        with self.streamlit_runtime():
             app = AppTest.from_file(str(PROJECT / "main.py"), default_timeout=20)
             app.query_params["page"] = "gerente_conflitos"
             app.session_state["auth_token"] = login.json()["data"]["access_token"]
             app.run()
             self.assertFalse(app.exception)
-            self.assertNotIn("conflicts", app.session_state.filtered_state)
+            self.assertNotIn("conflicts", app.session_state)
             self.assertEqual(app.dataframe[0].value["Status"].tolist(), ["Em aberto"])
             app.button(key="btn_resolve_conflict").click().run()
             app.selectbox(key=f"conflict_outcome_{item['id']}").select("alterou").run()
@@ -754,14 +751,14 @@ class PostgresIntegrationTests(unittest.TestCase):
         self.assertEqual(result.status_code, 201, result.text)
         reservation_id = result.json()["data"]["id"]
         item, = self.client.get("/notifications", headers=manager).json()["data"]["items"]
-        with self.api_process() as url, patch.dict(os.environ, {"ROOMFLOW_API_URL": url}):
+        with self.streamlit_runtime():
             app = AppTest.from_file(str(PROJECT / "main.py"), default_timeout=20)
             app.query_params["page"] = "notificacoes"
             app.session_state["auth_token"] = manager_login.json()["data"]["access_token"]
             app.run()
             self.assertFalse(app.exception)
             self.assertIn("Nova solicitação de reserva", [item.value for item in app.subheader])
-            self.assertNotIn("notifications", app.session_state.filtered_state)
+            self.assertNotIn("notifications", app.session_state)
             app.button(key=f"btn_read_{item['id']}").click().run()
             self.assertFalse(app.exception)
             self.assertEqual(self.client.get("/notifications/unread-count", headers=manager).json()["data"],
@@ -902,7 +899,7 @@ class PostgresIntegrationTests(unittest.TestCase):
         self.assertEqual(created.status_code, 201, created.text)
         reservation = created.json()["data"]
         day = datetime.fromisoformat(payload["start"]).date()
-        with self.api_process() as url, patch.dict(os.environ, {"ROOMFLOW_API_URL": url}):
+        with self.streamlit_runtime():
             app = AppTest.from_file(str(PROJECT / "main.py"), default_timeout=20)
             app.query_params["page"] = "gerente_dashboard"
             app.session_state["auth_token"] = login.json()["data"]["access_token"]
@@ -921,7 +918,7 @@ class PostgresIntegrationTests(unittest.TestCase):
             app.date_input(key="occupancy_date").set_value(day).run()
             self.assertFalse(app.exception)
             self.assertEqual({item.label: item.value for item in app.metric}["Taxa de ocupação no período"], "6.7%")
-            self.assertNotIn("reservations", app.session_state.filtered_state)
+            self.assertNotIn("reservations", app.session_state)
             self.assertEqual(app.selectbox(key="occupancy_reservation_selector").value, reservation["id"])
             next(button for button in app.button if button.label == "Ver detalhes").click().run()
             self.assertIn("Aula do Painel Real", [item.value for item in app.subheader])
@@ -1274,33 +1271,16 @@ class PostgresIntegrationTests(unittest.TestCase):
             self.assertEqual(restarted.post(path, headers=headers, json=identifier).status_code, 404)
 
     @contextmanager
-    def api_process(self):
-        with socket.socket() as listener:
-            listener.bind(("127.0.0.1", 0))
-            port = listener.getsockname()[1]
-        url = f"http://127.0.0.1:{port}"
-        env = {**os.environ, **self.database_config, "DATABASE_URL": "", "ROOMFLOW_PERSISTENCE": "postgres"}
-        process = subprocess.Popen([
-            sys.executable, "-B", "-m", "uvicorn", "api.main:app",
-            "--host", "127.0.0.1", "--port", str(port), "--log-level", "error",
-        ], cwd=PROJECT, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        try:
-            for _ in range(100):
-                if process.poll() is not None:
-                    break
-                try:
-                    if httpx.get(url + "/ready", timeout=1, trust_env=False).is_success:
-                        yield url
-                        return
-                except httpx.HTTPError:
-                    pass
-                time.sleep(0.1)
-            self.fail("O processo FastAPI de teste não ficou disponível.")
-        finally:
-            process.terminate()
-            process.wait(timeout=10)
+    def streamlit_runtime(self):
+        from controllers import streamlit_runtime
+        from infrastructure.persistence.runtime import build_postgres_runtime
+        services = build_postgres_runtime(self.factory, self.mailbox)
+        with patch.dict(os.environ, {"ROOMFLOW_PERSISTENCE": "postgres"}), patch.object(
+            streamlit_runtime, "_get_postgres_runtime", return_value=services,
+        ):
+            yield
 
-    def test_manager_streamlit_filters_edits_and_blocks_via_http(self):
+    def test_manager_streamlit_filters_edits_and_blocks_directly(self):
         payload, _ = self.register()
         admin = self.headers(self.login(payload["responsible_email"]))
         login = self._manager_login(admin)
@@ -1310,15 +1290,15 @@ class PostgresIntegrationTests(unittest.TestCase):
         self.assertEqual(resource.status_code, 201, resource.text)
         resource_id = resource.json()["data"]["id"]
         path = f"/structure/spaces/{room['id']}"
-        with self.api_process() as url, patch.dict(os.environ, {"ROOMFLOW_API_URL": url}):
+        with self.streamlit_runtime():
             app = AppTest.from_file(str(PROJECT / "main.py"), default_timeout=20)
             app.query_params["page"] = "espacos"
             app.session_state["auth_token"] = login.json()["data"]["access_token"]
             app.run()
             self.assertFalse(app.exception)
             self.assertIn("Sala Streamlit", app.dataframe[0].value["Espaço"].tolist())
-            self.assertNotIn("spaces", app.session_state.filtered_state)
-            self.assertNotIn("resources", app.session_state.filtered_state)
+            self.assertNotIn("spaces", app.session_state)
+            self.assertNotIn("resources", app.session_state)
             app.selectbox(key="space_building_filter").select(room["building_id"]).run()
             app.selectbox(key=f"space_floor_filter_{room['building_id']}").select(room["floor_id"]).run()
             app.number_input(key="space_min_capacity").set_value(21).run()
@@ -1346,7 +1326,7 @@ class PostgresIntegrationTests(unittest.TestCase):
             app.button(key="rf_nav_gerente_dashboard").click().run()
             app.button(key="rf_nav_espacos").click().run()
             self.assertFalse(any(item.key == "space_edit_name" for item in app.text_input))
-            self.assertNotIn("edit_space_id", app.session_state.filtered_state)
+            self.assertNotIn("edit_space_id", app.session_state)
 
             app.button(key="btn_action_block_space").click().run()
             app.query_params["page"] = "gerente_dashboard"
@@ -1354,9 +1334,9 @@ class PostgresIntegrationTests(unittest.TestCase):
             app.query_params["page"] = "espacos"
             app.run()
             self.assertFalse(any(item.label == "Motivo do bloqueio *" for item in app.text_area))
-            self.assertNotIn("block_space_id", app.session_state.filtered_state)
+            self.assertNotIn("block_space_id", app.session_state)
 
-    def test_manager_workflow_is_shared_across_streamlit_and_api_restarts(self):
+    def test_manager_workflow_persists_across_streamlit_processes(self):
         institution, _ = self.register()
         admin = self.headers(self.login(institution["responsible_email"]))
         requester_login = self._requester_login(admin)
@@ -1371,7 +1351,7 @@ class PostgresIntegrationTests(unittest.TestCase):
         fixture = {"password": PASSWORD, "room": room["id"], "title": title, "reason": reason,
                    "resource": resource.json()["data"]["id"], "phone": "(65) 90000-0000"}
 
-        def run_streamlit(url, role, login, steps):
+        def run_streamlit(role, login, steps):
             script = dedent("""
                 import json
                 import sys
@@ -1387,18 +1367,18 @@ class PostgresIntegrationTests(unittest.TestCase):
                 app.button(key="login_submit").click().run()
                 assert not app.exception
                 assert app.session_state["user"]["role"] == fixture["role"]
-                assert not {"spaces", "resources", "reservations", "conflicts", "notifications"} & app.session_state.filtered_state.keys()
+                assert not {"spaces", "resources", "reservations", "conflicts", "notifications"} & app.session_state.keys()
             """) + dedent(steps)
             result = subprocess.run(
                 [sys.executable, "-B", "-c", script],
                 input=json.dumps({**fixture, "role": role, "email": login.json()["data"]["user"]["email"]}),
                 encoding="utf-8", capture_output=True, timeout=90,
-                cwd=PROJECT, env={**os.environ, "ROOMFLOW_API_URL": url, "PYTHONIOENCODING": "utf-8"},
+                cwd=PROJECT, env={**os.environ, **self.database_config, "DATABASE_URL": "", "ROOMFLOW_PERSISTENCE": "postgres", "PYTHONIOENCODING": "utf-8"},
             )
             self.assertEqual(result.returncode, 0, result.stderr)
 
-        with self.api_process() as requester_api, self.api_process() as manager_api:
-            run_streamlit(requester_api, "solicitante", requester_login, """
+        with self.streamlit_runtime():
+            run_streamlit("solicitante", requester_login, """
                 app.button(key="rf_nav_nova_reserva").click().run()
                 app.selectbox(key="new_reservation_room").select(fixture["room"])
                 app.text_input(key="new_reservation_title").set_value(fixture["title"])
@@ -1407,7 +1387,7 @@ class PostgresIntegrationTests(unittest.TestCase):
                 next(button for button in app.button if button.label == "Solicitar reserva").click().run()
                 assert not app.exception and app.success
             """)
-            run_streamlit(manager_api, "gerente", manager_login, """
+            run_streamlit("gerente", manager_login, """
                 assert app.query_params["page"] == ["gerente_dashboard"]
                 app.query_params["page"] = "usuarios"
                 app.run()
@@ -1433,13 +1413,13 @@ class PostgresIntegrationTests(unittest.TestCase):
                 assert not app.exception
                 assert next(field for field in app.text_input if field.label == "Telefone").value == fixture["phone"]
             """)
-            with httpx.Client(base_url=manager_api, headers=manager, trust_env=False) as client:
+            with TestClient(create_app(postgres_session_factory=self.factory), headers=manager) as client:
                 self.assertEqual(client.get("/admin/users").status_code, 403)
                 self.assertEqual(client.get("/structure/buildings").status_code, 403)
                 self.assertEqual(client.get("/reservations/institution").json()["data"][0]["status"], "aprovada")
 
-        with self.api_process() as restarted_api:
-            run_streamlit(restarted_api, "solicitante", requester_login, """
+        with self.streamlit_runtime():
+            run_streamlit("solicitante", requester_login, """
                 assert fixture["title"] in [item.value for item in app.subheader]
                 next(button for button in app.button if button.label == "Ver histórico").click().run()
                 assert fixture["reason"] in [item.value for item in app.text]
@@ -1448,7 +1428,7 @@ class PostgresIntegrationTests(unittest.TestCase):
                 next(button for button in app.button if button.label == "Marcar como lida").click().run()
                 assert not app.exception
             """)
-            with httpx.Client(base_url=restarted_api, trust_env=False) as client:
+            with TestClient(create_app(postgres_session_factory=self.factory)) as client:
                 available = client.get(f"/structure/spaces/{room['id']}", headers=manager).json()["data"]
                 self.assertEqual((available["capacity"], available["resource_ids"]), (25, [fixture["resource"]]))
                 account = client.get("/auth/me", headers=manager).json()["data"]
@@ -1462,11 +1442,9 @@ class PostgresIntegrationTests(unittest.TestCase):
                 notification, = client.get("/notifications", headers=requester).json()["data"]["items"]
                 self.assertIsNotNone(notification["read_at"])
 
-    def test_streamlit_uses_separate_api_process(self):
+    def test_streamlit_uses_direct_postgres_runtime(self):
         payload, _ = self.register()
-        with self.api_process() as url, patch.dict(os.environ, {"ROOMFLOW_API_URL": url}):
-            status = httpx.get(url + "/ready", trust_env=False)
-            self.assertEqual(status.json()["data"], {"status": "ready", "persistence": "postgres"})
+        with self.streamlit_runtime():
             app = AppTest.from_file(str(PROJECT / "main.py"), default_timeout=20)
             app.query_params["page"] = "login"
             app.run()
@@ -1475,7 +1453,7 @@ class PostgresIntegrationTests(unittest.TestCase):
             app.button(key="login_submit").click().run()
             self.assertFalse(app.exception)
             self.assertEqual(app.session_state["user"]["email"], payload["responsible_email"])
-            self.assertNotIn("reservations", app.session_state.filtered_state)
+            self.assertNotIn("reservations", app.session_state)
             app.query_params["page"] = "configuracoes_instituicao"
             app.run()
             self.assertFalse(app.exception)
@@ -1484,7 +1462,7 @@ class PostgresIntegrationTests(unittest.TestCase):
             app.button(key="cfg_salvar").click().run()
             self.assertFalse(app.exception)
             token = app.session_state["auth_token"]
-            result = httpx.get(url + "/institutions/me", headers={"Authorization": f"Bearer {token}"})
+            result = self.client.get("/institutions/me", headers={"Authorization": f"Bearer {token}"})
             self.assertEqual(result.json()["data"]["address"], "Endereço salvo pelo Streamlit")
             app.query_params["page"] = "permissoes"
             app.run()
@@ -1492,3 +1470,60 @@ class PostgresIntegrationTests(unittest.TestCase):
             block = matrix.loc["Bloquear e desbloquear salas"]
             self.assertEqual((block["Administrador"], block["Gerente"], block["Solicitante"]),
                              ("Instituição do vínculo", "Instituição do vínculo", "—"))
+
+    def test_direct_signup_identity_isolation_restart_and_pool_lifecycle(self):
+        from controllers.local_runtime import LocalRuntime
+        from controllers.runtime_errors import SessionExpired
+        from application.services.institution_management_service import InstitutionRegistration
+        from infrastructure.persistence.runtime import build_postgres_runtime
+        from models.domain.entities.profile import Profile
+        from models.domain.exceptions import DomainAuthorizationError, ResourceNotFound
+
+        services = build_postgres_runtime(self.factory, self.mailbox)
+        tokens = [None, None]
+        first = LocalRuntime(services, lambda: tokens[0])
+        second = LocalRuntime(services, lambda: tokens[1])
+        owners = []
+        for index, runtime in enumerate((first, second)):
+            tag = secrets.token_hex(6)
+            registration = InstitutionRegistration(
+                name=f"Direct {tag}", institution_type="Faculdade", city="", state="", phone="", email="",
+                responsible_name="Admin", responsible_email=f"{tag}@example.test", password=PASSWORD,
+            )
+            institution, owner, code = runtime.institution_management.register(registration)
+            self.assertTrue(code)
+            login = runtime.authentication.login(owner.email, PASSWORD)
+            tokens[index] = login.access_token
+            owners.append(owner)
+            self.assertEqual(runtime.institution_management.get_own(owner).id, institution.id)
+
+        # A supplied actor can never replace the identity held by this browser session.
+        self.assertEqual(first.institution_management.get_own(owners[1]).id, owners[0].institution_id)
+        building = first.space_management.create_building(owners[0], "Private building")
+        with self.assertRaises((DomainAuthorizationError, ResourceNotFound)):
+            second.space_management.list_floors(owners[0], building.id)
+        tag = secrets.token_hex(6)
+        user = first.user_management.create_user(owners[0], "Member", f"{tag}@example.test", PASSWORD, Profile.REQUESTER)
+        restarted = LocalRuntime(build_postgres_runtime(self.factory, self.mailbox), lambda: tokens[0])
+        self.assertEqual(restarted.authentication.login(user.email, PASSWORD).user.id, user.id)
+        self.assertTrue(restarted.admin_audit.list_events(owners[0]))
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            results = list(pool.map(lambda runtime: runtime.institution_management.get_own(None).id, (first, second)))
+        self.assertEqual(results, [owner.institution_id for owner in owners])
+        first.authentication.logout(tokens[0])
+        with self.assertRaises(SessionExpired):
+            restarted.institution_management.get_own(owners[0])
+        self.assertEqual(second.institution_management.get_own(owners[1]).id, owners[1].institution_id)
+        self.assertEqual(self.engine.pool.checkedout(), 0)
+
+    def test_seed_passwords_work_in_direct_runtime_after_restart(self):
+        from controllers.local_runtime import LocalRuntime
+        from infrastructure.persistence.runtime import build_postgres_runtime
+        env = {**os.environ, **self.database_config, "DATABASE_URL": ""}
+        result = subprocess.run([sys.executable, "-m", "db.seeds", "--demo"], cwd=PROJECT,
+                                env=env, capture_output=True, text=True, timeout=30)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        runtime = LocalRuntime(build_postgres_runtime(self.factory, self.mailbox), lambda: None)
+        login = runtime.authentication.login("admin@gmail.com", "123456789")
+        restarted = LocalRuntime(build_postgres_runtime(self.factory, self.mailbox), lambda: login.access_token)
+        self.assertEqual(restarted.institution_management.get_own(login.user).id, login.user.institution_id)

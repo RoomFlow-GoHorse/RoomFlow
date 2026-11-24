@@ -3,15 +3,16 @@ from zoneinfo import ZoneInfo
 
 import streamlit as st
 
-from controllers.streamlit_runtime import get_streamlit_runtime, uses_roomflow_api
+from controllers.streamlit_runtime import get_streamlit_runtime, uses_persistent_runtime
+from controllers.runtime_errors import RuntimeUnavailable
 from models.domain.exceptions import DomainAuthorizationError, DuplicateResource, ResourceNotFound
 
 
-RESERVATION_ERRORS = (DomainAuthorizationError, DuplicateResource, ResourceNotFound, ValueError)
+RESERVATION_ERRORS = (DomainAuthorizationError, DuplicateResource, ResourceNotFound, RuntimeUnavailable, ValueError)
 
 
 def reservation_api():
-    if not uses_roomflow_api():
+    if not uses_persistent_runtime():
         st.info("Não foi possível carregar as reservas. Tente novamente.")
         return None
     return get_streamlit_runtime().reservation_service

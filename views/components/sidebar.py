@@ -5,8 +5,8 @@ import streamlit as st
 from config.constants import ROLE_NAV
 from controllers import auth_service
 from controllers.app_state_service import go
-from controllers.streamlit_runtime import API_PAGES, get_streamlit_runtime, uses_roomflow_api
-from controllers.roomflow_api import ApiUnavailable
+from controllers.streamlit_runtime import PERSISTENT_PAGES, get_streamlit_runtime, uses_persistent_runtime
+from controllers.runtime_errors import RuntimeUnavailable
 from models.domain.exceptions import DomainAuthorizationError
 from views.components.ui_components import is_dark_theme, logo, role_label
 
@@ -76,16 +76,16 @@ def render_sidebar(user):
     current_page = st.session_state.get("page", "landing")
     role = user.get("role", "participante")
     allowed_pages = {page for _, page in ROLE_NAV.get(role, [])}
-    notifications_unavailable = not uses_roomflow_api()
-    if uses_roomflow_api():
-        allowed_pages &= API_PAGES
+    notifications_unavailable = not uses_persistent_runtime()
+    if uses_persistent_runtime():
+        allowed_pages &= PERSISTENT_PAGES
         try:
             inbox = get_streamlit_runtime().notifications.inbox(
                 unread_only=True, limit=1, offset=0,
             )
             unread = inbox["unread_count"]
             notifications_unavailable = False
-        except (DomainAuthorizationError, ApiUnavailable) as error:
+        except (DomainAuthorizationError, RuntimeUnavailable) as error:
             LOGGER.warning("Could not load the sidebar notification count: %s", error)
             unread = 0
             notifications_unavailable = True
