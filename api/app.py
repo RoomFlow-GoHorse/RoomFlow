@@ -17,6 +17,7 @@ from controllers.http.admin_users import router as admin_users_router
 from controllers.http.admin_dashboard import router as admin_dashboard_router
 from controllers.http.admin_audit import router as admin_audit_router
 from controllers.http.health import router as health_router
+from controllers.http.reservation_types import router as reservation_types_router
 from controllers.http.institutions import router as institutions_router
 from controllers.http.institutions import registration_router
 from controllers.http.institution_invite_codes import router as invite_code_router
@@ -97,6 +98,9 @@ def create_app(
         return app
 
     runtime = build_application_runtime(active_environment)
+    app.state.reservation_type_management_service = (
+    runtime.reservation_type_management
+)
     app.state.space_repository = space_repository or runtime.spaces
     app.state.space_query_service = SpaceService(app.state.space_repository)
     app.state.space_management_service = runtime.space_management
@@ -116,6 +120,7 @@ def create_app(
     app.state.simulated_email_sender = runtime.simulated_email_sender
     app.state.pending_member_signups = runtime.pending_member_signups
     if active_environment in {"development", "test"}:
+        app.include_router(reservation_types_router)
         app.include_router(spaces_router)
         app.include_router(structure_router)
         app.include_router(admin_users_router)

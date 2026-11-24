@@ -5,6 +5,7 @@ from application.services.authentication_service import (
     AuthenticationService,
     InvalidSession,
 )
+from application.services.reservation_type_service import ReservationTypeService
 from application.services.enrollment_management_service import EnrollmentManagementService
 from application.services.institution_invite_code_service import InstitutionInviteCodeService
 from application.services.institution_management_service import InstitutionManagementService
@@ -51,6 +52,10 @@ def get_authentication_service(request: Request) -> AuthenticationService:
 
 def get_user_management_service(request: Request) -> UserManagementService:
     return request.app.state.user_management_service
+def get_reservation_type_management_service(
+    request: Request,
+) -> ReservationTypeService:
+    return request.app.state.reservation_type_management_service
 
 
 def get_institution_management_service(request: Request) -> InstitutionManagementService:
